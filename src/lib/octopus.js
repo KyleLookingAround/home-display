@@ -131,6 +131,20 @@ export const COMPARE = [
   { id:'cosy',   re:/^COSY-/,              label:'Cosy Octopus', note:'Needs a heat pump.' },
   { id:'tracker',re:/^SILVER-/,            label:'Octopus Tracker', note:'Price changes daily with wholesale costs.' }
 ];
+/* Gas tariffs to compare. Gas costs the same all day, so it's priced at today's rates over a usual year. */
+export const GAS_COMPARE = [
+  { id:'flex',    re:/^VAR-\d/,       label:'Flexible Octopus', note:'Moves with the price cap each quarter.' },
+  { id:'fix12',   re:/^OE-FIX-12M-/,  label:'Octopus 12M Fixed', note:'Fixed for a year; leaving early can cost.' },
+  { id:'fix18',   re:/^OE-FIX-18M-/,  label:'Octopus 18M Fixed', note:'Fixed for 18 months; leaving early can cost.' },
+  { id:'tracker', re:/^SILVER-/,      label:'Octopus Tracker', note:'Changes daily with wholesale prices.' }
+];
+/** A gas tariff's unit rate and standing charge today, in a region. Public data. */
+export async function loadGasOffer(product, region, pay = 'DIRECT_DEBIT'){
+  const base = `/v1/products/${product}/gas-tariffs/G-1R-${product}-${region}`, now = Date.now();
+  const unit = prepRates(await octoAll(`${base}/standard-unit-rates/?page_size=10`, false, 1), pay);
+  const sc = prepRates(await octoAll(`${base}/standing-charges/?page_size=10`, false, 1), pay);
+  return { product, unit: lookup(unit, now), sc: lookup(sc, now) };
+}
 export const EXPORTS = [
   { id:'agileOut', re:/^AGILE-OUTGOING-/, label:'Agile Outgoing' },
   { id:'fluxOut',  re:/^FLUX-EXPORT-/,    label:'Flux export' },

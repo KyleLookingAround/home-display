@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync, mkdtempSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,7 +21,8 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
   assert.ok(!existsSync(join(dir, 'server.py')), 'only the pages are published');
 
   const server = http.createServer((req, res) => {
-    const file = normalize(join(dir, new URL(req.url, 'http://x').pathname));
+    let file = normalize(join(dir, new URL(req.url, 'http://x').pathname));
+    if (file.startsWith(dir) && existsSync(file) && statSync(file).isDirectory()) file = join(file, 'index.html');   // as GitHub Pages does
     if (!file.startsWith(dir) || !existsSync(file)) { res.writeHead(404); return res.end(); }
     res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' })[extname(file)] || 'application/octet-stream' }); res.end(readFileSync(file));
   });

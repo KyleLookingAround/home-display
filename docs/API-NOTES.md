@@ -171,6 +171,11 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
 - **Grid mix:** National Grid `GET https://api.carbonintensity.org.uk/regional/regionid/3` (North West). `data[0].data[0].generationmix[]` with `fuel` and `perc`.
 - **Not usable from a browser:** the Met Office's warnings feed (no `Access-Control-Allow-Origin`).
 
+## Octopus gas tariffs
+
+- `GET /v1/products/{code}/gas-tariffs/G-1R-{code}-{region}/standard-unit-rates/` and `/standing-charges/`, public. Flexible (`VAR-…`) gives both payment methods; the fixes (`OE-FIX-12M-…`, `OE-FIX-18M-…`) one rate with `payment_method: null`, valid from when the product launched.
+- Tracker (`SILVER-…`) wasn't in the public product list on 5 October 2026; the comparison includes it when it is.
+
 ## ntfy.sh (the phone as a remote)
 
 - `POST https://ntfy.sh/{topic}` with a body publishes it; `GET https://ntfy.sh/{topic}/sse` streams new messages as server-sent events, each `data:` a JSON object with `event: "message"` and the body in `message`. `?poll=1&since=all` reads what's cached (12 hours). No account; `Access-Control-Allow-Origin: *`.

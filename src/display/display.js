@@ -324,17 +324,29 @@ function startRemote(){
     if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
     else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
     else if (r.cmd === 'reload'){ location.reload(); return; }
+    else if (r.cmd === 'account'){ takeAccount(r.box); return; }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
 }
-/** Tells a listening phone what's on screen, when that changes. */
-function tellRemote(){
+/** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
+function tellRemote(note){
   if (!D.remote || D.embed) return;
-  const key = D.mode + '/' + shown();
-  if (key === D.sentState) return;
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds;
+  if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now() } });
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
+}
+/** An Octopus account sent from the phone, sealed with the site's PIN (see src/lib/remote.js). */
+async function takeAccount(box){
+  const secret = lockSecret();
+  const a = secret && canSeal() ? await openAccount(D.remote, secret, box) : null;
+  if (!a){ toast('Your phone sent an account this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
+  store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
+  NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
+  ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+  toast(`Octopus account ${a.account} connected, from your phone`, 5000);
+  render(); tellRemote('Account connected');
 }
 function newPairing(){
   if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }

@@ -7,7 +7,9 @@ A home energy dashboard for your Octopus account, and a household display for th
   - **Money:** this month so far and where it's heading, the year ahead against your Direct Debit, your tariff, this week and rewards.
   - **Usage:** every day, your day as a clock, every day you have as a heat map, heating against the weather, anything unusual, and carbon.
   - **Home:** bins, today's and tomorrow's events, trains and the weather; upgrades (tariffs, battery, solar, insulation, the certificate) with a saving, a cost and a payback each; and the change log.
-  - **Screen:** the wall display's views, live, and buttons that change what your TV shows.
+  - **Screen:** the wall display's views, live, buttons that change what your TV shows, and "Send my account to the TV", sealed with your PIN.
+
+  Once you've seen them, the pages open straight away and with no signal, with the last data they had.
   - **Settings** (the gear at the top): the account, notifications, the household, appliances, other screens, your data and the look.
 
   Your account's data is kept in the browser for half an hour, so moving between pages is quick; Refresh fetches it again.

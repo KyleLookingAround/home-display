@@ -41,6 +41,23 @@ test('the price verdict says the same thing on the phone and the TV', () => {
   assert.deepEqual(plain([-1, 5, 20, 30, null].map(A.priceTone)), ['neg', 'cheap', 'normal', 'peak', 'muted']);
 });
 
+test('the account goes to the TV sealed with the PIN: the wrong PIN or code opens nothing', async () => {
+  const R = await import('../src/lib/remote.js');
+  const acct = { account: 'A-1234ABCD', key: 'sk_live_abcdef123456', gasUnit: 'm3', pay: 'DIRECT_DEBIT' };
+  const box = await R.sealAccount('ABCDEFGH', 'hashed-pin', acct);
+  assert.doesNotMatch(JSON.stringify(box), /1234ABCD|sk_live/, 'nothing readable in the box');
+  assert.deepEqual(await R.openAccount('ABCDEFGH', 'hashed-pin', box), acct);
+  assert.equal(await R.openAccount('ABCDEFGH', 'another-pin', box), null);
+  assert.equal(await R.openAccount('ABCDEFGJ', 'hashed-pin', box), null);
+  const junk = await R.sealAccount('ABCDEFGH', 'hashed-pin', { account: 'nope', key: 'x' });
+  assert.equal(await R.openAccount('ABCDEFGH', 'hashed-pin', junk), null, 'only something shaped like an account is taken');
+  const msg = m => JSON.stringify({ event: 'message', message: JSON.stringify(m) });
+  assert.deepEqual(R.readRemote(msg({ from: 'phone', cmd: 'account', box })).box, box);
+  assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'account' })), null, 'an account request needs its box');
+  assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'shell', mode: 'x' })), null);
+  assert.equal(R.cleanCode('abcd-efgh'), 'ABCDEFGH'); assert.equal(R.cleanCode('abcd-efg0'), null);
+});
+
 test('night window works across midnight', () => {
   assert.equal(A.inWindow(at('2026-10-05T23:30:00'), '23:00', '06:30'), true);
   assert.equal(A.inWindow(at('2026-10-06T06:29:00'), '23:00', '06:30'), true);

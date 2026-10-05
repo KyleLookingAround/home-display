@@ -22,11 +22,11 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `format.js`: constants, dates, money and number formatting, `nz`, `niceScale`.
     - `browser.js`: `$`, `$$` and `store` (per-device `localStorage`, keys prefixed `hse.`).
     - `net.js`: `request`, `NET`, `detectProxy`, `errorText`.
-    - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards).
+    - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards; `COMPARE` and `GAS_COMPARE` with `loadGasOffer`).
     - `carbon.js` (the forecast, history and `loadGridMix`: what the region's power is made of now), `weather.js`, `pvgis.js`: the other services.
     - `outdoors.js`: bank holidays (GOV.UK), rain every quarter hour (`loadNowcast`, `rainSoon`), the rain radar (RainViewer over CARTO's map; `tileOf`), air quality, UV and pollen (Open-Meteo's air quality service; `aqiLabel`, `uvLabel`, `pollenLabel`) and Environment Agency flood warnings within 15 km.
-    - `remote.js`: the phone as a remote for a screen, through ntfy.sh. A screen makes an eight-letter code (`newRemoteCode`) and listens on `hse-screen-<code>`; a paired phone asks it to change view, wake or start afresh, and asks what it shows. `readRemote` lets through only those requests and the screen's answer.
-    - `analysis.js`: pure functions with no DOM. `priceVerdict` and `priceTone` (the answer to "use power now?", worded the same on the phone and the TV), example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
+    - `remote.js`: the phone as a remote for a screen, through ntfy.sh. A screen makes an eight-letter code (`newRemoteCode`) and listens on `hse-screen-<code>`; a paired phone asks it to change view, wake or start afresh, and asks what it shows. `readRemote` lets through only those requests and the screen's answer. The Octopus account can go too, sealed (`sealAccount`, `openAccount`: AES-GCM, key from PBKDF2 over the lock's remembered PIN hash, `staticrypt_passphrase`, salted with the code).
+    - `analysis.js`: pure functions with no DOM. `compareGas` (a usual year of gas on each tariff at today's rates), `priceVerdict` and `priceTone` (the answer to "use power now?", worded the same on the phone and the TV), example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
     - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes (`MODES`; `MODE_ALIASES` sends old `#home` links to Today) and the night window, bins (`nextCollections(bins, now, holidays)` moves a repeat a day later in a bank holiday week, marked `moved`, and marks Christmas `check`; `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, public Darwin boards for trains (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), Realtime Trains and TfGM parsing, `leaveBy`, `headsUp`, `todayCost`, nightly reload and staleness.
     - `voyage.js`: the cockpit's logic, also used by the phone's Now page: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards`, `worldFor` with `moonPhase` and `issPass`, `voyageFor` (the next twelve hours) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost`.
   - `pages/`: the dashboard's pages, phone first ([decision 0010](docs/decisions/0010-redesign.md)): `index` (Now), `money`, `usage`, `home`, `screen` (the wall display from the phone), and `settings` (a gear in the header on a phone, the foot of the rail on a laptop). Each is a list of islands. `patterns`, `prices` and `compare` only send old links to their new homes.
@@ -58,6 +58,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
   - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure; the outdoors and the grid mix too), the views (`renderToday`, `renderEnergy`, `renderTravel`, `renderNight`), mode switching, the TV remote and spatial navigation, the phone as a remote (`startRemote`, `tellRemote`), screensaver motion, night mode and the settings sheet.
   - `starfield.js`: the animated background, on both pages. It rests while the screensaver covers it.
+- `public/sw.js`: the service worker for the phone pages (registered by `App.astro` in a built site): pages and `household.json` network-first with a four-second fallback to the kept copy, hashed assets and fonts from the copy first. Data stays in IndexedDB.
 - `server.py`: optional stdlib-only home server helper.
   - It serves the folder (never dotfiles, `.py` or `.md`) and proxies a fixed allowlist of hosts under `/proxy/<name>/…`.
   - It holds the train and tram keys from `.env` or the environment: `RTT_TOKEN` or `RTT_REFRESH_TOKEN`, and `TFGM_KEY`. `GET /proxy/status` says which are set.
@@ -84,7 +85,7 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
 - **Money**: this month so far and on track for, the year ahead and the Direct Debit check, your tariff and the price cap, this week (with the log as text), rewards.
 - **Usage**: the period (7, 30, 90 days, against the period before), every day, your day as a clock face, every day as a heat map, heating against the weather, unusual days and half hours, carbon.
 - **Home**: weather (with rain soon, air, UV, pollen and the radar), bins, today and tomorrow, trains; upgrades (tariffs, insulation and heating, the certificate, battery, solar); changes.
-- **Screen**: the wall display's views in a live picture, pairing with a screen's code (`hse.remoteTV`), and buttons that change what the TV shows.
+- **Screen**: the wall display's views in a live picture, pairing with a screen's code (`hse.remoteTV`), buttons that change what the TV shows, and sending your account to it sealed with the site PIN.
 - **Settings**: account (`#account`), notifications, household (`#household`), appliances (`#appliances`), screens (mode links and a setup link), data (CSV, clear the cache, the helper), look (corners), about.
 
 ## Conventions
@@ -104,7 +105,6 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
 - The phone-to-TV remote goes through ntfy.sh, a free relay with no guarantee; without it the TV still works, and only the remote stops.
 - Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from free community Darwin boards (Huxley2 and a mirror) with no guarantee; three are tried in turn. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
-- The tariff comparison covers electricity only.
 - Realtime Trains' new API and TfGM's Metrolink fields are coded from the spec and community code, and haven't been tried with live keys yet.
 - Bin days are entered by hand (and checked with the council weekly once its secret is set). Bank holiday weeks move a collection a day later, which is the usual pattern but not the council's word.
 

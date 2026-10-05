@@ -20,7 +20,8 @@
   - ntfy.sh is a free publish-and-subscribe relay. It needs no account, allows browser calls, and the TV's browser can listen with `EventSource`.
   - The screen makes an eight-letter code, shows it in its settings, and listens on a topic named from it. The phone pairs by typing the code.
   - Only small requests go through it: change view, wake, start afresh, "what are you showing?". The screen's answer goes back the same way. Anything else is ignored, and a request for a view that doesn't exist too.
-  - No prices, readings, settings or keys pass through it. Someone who guessed a code could only change the view.
+  - No prices, readings or settings pass through it. Someone who guessed a code could only change the view.
+  - The one exception is the Octopus account, so the TV never needs the key typed with a remote. The phone seals it (AES-GCM) with a key made from what the lock keeps on each device unlocked with "Remember this screen" (the PIN, hashed) and the screen's code. The relay sees only the sealed box; a screen unlocked with another PIN can't open it, and without the lock there's nothing to seal with, so it isn't offered.
 
 **Consequences.**
 - The relay has no service guarantee. If it goes, the remote stops and everything else carries on; a new relay is one constant in `remote.js`.

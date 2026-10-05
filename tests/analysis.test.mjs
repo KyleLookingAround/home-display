@@ -6,7 +6,7 @@ import { shared } from './shared.mjs';
 
 const src = shared('format', 'browser', 'net', 'octopus', 'analysis');
 const ctx = vm.createContext({ console, btoa, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-vm.runInContext(src + '\n;globalThis.__api = { makeDemo, buildModel, gasRegression, annualGas, compareTariffs, simulateBattery, simulateSolar, solarShape, cheapestWindow, lookup, unitPriceAt, nextCapChange, weekLog, toCSV, SOLAR_SOUTH, sum };', ctx);
+vm.runInContext(src + '\n;globalThis.__api = { makeDemo, buildModel, gasRegression, annualGas, compareTariffs, compareGas, simulateBattery, simulateSolar, solarShape, cheapestWindow, lookup, unitPriceAt, nextCapChange, weekLog, toCSV, SOLAR_SOUTH, sum };', ctx);
 const A = ctx.__api;
 const raw = A.makeDemo();
 
@@ -76,4 +76,14 @@ test('CSV has a header and a row per half hour', () => {
   const lines = A.toCSV(raw).split('\n');
   assert.match(lines[0], /^interval_start,/);
   assert.equal(lines.length - 1, raw.elec.length);
+});
+
+test('gas on each tariff for a usual year, at today\'s rates', () => {
+  const reg = { a: 8, b: 2 };   // 8 kWh a day for hot water and cooking, 2 kWh more for each degree under 15.5
+  const r = A.compareGas(reg, { unit: 7.86, sc: 28.85 }, [{ id: 'fix12', label: '12M Fixed', unit: 8.72, sc: 28.85 }, { id: 'flex', label: 'Flexible', unit: 7.86, sc: 28.85 }, { id: 'cheap', label: 'Cheaper', unit: 7.0, sc: 30 }, { id: 'none', label: 'No rate', unit: null }]);
+  assert.deepEqual(Array.from(r.rows, x => x.id), ['cheap', 'current', 'fix12'], 'your own tariff once, cheapest first, nothing without a rate');
+  const yr = A.annualGas(reg).total;
+  assert.ok(Math.abs(r.kwh - yr) < 1e-9);
+  assert.ok(Math.abs(r.rows[1].year - (yr * 7.86 + 365 * 28.85)) < 1e-6);
+  assert.equal(A.compareGas(null, { unit: 7 }, []), null);
 });

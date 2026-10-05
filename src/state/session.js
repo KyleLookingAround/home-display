@@ -84,8 +84,10 @@ export async function loadPrices(force){
   try { agile = await loadAgile(region, today, addDays(today, 2), 1); app.agileErr = null; } catch (e){ app.agileErr = e; }
   try { carbon = await loadCarbonForecast(CI_REGION[region]); app.carbonErr = null; } catch (e){ app.carbonErr = e; }
   if (region !== app.region) return;
+  // no signal: the last prices kept here are better than none (the strips only show what's still ahead)
+  if (!agile || !carbon){ const old = await cacheGet(key); if (old){ agile = agile || old.value.agile; carbon = carbon || old.value.carbon; } }
   app.agileToday = agile; app.carbonFc = carbon;
-  if (agile && carbon) cacheSet(key, { agile, carbon });
+  if (agile && carbon && !app.agileErr && !app.carbonErr) cacheSet(key, { agile, carbon });
 }
 
 /** Connects an account, or forgets it. */

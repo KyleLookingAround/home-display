@@ -4,6 +4,10 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Creation** (redesign): send your Octopus account from the phone's Screen tab to the paired TV, sealed (AES-GCM) with a key made from the site's PIN as the lock keeps it on each device, so the key is never typed with a remote. The relay sees only the sealed box; a screen unlocked with another PIN can't open it.
+- **Creation** (redesign): the phone pages open at once and with no signal once seen (`public/sw.js`): pages from the network when it answers, the kept copy when it doesn't; prices fall back to the last ones kept.
+- **Update** (redesign): gas in the tariff comparison: a usual year of your gas (winter included) at each Octopus gas tariff's rates today (Flexible, the 12 and 18 month fixes, and Tracker when it's listed).
+- **Finding:** Octopus isn't listing Tracker (SILVER) among its public products today.
 - **Update** (redesign): the wall display redesigned in the phone pages' look. Today is the household at a glance (the price verdict, weather, heads-ups, the next twelve hours, trains, bins and the calendar, what's live); Energy and Travel are the detail; the cockpit stays as the screensaver; Night names the next thing to act on. Old `#home` links open Today ([0011](decisions/0011-wall-display.md)).
 - **Creation** (redesign): the Screen page on the phone: the wall display's views live, and, once paired with the code in a screen's settings, buttons that change what the TV shows, wake it or start it afresh, through the ntfy.sh relay. Settings moved to a gear in the header on a phone.
 - **Update** (redesign): the price verdict is shared by the phone and the TV, and no longer calls a flat peak price a "good time".

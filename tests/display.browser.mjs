@@ -148,9 +148,9 @@ after(async () => { await browser.close(); server.close(); });
 const SETTINGS = { trainFrom: 'SPT', trainWalk: 12, tramStop: 'East Didsbury', tramWalk: 8, ical: 'https://calendar.google.com/calendar/ical/x%40group.calendar.google.com/private-0/basic.ics',
   bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Paper and card', colour: 'blue', date: '2026-10-13', every: 2 }, { name: 'Garden waste', colour: 'brown', date: '2026-10-08', every: 2 }] };
 
-async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true } = {}){
+async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false } = {}){
   helper = withHelper;
-  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: 'block' });
+  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: sw ? 'allow' : 'block' });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -456,6 +456,8 @@ test('dashboard: the controls work', async () => {
   await page.click('#tariffs summary');
   await page.waitForSelector('#tariffs tr.best');   // the comparison runs by itself, once a week
   assert.match(await page.textContent('#tariffs .line'), /would be the cheapest|already the cheapest/);
+  assert.match(await page.textContent('#tariffs'), /Octopus 12M Fixed/, 'gas tariffs are compared too');
+  assert.match(await page.textContent('#tariffs .line'), /For gas|gas tariff is already/);
   await page.click('#battery summary');
   assert.ok(await page.locator('#bTariff option').count() >= 3, 'the battery offers the compared tariffs');
   await page.fill('#bCap', '10'); await page.fill('#bCost', '2000');
@@ -549,6 +551,58 @@ test('dashboard: the Screen page shows the wall display and drives the paired TV
   await ctx.close();
 });
 
+test('dashboard: the phone sends its account to the TV, sealed with the site PIN', async () => {
+  const LOCK = 'a1b2c3-hashed-pin';
+  const tv = await open('/display.html#today', { clock: false, settings: SETTINGS });
+  let toTv = [];
+  const tvSent = await relay(tv.page, () => toTv);
+  await tv.page.addInitScript(s => { try { localStorage.setItem('staticrypt_passphrase', s); } catch (e) {} }, LOCK);
+  await tv.page.reload(); await tv.page.waitForTimeout(800);
+  const code = await tv.page.evaluate(() => localStorage.getItem('hse.remote'));
+  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.account')), null, 'the TV starts with no account');
+  // the phone, in its own browser, with its account and the same PIN remembered
+  const phone = await open('/screen.html', { clock: false, settings: SETTINGS, withHelper: false });
+  const phoneSent = await relay(phone.page, () => []);
+  await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_live_test123456'); } catch (e) {} }, [LOCK, code]);
+  await phone.page.reload(); await ready(phone.page);
+  await phone.page.click('text=Send my account to the TV');
+  for (let i = 0; i < 50 && !phoneSent.some(s => s.msg.cmd === 'account' && s.msg.box); i++) await phone.page.waitForTimeout(100);
+  const sealed = phoneSent.filter(s => s.msg.cmd === 'account' && s.msg.box)[0];
+  assert.ok(sealed, 'the phone sent it');
+  assert.doesNotMatch(JSON.stringify(sealed.msg), /TEST1234|sk_live/, 'the relay sees only the sealed box');
+  // the relay hands it to the TV
+  toTv = [sealed.msg];
+  await tv.page.reload();
+  await tv.page.waitForFunction(() => localStorage.getItem('hse.account') === 'A-TEST1234', null, { timeout: 10000 });
+  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.key')), 'sk_live_test123456');
+  for (let i = 0; i < 30 && !tvSent.some(s => s.msg.state && s.msg.state.account); i++) await tv.page.waitForTimeout(100);
+  assert.ok(tvSent.some(s => s.msg.state && s.msg.state.account && /connected/.test(s.msg.state.note)), 'the TV says it has it');
+  // a TV with a different PIN can't open it
+  await tv.page.evaluate(() => { localStorage.removeItem('hse.account'); localStorage.removeItem('hse.key'); });
+  await tv.page.addInitScript(() => { try { localStorage.setItem('staticrypt_passphrase', 'some-other-pin'); } catch (e) {} });
+  await tv.page.reload(); await tv.page.waitForTimeout(1500);
+  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.account')), null);
+  assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
+  await tv.ctx.close(); await phone.ctx.close();
+});
+
+test('dashboard: the pages open with no signal, once seen', async () => {
+  const { page, ctx, errors } = await open('/index.html', { width: 390, height: 844, settings: null, withHelper: false, clock: false, sw: true });
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload(); await ready(page);                           // now under the service worker's care
+  assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller), 'the pages are kept on this device');
+  for (const id of ['money', 'usage', 'index']) { await page.goto(`${base}/${id}.html`); await ready(page); }
+  await ctx.setOffline(true);
+  for (const [id, text] of [['money', /so far/i], ['index', /Wait if you can|Good time|price|Paid/i]]) {
+    await page.goto(`${base}/${id}.html`); await ready(page);
+    await page.waitForFunction(() => /Offline/.test(document.getElementById('status').textContent));
+    assert.match(await page.textContent('main'), text, `${id} opens offline, with what was kept`);
+  }
+  await ctx.setOffline(false);
+  assert.deepEqual(errors.filter(e => !/Failed to fetch|NetworkError|ERR_INTERNET_DISCONNECTED/.test(e)), []);
+  await ctx.close();
+});
+
 test('dashboard: the account is fetched once, then each page reads it from the cache', async () => {
   const { page, ctx, errors } = await open('/index.html', { account: true });
   await page.waitForFunction(() => /Updated/.test(document.getElementById('status').textContent));
@@ -636,13 +690,15 @@ test('cockpit frame budget', { skip: !process.env.BENCH }, async () => {
   await ctx.close();
 });
 
-// PAGES=index,money,usage,home,settings (with SHOTS=1): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
+// PAGES=index,money,usage,home,settings (with SHOTS=1; OPEN='#tariffs summary' opens folds first): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
 test('page shots', { skip: !process.env.PAGES }, async () => {
   for (const [width, height] of [[390, 844], [1280, 900]]) {
     const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, account: !!process.env.ACCOUNT });
     for (const id of process.env.PAGES.split(',')) {
       await page.goto(`${base}/${id}.html`);
       await page.waitForTimeout(1200);
+      // OPEN='#tariffs summary,#battery summary': open folded sections first
+      for (const sel of (process.env.OPEN || '').split(',').filter(Boolean)) { const el = page.locator(sel); if (await el.count()) { await el.first().click(); await page.waitForTimeout(400); } }
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `page-${id}-${width}${process.env.ACCOUNT ? '-account' : ''}.png`), fullPage: true });
     }
     assert.deepEqual(errors, []);

@@ -59,5 +59,9 @@ const NAV = [
   </div>
 </div>
 <script>import '../starfield.js';</script>
+{import.meta.env.PROD && <script is:inline>
+  // Keeps the pages on this device, so they open at once and with no signal (public/sw.js).
+  try { if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) navigator.serviceWorker.register('sw.js').catch(function(){}); } catch (e) {}
+</script>}
 </body>
 </html>

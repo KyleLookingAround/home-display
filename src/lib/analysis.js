@@ -171,6 +171,19 @@ export function annualGas(reg, heatScale = 1){
   for (let m = 0; m < 12; m++){ const dm = DAYS_IN_MONTH(m); base += reg.a*dm; heat += reg.b * Math.max(0, 15.5 - TEMP_NORMALS[m]) * dm * heatScale; }
   return { base, heat, total: base + heat };
 }
+/**
+ * Gas on each tariff for a usual year (from how your gas follows the weather), at today's unit rates and standing
+ * charges. mine and each offer: { unit, sc } in pence; offers also carry id, label and note.
+ */
+export function compareGas(reg, mine, offers){
+  const yr = annualGas(reg);
+  if (!yr || !mine || mine.unit == null) return null;
+  const year = o => yr.total * o.unit + 365 * nz(o.sc, 0);
+  const rows = [{ id: 'current', label: 'Your tariff now', note: '', unit: mine.unit, sc: mine.sc, year: year(mine) }]
+    // an offer at your own rates is the tariff you're on: it isn't listed twice
+    .concat((offers || []).filter(o => o.unit != null && !(Math.abs(o.unit - mine.unit) < 0.01 && Math.abs(nz(o.sc, 0) - nz(mine.sc, 0)) < 0.01)).map(o => ({ id: o.id, label: o.label, note: o.note, product: o.product, unit: o.unit, sc: o.sc, year: year(o) })));
+  return { kwh: yr.total, rows: rows.sort((a, b) => a.year - b.year) };
+}
 export const MEASURES = [
   // cost: a rough installed price in pence for a terraced house, for the payback; quotes will differ.
   { id:'loft',    label:'Top up loft insulation to 270mm', cut:.10, cost:50000 },

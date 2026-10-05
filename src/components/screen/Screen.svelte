@@ -6,19 +6,24 @@
   import { onMount } from 'svelte';
   import { store } from '../../lib/browser.js';
   import { MODES } from '../../lib/household.js';
-  import { cleanCode, showCode, sendRemote, listenRemote } from '../../lib/remote.js';
+  import { cleanCode, showCode, sendRemote, listenRemote, lockSecret, canSeal, sealAccount } from '../../lib/remote.js';
   import { hhmm } from '../../lib/format.js';
 
   let code = $state(null), typed = $state(''), bad = $state(false);
   let view = $state('today'), tv = $state(null), asked = $state(0), quiet = $state(false), sent = $state('');
   let width = $state(360);
+  let mine = $state(null), locked = $state(false), sending = $state(''), sentAt = $state(0);
   let stop = () => {};
   const scale = $derived(width / 1920);
 
   function listen(){
     stop();
     if (!code) return;
-    stop = listenRemote(code, r => { if (r.from === 'screen'){ tv = r.state; view = r.state.shown; quiet = false; } });
+    stop = listenRemote(code, r => {
+      if (r.from !== 'screen') return;
+      tv = r.state; view = r.state.shown; quiet = false;
+      if (sentAt && r.state.at >= sentAt - 1000) sending = r.state.account && /connected/i.test(r.state.note) ? 'Done: the TV has your account.' : r.state.note || sending;
+    });
     // give the stream a moment to open, then ask the screen what it's showing
     setTimeout(() => ask('hello'), 800);
   }
@@ -37,7 +42,23 @@
     code = c; store.set('remoteTV', c); typed = ''; tv = null; listen();
   }
   function unpair(){ stop(); store.del('remoteTV'); code = null; tv = null; quiet = false; }
+  // Your Octopus account, sent to the TV sealed with the site's PIN, so it never has to be typed with a remote.
+  async function sendAccount(){
+    const secret = lockSecret();
+    if (!code || !mine || !secret || !canSeal()) return;
+    sending = 'Sealing and sending…';
+    try {
+      const box = await sealAccount(code, secret, mine);
+      asked = Date.now(); quiet = false;
+      const ok = await sendRemote(code, { from: 'phone', cmd: 'account', box });
+      sentAt = Date.now();
+      sending = ok ? 'Sent. Waiting for the TV…' : 'The relay didn\'t take it. Try again.';
+    } catch (e){ sending = 'This browser couldn\'t seal it.'; }
+  }
   onMount(() => {
+    const a = store.get('account'), k = store.get('key');
+    mine = a && k ? { account: a, key: k, gasUnit: store.get('gasUnit') || 'm3', pay: store.get('pay') || 'DIRECT_DEBIT' } : null;
+    locked = !!lockSecret();
     code = cleanCode(store.get('remoteTV'));
     listen();
     return () => stop();
@@ -63,6 +84,20 @@
     <p class="note">These are the wall display's views, with your data. Pair with your TV to change what it shows from here.</p>
   {/if}
 </section>
+
+{#if code}
+  <section class="card" id="tvAccount">
+    <h2 class="label">Your account on the TV</h2>
+    {#if tv && tv.account && !sending}<p class="line">The TV has an Octopus account, for live draw and today's cost.</p>{/if}
+    {#if !mine}<p class="note">Connect your Octopus account on this phone first, in <a href="./settings.html#account">Settings</a>. Then you can send it to the TV.</p>
+    {:else if !locked}<p class="note">Sending it needs the site's PIN on both: unlock this phone and the TV with the PIN, with "Remember this screen" ticked.</p>
+    {:else}
+      <p class="note">Sends account {mine.account} and its key to the TV, sealed with your site PIN, so you never type the key with a remote. The relay only sees the sealed box.</p>
+      <div class="actions"><button class="btn primary small" type="button" onclick={sendAccount}>Send my account to the TV</button></div>
+    {/if}
+    {#if sending}<p class="note" role="status">{sending}</p>{/if}
+  </section>
+{/if}
 
 <section class="card" id="pair">
   <h2 class="label">Pairing</h2>

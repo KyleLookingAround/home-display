@@ -709,6 +709,20 @@ const COMPARE = [
   { id:'cosy',   re:/^COSY-/,              label:'Cosy Octopus', note:'Needs a heat pump.' },
   { id:'tracker',re:/^SILVER-/,            label:'Octopus Tracker', note:'Price changes daily with wholesale costs.' }
 ];
+/* Gas tariffs to compare. Gas costs the same all day, so it's priced at today's rates over a usual year. */
+const GAS_COMPARE = [
+  { id:'flex',    re:/^VAR-\d/,       label:'Flexible Octopus', note:'Moves with the price cap each quarter.' },
+  { id:'fix12',   re:/^OE-FIX-12M-/,  label:'Octopus 12M Fixed', note:'Fixed for a year; leaving early can cost.' },
+  { id:'fix18',   re:/^OE-FIX-18M-/,  label:'Octopus 18M Fixed', note:'Fixed for 18 months; leaving early can cost.' },
+  { id:'tracker', re:/^SILVER-/,      label:'Octopus Tracker', note:'Changes daily with wholesale prices.' }
+];
+/** A gas tariff's unit rate and standing charge today, in a region. Public data. */
+async function loadGasOffer(product, region, pay = 'DIRECT_DEBIT'){
+  const base = `/v1/products/${product}/gas-tariffs/G-1R-${product}-${region}`, now = Date.now();
+  const unit = prepRates(await octoAll(`${base}/standard-unit-rates/?page_size=10`, false, 1), pay);
+  const sc = prepRates(await octoAll(`${base}/standing-charges/?page_size=10`, false, 1), pay);
+  return { product, unit: lookup(unit, now), sc: lookup(sc, now) };
+}
 const EXPORTS = [
   { id:'agileOut', re:/^AGILE-OUTGOING-/, label:'Agile Outgoing' },
   { id:'fluxOut',  re:/^FLUX-EXPORT-/,    label:'Flux export' },
@@ -1016,6 +1030,19 @@ function annualGas(reg, heatScale = 1){
   let base = 0, heat = 0;
   for (let m = 0; m < 12; m++){ const dm = DAYS_IN_MONTH(m); base += reg.a*dm; heat += reg.b * Math.max(0, 15.5 - TEMP_NORMALS[m]) * dm * heatScale; }
   return { base, heat, total: base + heat };
+}
+/**
+ * Gas on each tariff for a usual year (from how your gas follows the weather), at today's unit rates and standing
+ * charges. mine and each offer: { unit, sc } in pence; offers also carry id, label and note.
+ */
+function compareGas(reg, mine, offers){
+  const yr = annualGas(reg);
+  if (!yr || !mine || mine.unit == null) return null;
+  const year = o => yr.total * o.unit + 365 * nz(o.sc, 0);
+  const rows = [{ id: 'current', label: 'Your tariff now', note: '', unit: mine.unit, sc: mine.sc, year: year(mine) }]
+    // an offer at your own rates is the tariff you're on: it isn't listed twice
+    .concat((offers || []).filter(o => o.unit != null && !(Math.abs(o.unit - mine.unit) < 0.01 && Math.abs(nz(o.sc, 0) - nz(mine.sc, 0)) < 0.01)).map(o => ({ id: o.id, label: o.label, note: o.note, product: o.product, unit: o.unit, sc: o.sc, year: year(o) })));
+  return { kwh: yr.total, rows: rows.sort((a, b) => a.year - b.year) };
 }
 const MEASURES = [
   // cost: a rough installed price in pence for a terraced house, for the payback; quotes will differ.
@@ -1782,7 +1809,9 @@ function deviceChanges(form, household){
 //
 // A screen makes an eight-letter code and listens on a topic named from it. A phone that knows the code can ask
 // the screen to change view, wake up or start afresh, and ask what it's showing. Only these small requests and the
-// screen's answer pass through the relay: no prices, readings, settings or keys.
+// screen's answer pass through the relay: no prices, readings or settings. The one exception is the Octopus account,
+// which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
+// was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
 
 const RELAY = 'https://ntfy.sh';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I/L, for reading off a TV
@@ -1801,7 +1830,7 @@ const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload'];
+const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 function readRemote(data){
   let m, c;
@@ -1809,10 +1838,11 @@ function readRemote(data){
   if (!c || typeof c !== 'object') return null;
   if (c.from === 'phone' && REMOTE_CMDS.indexOf(c.cmd) >= 0){
     if (c.cmd === 'mode' && !MODES.some(x => x.id === c.mode)) return null;
-    return { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null };
+    if (c.cmd === 'account' && !(c.box && typeof c.box.iv === 'string' && typeof c.box.data === 'string' && c.box.data.length < 2000)) return null;
+    return { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null, box: c.cmd === 'account' ? { iv: c.box.iv, data: c.box.data } : null };
   }
   if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
-    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, name: String(c.state.name || '').slice(0, 40) } };
+    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account, note: String(c.state.note || '').slice(0, 80) } };
   }
   return null;
 }
@@ -1826,6 +1856,35 @@ function listenRemote(code, onMsg){
   const es = new EventSource(RELAY + '/' + remoteTopic(code) + '/sse');
   es.onmessage = e => { const r = readRemote(e.data); if (r) onMsg(r); };
   return () => { try { es.close(); } catch(e){} };
+}
+
+/* ---------- the account, sealed with the site's PIN ---------- */
+/** What the lock keeps on a device unlocked with "Remember this screen": the PIN, hashed. Null when there's no lock. */
+const LOCK_KEY = 'staticrypt_passphrase';
+function lockSecret(){ try { return localStorage.getItem(LOCK_KEY) || null; } catch(e){ return null; } }
+const canSeal = () => !!(typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined');
+const toB64 = buf => { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); };
+const fromB64 = s => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+function boxKey(code, secret){
+  const enc = new TextEncoder();
+  return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'PBKDF2' }, false, ['deriveKey'])
+    .then(base => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('hse-account:' + code), iterations: 100000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
+}
+/** Seals { account, key, gasUnit, pay } for the screen with this code. */
+async function sealAccount(code, secret, acct){
+  const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(acct)));
+  return { iv: toB64(iv), data: toB64(data) };
+}
+/** Opens a sealed account, or null if it wasn't sealed with this PIN and code, or isn't an account. */
+async function openAccount(code, secret, box){
+  try {
+    const k = await boxKey(code, secret);
+    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, k, fromB64(box.data));
+    const a = JSON.parse(new TextDecoder().decode(plain));
+    if (!a || !/^A-[0-9A-Z]{6,10}$/i.test(String(a.account)) || !/^sk_\w{6,}$/.test(String(a.key))) return null;
+    return { account: String(a.account).toUpperCase(), key: String(a.key), gasUnit: a.gasUnit === 'kwh' ? 'kwh' : 'm3', pay: a.pay === 'NON_DIRECT_DEBIT' ? 'NON_DIRECT_DEBIT' : 'DIRECT_DEBIT' };
+  } catch(e){ return null; }
 }
 /* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
@@ -3758,17 +3817,29 @@ function startRemote(){
     if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
     else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
     else if (r.cmd === 'reload'){ location.reload(); return; }
+    else if (r.cmd === 'account'){ takeAccount(r.box); return; }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
 }
-/** Tells a listening phone what's on screen, when that changes. */
-function tellRemote(){
+/** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
+function tellRemote(note){
   if (!D.remote || D.embed) return;
-  const key = D.mode + '/' + shown();
-  if (key === D.sentState) return;
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds;
+  if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now() } });
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
+}
+/** An Octopus account sent from the phone, sealed with the site's PIN (see src/lib/remote.js). */
+async function takeAccount(box){
+  const secret = lockSecret();
+  const a = secret && canSeal() ? await openAccount(D.remote, secret, box) : null;
+  if (!a){ toast('Your phone sent an account this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
+  store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
+  NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
+  ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+  toast(`Octopus account ${a.account} connected, from your phone`, 5000);
+  render(); tellRemote('Account connected');
 }
 function newPairing(){
   if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }
