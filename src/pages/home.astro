@@ -1,13 +1,21 @@
 ---
-import Dashboard from '../layouts/Dashboard.astro';
-import ChangeLog from '../components/ChangeLog.svelte';
-import InsulationPlan from '../components/InsulationPlan.svelte';
-import Certificate from '../components/Certificate.svelte';
-import DataSetup from '../components/DataSetup.svelte';
+import App from '../layouts/App.astro';
+import Notices from '../components/Notices.svelte';
+import Household from '../components/home/Household.svelte';
+import Tariffs from '../components/home/Tariffs.svelte';
+import Battery from '../components/home/Battery.svelte';
+import Solar from '../components/home/Solar.svelte';
+import Insulation from '../components/home/Insulation.svelte';
+import Certificate from '../components/home/Certificate.svelte';
+import Changes from '../components/home/Changes.svelte';
 ---
-<Dashboard page="home" title="Home">
-  <ChangeLog client:load />
-  <InsulationPlan client:load />
-  <Certificate client:load />
-  <DataSetup client:load />
-</Dashboard>
+<App page="home" title="Home">
+  <Notices client:load />
+  <Household client:load />
+  <h2 class="section">Upgrades</h2>
+  <div class="cols">
+    <div class="page"><Tariffs client:load /><Insulation client:load /><Certificate client:load /></div>
+    <div class="page"><Battery client:load /><Solar client:load /></div>
+  </div>
+  <Changes client:load />
+</App>

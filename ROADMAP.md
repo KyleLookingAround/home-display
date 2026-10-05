@@ -79,13 +79,12 @@ On a TV, typing a password with a remote is painful. Options:
 The five tabs are Astro pages made of small Svelte islands ([decision 0009](docs/decisions/0009-astro-dashboard.md)).
 - `analysis.js` moved across as-is into `src/lib/`. `core.js` split into one module per service there.
 - The display's build flattens those modules, so the display is still one file for TV browsers.
-- The design tokens are a global stylesheet, `src/styles/dashboard.css`.
+- The design tokens are a global stylesheet, now `src/styles/app.css`.
 - The islands share one state object. The account's data is cached in the browser, so moving between pages doesn't fetch it again.
 
 Still to do here:
-- **A full redesign of everything** (proposed, not started): one household app on phone, tablet and TV, sharing one look, one data service and one settings model. The plan, and the questions it needs answering first, are in [docs/redesign.md](docs/redesign.md).
-- **More islands:** the panels still mirror the old tabs one for one. Now they're components, they can grow on their own. For example, a period chooser on any chart, or a comparison that remembers its last run.
-- `src/display/sources.js` is pure apart from its loaders and could become modules too. It isn't urgent: the display builds fine as it is.
+- **A full redesign of everything** (built on the `redesign` branch, previewed at `/preview/`, waiting for Kyle's go-ahead): five plain pages, phone first, with the household on the phone too ([decision 0010](docs/decisions/0010-redesign.md), plan in [docs/redesign.md](docs/redesign.md)). The wall display is left as it is for now.
+- **A comparison that remembers its last run,** so the tariffs card shows the cheapest tariff without running it again.
 
 ## 3. A small backend
 

@@ -3,7 +3,7 @@
 
 Serves the dashboard and the household display on your home network, and
 forwards requests to the few services that don't let a browser page call them
-directly: PVGIS solar data, the EPC register, Google Calendar's iCal feeds,
+directly: PVGIS solar data, Google Calendar's iCal feeds,
 Realtime Trains and TfGM Metrolink.
 
 It holds the train and tram keys, so they never reach a browser. Put them in
@@ -41,7 +41,6 @@ DIST = os.path.join(ROOT, "dist")
 ROUTES = {
     "octopus": "https://api.octopus.energy",
     "pvgis": "https://re.jrc.ec.europa.eu/api",
-    "epc": "https://api.get-energy-performance-data.communities.gov.uk/api",
     "carbon": "https://api.carbonintensity.org.uk",
     "meteo": "https://api.open-meteo.com",
     "rtt": "https://data.rtt.io",

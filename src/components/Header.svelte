@@ -41,6 +41,21 @@
       }
     } catch {}
   });
+  // a Saving Session announced: a notification, once each, if switched on in Settings
+  $effect(() => {
+    const s = app.rewards && app.rewards.sessions, list = s ? (s.events || []).filter(e => +new Date(e.startAt) > app.now) : [];
+    if (!list.length) return;
+    try {
+      if (store.get('notifySessions') === 'on' && 'Notification' in window && Notification.permission === 'granted'){
+        const e = list[0], key = 'session-' + e.startAt;
+        if (store.get('lastSession') !== key){
+          const at = new Date(e.startAt);
+          new Notification('Saving Session announced', { body: `${dayKey(at) === dayKey(Date.now()) ? 'Today' : 'On ' + at.toLocaleDateString('en-GB', { weekday: 'long' })} from ${hhmm(at)} to ${hhmm(new Date(e.endAt))}. Join it in the Octopus app.` });
+          store.set('lastSession', key);
+        }
+      }
+    } catch {}
+  });
 </script>
 
 <header class="head">

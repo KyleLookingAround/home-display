@@ -48,10 +48,10 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
     await page.waitForSelector('section[data-mode="home"]:not([hidden])');
     assert.match(await page.evaluate(() => location.hash), /#home/);
     await page.goto(base + '/index.html');
-    await page.waitForSelector('.tabs', { timeout: 10000 });     // no PIN asked again
+    await page.waitForSelector('.nav', { timeout: 10000 });     // no PIN asked again
     await page.waitForFunction(() => /Example data/.test((document.getElementById('status') || {}).textContent || ''), null, { timeout: 10000 });   // its islands run once unlocked
-    await page.goto(base + '/prices.html');
-    await page.waitForSelector('.tabs [aria-current="page"]', { timeout: 10000 });
+    await page.goto(base + '/money.html');
+    await page.waitForSelector('.nav [aria-current="page"]', { timeout: 10000 });
     assert.deepEqual(errors, []);
   } finally {
     await browser.close(); server.close();

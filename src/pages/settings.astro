@@ -1,0 +1,27 @@
+---
+import App from '../layouts/App.astro';
+import Account from '../components/settings/Account.svelte';
+import Notifications from '../components/settings/Notifications.svelte';
+import Household from '../components/settings/Household.svelte';
+import Appliances from '../components/settings/Appliances.svelte';
+import Screens from '../components/settings/Screens.svelte';
+import Data from '../components/settings/Data.svelte';
+import Look from '../components/settings/Look.svelte';
+---
+<App page="settings" title="Settings">
+  <div class="cols">
+    <div class="page"><Account client:load /><Household client:load /></div>
+    <div class="page">
+      <Notifications client:load />
+      <Appliances client:load />
+      <Screens client:load />
+      <Data client:load />
+      <Look client:load />
+      <section class="card" id="about">
+        <h2 class="label">About</h2>
+        <p class="note">Harold Street Energy reads your Octopus account and public data: Agile prices, the grid's carbon forecast, the weather and the trains. Everything you set is kept on this device.</p>
+        <p class="note">The code is at <a href="https://github.com/KyleLookingAround/home-display" target="_blank" rel="noopener">github.com/KyleLookingAround/home-display</a>.</p>
+      </section>
+    </div>
+  </div>
+</App>

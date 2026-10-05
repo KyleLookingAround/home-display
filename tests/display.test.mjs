@@ -308,7 +308,7 @@ test('the built display matches the source', () => {
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'epc', 'analysis', 'household', 'voyage']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'voyage']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

@@ -2,7 +2,14 @@
 
 A home energy dashboard for your Octopus account, and a household display for the wall tablet, phones and the TV.
 
-- **Dashboard** (`index.html` and four more pages: Patterns, Prices, Compare, Home): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house. Your account's data is kept in the browser for half an hour, so moving between pages is quick; Refresh fetches it again.
+- **Dashboard**, made for your phone, five pages:
+  - **Now:** should you use power now, the next twelve hours of prices with rain and your next train, your live draw, and when to run the washing machine, dishwasher and dryer.
+  - **Money:** this month so far and where it's heading, the year ahead against your Direct Debit, your tariff, this week and rewards.
+  - **Usage:** every day, your day as a clock, every day you have as a heat map, heating against the weather, anything unusual, and carbon.
+  - **Home:** bins, today's and tomorrow's events, trains and the weather; upgrades (tariffs, battery, solar, insulation, the certificate) with a saving, a cost and a payback each; and the change log.
+  - **Settings:** the account, notifications, the household, appliances, other screens, your data and the look.
+
+  Your account's data is kept in the browser for half an hour, so moving between pages is quick; Refresh fetches it again.
 - **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
   - **Screensaver: the voyage.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
     - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, nebulae, planets and traffic give it depth.
@@ -34,7 +41,7 @@ A home energy dashboard for your Octopus account, and a household display for th
 
 ## The display
 
-Open https://kylelookingaround.github.io/home-display/display.html, or use the Wall display button on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
+Open https://kylelookingaround.github.io/home-display/display.html, or open a mode from Settings → Screens on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
 
 To see the cockpit in any weather, add it to the link. For example, `display.html#screensaver&wx=thunder&phase=night` or `#screensaver&price=-3`:
 - `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;
@@ -105,7 +112,7 @@ Everything below works from the published site, in the browser, with no server:
 A few things can't be fetched by a web page:
 - **Metrolink times:** TfGM refuses browser calls.
 - **Google Calendar:** its secret iCal address refuses browser calls. Calendars from hosts that allow them work.
-- **PVGIS solar data and the EPC search** on the dashboard.
+- **PVGIS solar data** for your exact roof pitch, on the dashboard (it uses typical Stockport sunshine without).
 
 These need a small server: the backend in `ROADMAP.md` item 3, or `server.py` on a home server if you ever have one. Until then, the display leaves them out and says what's needed.
 
@@ -119,7 +126,6 @@ These need a small server: the backend in `ROADMAP.md` item 3, or `server.py` on
 The helper only forwards requests to a fixed list of services:
 - Octopus
 - PVGIS
-- the EPC register
 - National Grid's carbon API
 - Open-Meteo
 - Google Calendar's iCal feeds
@@ -176,7 +182,7 @@ What the lock does and doesn't do:
 
 ## Your data
 
-Your API key, Direct Debit amount, change log, appliance figures, EPC notes and display settings are stored in the browser you use, not on the server. Each device needs connecting once. Download readings to CSV from the Home tab if you want a permanent record.
+Your API key, Direct Debit amount, change log, appliance figures, certificate notes and display settings are stored in the browser you use, not on the server. Each device needs connecting once. Download readings to CSV from Settings if you want a permanent record.
 
 ## What may need adjusting
 
@@ -184,7 +190,6 @@ These parts use features that aren't fully documented, so they're the most likel
 
 - Live readings from an Octopus Home Mini
 - Saving Sessions and Octoplus points
-- The EPC search (the government moved to a new data service in 2026)
 - Metrolink departures (TfGM's field names come from community code)
 
 If one of these shows an error, the rest keeps working.
@@ -194,8 +199,8 @@ If one of these shows an error, the rest keeps working.
 | Path | What it is |
 |---|---|
 | `display.html` | The display, built from `src/`; don't edit it directly. It opens straight from disk. |
-| `src/lib/` | The data code both use: Octopus, the grid, the weather, PVGIS, EPC, and the analysis. |
-| `src/pages/`, `src/components/`, `src/layouts/`, `src/state/`, `src/styles/` | The dashboard: Astro pages made of Svelte panels, their shared state and cache, and its look. |
+| `src/lib/` | The data code both use: Octopus, the grid, the weather, PVGIS, the household (bins, trains, calendar), the voyage, and the analysis. |
+| `src/pages/`, `src/components/`, `src/layouts/`, `src/state/`, `src/styles/` | The dashboard: five Astro pages made of Svelte cards, the chart kit, their shared state and cache, and the look. |
 | `src/display/` | Display source: styles, markup, household data sources, the cockpit, modes and remote control. |
 | `build.py`, `astro.config.mjs` | `npm run build` builds the display (`build.py`) and the dashboard (Astro, into `dist/`). `npm run dev` serves the dashboard while you work on it. |
 | `server.py` | Home server helper. |

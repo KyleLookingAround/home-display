@@ -1,6 +1,6 @@
 # A full redesign of everything: the plan
 
-**Status:** proposed, October 2026, and still being worked out. Nothing here is built.
+**Status:** the phone pages are built on the `redesign` branch and previewed at `/preview/` on the published site ([decision 0010](decisions/0010-redesign.md)); they go to `main` once Kyle is happy. Not yet built: carrying the account in a setup link encrypted with the site PIN, and the "Later, when wanted" steps. The wall display is unchanged.
 
 "Everything" means:
 - the dashboard;

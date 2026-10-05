@@ -175,3 +175,6 @@ tr.best td{background:rgba(70,230,161,.07)}
 .foot{margin-top:var(--s6);font:12px/1.55 var(--f-mono);color:var(--faint);display:grid;gap:6px}
 
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+/* a heading between groups of cards */
+.section{font:600 13px/1.3 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin:var(--s4) 0 0}

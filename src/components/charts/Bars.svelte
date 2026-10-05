@@ -44,7 +44,7 @@
       {#if ghost}{#each ghost as g, i}{#if g > 0}<rect x={P.l + i * bw + gap / 2} y={y(g)} width={Math.max(1.5, bw - gap)} height={Math.max(.5, y(0) - y(g))} rx="3" fill="none" stroke="var(--muted)" stroke-opacity=".45" stroke-dasharray="2 2"/>{/if}{/each}{/if}
       {#if selected != null}<rect x={P.l + selected * bw} y={P.t} width={bw} height={ih} fill="var(--sel)" rx="4"/>{/if}
       {#each bars as b}<rect class={b.cls} x={b.x} y={b.y} width={b.w} height={b.h} rx={b.top ? Math.min(3, b.w / 2) : 0}/>{/each}
-      {#each marks as m}<line x1={P.l + m.i * bw + bw / 2} x2={P.l + m.i * bw + bw / 2} y1={P.t} y2={P.t + ih} stroke="var(--cal)" stroke-width="1.5"/><circle cx={P.l + m.i * bw + bw / 2} cy={P.t} r="3.5" fill="var(--cal)"/>{/each}
+      {#each marks as m}<line x1={P.l + m.i * bw + bw / 2} x2={P.l + m.i * bw + bw / 2} y1={P.t} y2={P.t + ih} stroke="var(--cal)" stroke-width="1.5"/><circle class="mark" cx={P.l + m.i * bw + bw / 2} cy={P.t} r="3.5" fill="var(--cal)"/>{/each}
       {#each labels as l}<text x={l.x} y={height - 6} text-anchor="middle">{l.text}</text>{/each}
     </svg>
     {#if tip}<div class="tip" style="left:{clamp(tip.x, 80, W - 80)}px;top:{tip.y}px">{tip.text}</div>{/if}

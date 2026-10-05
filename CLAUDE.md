@@ -23,19 +23,24 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `browser.js`: `$`, `$$` and `store` (per-device `localStorage`, keys prefixed `hse.`).
     - `net.js`: `request`, `NET`, `detectProxy`, `errorText`.
     - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards).
-    - `carbon.js`, `weather.js`, `pvgis.js`, `epc.js`: the other services.
-    - `analysis.js`: pure functions with no DOM. Example data, the period roll-up, spikes, weather regression, projections, tariff comparison, battery and solar simulators, and `cheapestWindow`.
-  - `pages/`: the dashboard's five pages: `index` (Overview), `patterns`, `prices`, `compare`, `home`. Each is a list of islands.
-  - `layouts/Dashboard.astro`: the head, starfield, bridge, tabs (links, `aria-current`) and footer around every page.
-  - `components/`: one Svelte island per panel, plus:
-    - `Bridge.svelte`: header, status, account settings, notices, and the negative price alert and notifications.
-    - `BarChart.svelte`: the SVG bar chart; tap, point or arrow to read a bar, `bind:selected`.
-    - `Example.svelte`: the Example tag.
+    - `carbon.js`, `weather.js`, `pvgis.js`: the other services.
+    - `analysis.js`: pure functions with no DOM. Example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
+    - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes and the night window, bins (`nextCollections`, `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, Huxley2, Realtime Trains and TfGM parsing, `leaveBy`, `todayCost`, nightly reload and staleness.
+    - `voyage.js`: the cockpit's logic, also used by the phone's Now page: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards`, `worldFor` with `moonPhase` and `issPass`, `voyageFor` (the next twelve hours) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost`.
+  - `pages/`: the dashboard's five pages, phone first ([decision 0010](docs/decisions/0010-redesign.md)): `index` (Now), `money`, `usage`, `home`, `settings`. Each is a list of islands. `patterns`, `prices` and `compare` only send old links to their new homes.
+  - `layouts/App.astro`: the head, starfield, the nav (a bottom bar on phones, a rail from 900px; links with `aria-current`), the header and the footer around every page. It sets `data-corners` from `hse.corners` before the page draws.
+  - `components/`: one Svelte island per card, in a folder per page (`now/`, `money/`, `usage/`, `home/`, `settings/`), plus:
+    - `Header.svelte`: the title, the status (`#status`: "Updated hh:mm", "Example data", "Updating…", "No signal", "Offline"), Refresh, and the negative price and Saving Session notifications.
+    - `Notices.svelte`: the example-data banner (on Now) and errors.
+    - `home/Upgrade.svelte`: the shape every upgrade shares: a year's saving, a rough cost, the payback, and the simulator folded under "Work it out".
+    - `charts/`: `Strip` (prices over time, cheapest hours, carbon band, markers), `Bars` (ghost of the period before, change marks), `HeatMap`, `ClockFace`, `Dial`, `Sparkline`, `Scatter`. Tap, point or arrow keys to read them.
   - `state/`:
     - `app.svelte.js`: the one state object every island shares. Account data is `$state.raw`, replaced whole; `model` and `reg` are derived.
     - `session.js`: `boot()` once per page; `refresh`, `loadPrices`, `connect`, `forget`.
     - `cache.js`: IndexedDB, keeping account data across pages for half an hour and prices for ten minutes.
-  - `styles/dashboard.css`: the dashboard's design tokens on `:root` and its classes, global.
+    - `house.js`: the household on the phone: `houseSettings()` (household.json, then this device's changes), `saveHouse(form)` (keeps only what differs, in `hse.display`, as a screen does), weather, council bins, trains and the calendar each cached for its own time (`watchHouse`), and the Home Mini (`watchLive`: the draw each minute, today's rows each ten).
+    - `usage.svelte.js`: the Usage page's comparison with the period before.
+  - `styles/app.css`: the design tokens on `:root` (`--radius` changes with `data-corners="sharp"`) and the shared classes: cards, answers, stats, rows, folds, banners, forms, charts.
   - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
   - `display/cockpit.js`: the screensaver, a side window onto space. It decides when and where things appear. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`; `readableAt` caps it for text). Layers, back to front:
     - `cSpace` canvas: the backdrop (sky, far and middle stars and both nebulae, baked together into one picture two screens wide and slid along), near stars, sun, comets, moon, aurora (painted small, stretched), planets, traffic, the house, wildlife, the ISS.
@@ -46,13 +51,6 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `TIERS` set canvas resolution, frames a second and how often the road ahead redraws. TVs start lower, any screen steps down when it can't keep up, and Settings or `detail=low|high` can fix it ([decision 0008](docs/decisions/0008-drawing-for-tvs.md)). Lower tiers add `body.lite`, which drops blurred shadows and looping animations. Don't add full-screen layers drawn every frame: bake slow things into the backdrop. Check with `BENCH=1 node --test --test-name-pattern="frame budget" tests/display.browser.mjs` (CPU slowed six times).
     - It shows a still frame under reduced motion.
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
-  - `display/sources.js`: the display's household data, mostly pure.
-    - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`, `voyageFor` (the road ahead) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost` (the cabin's dials).
-    - Huxley2 trains, and household settings merging.
-    - Modes, night window and settings defaults.
-    - Bins, weather, and the iCal parser and `RRULE` expansion.
-    - Realtime Trains and TfGM parsing, leave-by countdowns, today's cost.
-    - Nightly reload and staleness.
   - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure), mode switching, remote control and spatial navigation, screensaver motion, night mode and the settings sheet.
   - `starfield.js`: the animated background, on both pages. It rests while the screensaver covers it.
 - `server.py`: optional stdlib-only home server helper.
@@ -76,11 +74,12 @@ Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Nigh
 
 ## Dashboard pages
 
-- **Overview**: tariffs, period totals, daily chart with change-log markers, bill tracker and Direct Debit check, price cap countdown, Saving Sessions and Octoplus, weekly log.
-- **Patterns**: electricity and gas by time of day, boiler schedule check, spike detective, carbon footprint, gas against temperature.
-- **Prices**: Home Mini live readings, Agile today and tomorrow with negative-price alerts, grid carbon forecast, best time to run, appliance costs.
-- **Compare**: the user's half-hourly use priced on each Octopus tariff, battery simulator, solar simulator.
-- **Home**: change log, insulation plan, EPC, CSV export and setup notes.
+Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md)).
+- **Now**: the verdict on the price now, the next twelve hours (price strip with cheapest hours, carbon, rain, your next event and train; today and tomorrow folded), right now (live draw, today so far, grid carbon), coming up (negative prices, tomorrow's prices, Saving Sessions), and run it now or later (three appliances, chosen in Settings).
+- **Money**: this month so far and on track for, the year ahead and the Direct Debit check, your tariff and the price cap, this week (with the log as text), rewards.
+- **Usage**: the period (7, 30, 90 days, against the period before), every day, your day as a clock face, every day as a heat map, heating against the weather, unusual days and half hours, carbon.
+- **Home**: weather, bins, today and tomorrow, trains; upgrades (tariffs, insulation and heating, the certificate, battery, solar); changes.
+- **Settings**: account (`#account`), notifications, household (`#household`), appliances (`#appliances`), screens (mode links and a setup link), data (CSV, clear the cache, the helper), look (corners), about.
 
 ## Conventions
 
@@ -98,7 +97,6 @@ Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Nigh
 
 - Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from Huxley2, a free community service with no guarantee. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
-- The EPC register moved to a new government service in 2026. The search endpoint and its parameters in `searchEPC()` are a best guess.
 - The tariff comparison covers electricity only.
 - Realtime Trains' new API and TfGM's Metrolink fields are coded from the spec and community code, and haven't been tried with live keys yet.
 - Bin days are entered by hand. Bank holiday changes aren't known.

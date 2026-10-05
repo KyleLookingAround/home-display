@@ -23,7 +23,7 @@ Suggestions for the Astro version, picked for a household project that one perso
 
 - **Cloudflare Worker** on the free tier:
   - `/api/octopus/*` proxy, with the API key stored as a Worker secret and CORS limited to your site's address.
-  - `/api/pvgis` and `/api/epc` proxies.
+  - `/api/pvgis` proxy.
   - Cron triggers for negative-price alerts, Saving Session alerts and the weekly email.
   - **D1** (SQLite) or **KV** to keep readings history.
 - **Push notifications:** ntfy.sh (free, a phone app, one HTTP call to send), Pushover, or a Telegram bot.

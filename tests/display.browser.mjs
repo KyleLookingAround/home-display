@@ -358,86 +358,109 @@ test('display: a setup link copies settings to this device', async () => {
   await ctx.close();
 });
 
-const PAGES = [['index', 'Overview'], ['patterns', 'Patterns'], ['prices', 'Prices'], ['compare', 'Compare'], ['home', 'Home']];
-test('dashboard: every page works on a phone and a TV, with example data labelled', async () => {
+const PAGES = [['index', 'Now'], ['money', 'Money'], ['usage', 'Usage'], ['home', 'Home'], ['settings', 'Settings']];
+test('dashboard: every page works on a phone, a tablet and a laptop, with example data labelled', async () => {
   if (!existsSync(join(DIST, 'index.html'))) throw new Error('build the dashboard first: npm run build');
-  for (const [width, height] of [[390, 844], [1920, 1080]]) {
+  for (const [width, height] of [[390, 844], [768, 1024], [1280, 900]]) {
     const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, withHelper: false });
     for (const [id, label] of PAGES) {
       if (id !== 'index') await page.goto(`${base}/${id}.html`);
       await page.waitForFunction(() => /Example data/.test((document.getElementById('status') || {}).textContent || ''));
       await page.waitForTimeout(300);
-      assert.equal(await page.textContent('.tabs [aria-current="page"]'), label);
+      assert.equal((await page.textContent('.nav [aria-current="page"]')).trim(), label);
       const l = await layout(page);
       assert.ok(l.sw <= l.iw, `${id} at ${width}: scrolls sideways (${l.wide})`);
-      if (id === 'index') assert.ok(await page.locator('.tag.warn', { hasText: 'Example' }).count() > 0, 'example figures are labelled');
+      if (id === 'index') assert.ok(await page.locator('.banner', { hasText: 'example data' }).count() > 0, 'example figures are labelled');
       await shot(page, `dashboard-${width}-${id}`);
     }
-    assert.equal(await page.getAttribute('#wallBtn', 'href'), 'display.html#energy');
     assert.deepEqual(errors, []);
     await ctx.close();
   }
+});
+
+test('dashboard: the old pages send you to their new homes', async () => {
+  const { page, ctx } = await open('/patterns.html', { settings: null, withHelper: false });
+  for (const [old, now] of [['patterns', 'usage'], ['prices', 'index'], ['compare', 'home']]) {
+    await page.goto(`${base}/${old}.html`);
+    await page.waitForURL(new RegExp(`/${now}\\.html$`));
+  }
+  await ctx.close();
 });
 
 // Astro islands start once their scripts load: wait for every one before touching its controls.
 const ready = page => page.waitForFunction(() => document.querySelectorAll('astro-island').length > 0 && !document.querySelector('astro-island[ssr]'));
 
 test('dashboard: the controls work', async () => {
-  const { page, ctx, errors } = await open('/index.html', { settings: null, withHelper: false });
+  const { page, ctx, errors } = await open('/usage.html', { settings: null, withHelper: false });
   await page.waitForFunction(() => /Example data/.test(document.getElementById('status').textContent)); await ready(page);
-  // the period and the units
+  // Usage: the period and the units, and reading a day with the arrow keys
   await page.click('[aria-label="Period"] >> text=7 days');
-  await page.waitForFunction(() => document.querySelectorAll('.chart svg')[0] && document.querySelectorAll('.chart svg')[0].querySelectorAll('.hit').length === 7);
+  await page.waitForFunction(() => document.querySelector('.chart svg') && document.querySelector('.chart svg').querySelectorAll('rect.bar-e').length === 7);
   await page.click('[aria-label="Show"] >> text=kWh');
-  assert.match(await page.textContent('.readline'), /kWh/);
+  const before = await page.textContent('.readout');
+  assert.match(before, /kWh/);
   await page.locator('.chart').first().focus(); await page.keyboard.press('ArrowLeft');
-  assert.match(await page.textContent('.readline'), /—/, 'arrow keys read another day');
-  // the period is kept for the next page
-  await page.goto(`${base}/patterns.html`); await ready(page);
+  assert.notEqual(await page.textContent('.readout'), before, 'arrow keys read another day');
+  // the period is kept for the next visit
+  await page.goto(`${base}/usage.html`); await ready(page);
   await page.waitForFunction(() => document.querySelector('[aria-label="Period"] [aria-pressed="true"]'));
   assert.equal(await page.textContent('[aria-label="Period"] [aria-pressed="true"]'), '7 days');
-  // the change log, shown on the daily chart
+  // Home: a change, marked on the Usage chart
   await page.goto(`${base}/home.html`); await ready(page);
-  await page.fill('#clDate', '2026-10-01'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('text=Add to log');
+  await page.fill('#clDate', '2026-10-01'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('#changes button[type=submit]');
   await page.waitForSelector('text=Loft insulation topped up');
-  await page.check('#m-loft'); await page.waitForSelector('text=could cut heating');
-  await page.goto(`${base}/index.html`);
+  await page.goto(`${base}/usage.html`);
   await page.waitForFunction(() => document.querySelector('.chart .mark'));
-  // the comparison feeds the battery's tariffs
-  await page.goto(`${base}/compare.html`); await ready(page);
-  await page.click('text=Run comparison');
-  await page.waitForSelector('text=Cheapest');
+  // Home: upgrades show an answer before anything is touched, and the comparison feeds the battery's tariffs
+  await page.goto(`${base}/home.html`); await ready(page);
+  assert.ok(await page.locator('#battery .stat .v', { hasText: '£' }).count() >= 2, 'the battery card shows a saving and a cost');
+  await page.click('#tariffs summary'); await page.click('text=Price every Octopus tariff');
+  await page.waitForSelector('#tariffs tr.best');
+  await page.click('#battery summary');
   assert.ok(await page.locator('#bTariff option').count() >= 3, 'the battery offers the compared tariffs');
-  await page.fill('#bCap', '10');
-  await page.waitForSelector('text=Saved a year');
-  await page.fill('#sSouth', '8');
-  await page.waitForSelector('text=Generated a year');
-  // settings open and close
-  await page.click('text=Connect account'); await page.waitForSelector('#acct');
-  await page.click('.settings >> text=Close'); assert.equal(await page.locator('#acct').count(), 0);
-  // Prices: the region, and an activity's kWh
-  await page.goto(`${base}/prices.html`); await ready(page);
+  await page.fill('#bCap', '10'); await page.fill('#bCost', '2000');
+  await page.waitForFunction(() => /£2,000/.test(document.querySelector('#battery .stats').textContent));
+  await page.click('#insulation summary'); await page.uncheck('#m-loft');
+  await page.waitForSelector('#insulation >> text=What you ticked');
+  // Settings: an appliance's kWh and the three that lead Now, the region, the corners
+  await page.goto(`${base}/settings.html`); await ready(page);
+  await page.fill('#kwh-kettle', '3'); await page.locator('#kwh-kettle').dispatchEvent('change');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.acts') || '{}').kettle), 3);
+  await page.check('#lead-kettle');
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.leadActs'))), ['dish', 'dryer', 'kettle'], 'three lead, the newest replacing the oldest');
   await page.waitForSelector('#region');
-  await page.locator('td input.kwh').first().fill('3'); await page.locator('td input.kwh').first().dispatchEvent('change');
-  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.acts') || '{}')[Object.keys(JSON.parse(localStorage.getItem('hse.acts') || '{}'))[0]]), 3);
+  await page.click('#look >> text=Sharp');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.corners), 'sharp');
+  await page.goto(`${base}/index.html`); await ready(page);
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.corners), 'sharp', 'the corners stay on the next page');
+  assert.ok(await page.locator('text=Kettle, full boil').count() > 0, 'Now leads with the chosen appliances');
+  // Settings: the household's bins and station stay on this device, and only what changed is kept
+  await page.goto(`${base}/settings.html`); await ready(page);
+  await page.waitForSelector('#hWalk');
+  await page.fill('#hWalk', '9'); await page.click('#household >> text=Save');
+  await page.waitForSelector('#household >> text=Saved on this device');
+  const mine = await page.evaluate(() => JSON.parse(localStorage.getItem('hse.display')));
+  assert.equal(mine.trainWalk, 9);
+  assert.equal(mine.bins, undefined, 'the bins stay as household.json has them');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
 
 test('dashboard: the account is fetched once, then each page reads it from the cache', async () => {
   const { page, ctx, errors } = await open('/index.html', { account: true });
-  await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+  await page.waitForFunction(() => /Updated/.test(document.getElementById('status').textContent));
   await page.waitForTimeout(500);
   const first = accountCalls;
   assert.ok(first > 0, 'the account was fetched');
-  assert.match(await page.textContent('.eyebrow'), /A-TEST1234/);
-  for (const id of ['patterns', 'prices', 'compare', 'home', 'index']) {
+  for (const id of ['money', 'usage', 'home', 'settings', 'index']) {
     await page.goto(`${base}/${id}.html`);
-    await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+    await page.waitForFunction(() => /Updated/.test(document.getElementById('status').textContent));
   }
   assert.equal(accountCalls, first, 'no page fetched the account again');
-  await page.click('text=Refresh');
-  await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+  await page.goto(`${base}/settings.html`);
+  await page.waitForSelector('#account >> text=A-TEST1234');
+  await page.click('[aria-label="Refresh"]');
+  await page.waitForFunction(() => /Updated/.test(document.getElementById('status').textContent));
   await page.waitForTimeout(300);
   assert.ok(accountCalls > first, 'Refresh fetches it afresh');
   assert.deepEqual(errors, []);
@@ -510,7 +533,7 @@ test('cockpit frame budget', { skip: !process.env.BENCH }, async () => {
   await ctx.close();
 });
 
-// PAGES=index,money (with SHOTS=1): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
+// PAGES=index,money,usage,home,settings (with SHOTS=1): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
 test('page shots', { skip: !process.env.PAGES }, async () => {
   for (const [width, height] of [[390, 844], [1280, 900]]) {
     const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, account: !!process.env.ACCOUNT });

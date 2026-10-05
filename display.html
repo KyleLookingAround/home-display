@@ -981,19 +981,21 @@ function annualGas(reg, heatScale = 1){
   return { base, heat, total: base + heat };
 }
 const MEASURES = [
-  { id:'loft',    label:'Top up loft insulation to 270mm', cut:.10 },
-  { id:'cavity',  label:'Cavity wall insulation', cut:.20 },
-  { id:'draught', label:'Draught-proof doors, windows and floors', cut:.07 },
-  { id:'glazing', label:'Replace remaining single glazing', cut:.08 },
-  { id:'thermo',  label:'Turn the thermostat down 1°C', cut:.08 },
-  { id:'flow',    label:'Lower boiler flow temperature to 55°C', cut:.05 },
-  { id:'trv',     label:'Smart radiator valves, heat rooms only when used', cut:.06 }
+  // cost: a rough installed price in pence for a terraced house, for the payback; quotes will differ.
+  { id:'loft',    label:'Top up loft insulation to 270mm', cut:.10, cost:50000 },
+  { id:'cavity',  label:'Cavity wall insulation', cut:.20, cost:120000 },
+  { id:'draught', label:'Draught-proof doors, windows and floors', cut:.07, cost:30000 },
+  { id:'glazing', label:'Replace remaining single glazing', cut:.08, cost:300000 },
+  { id:'thermo',  label:'Turn the thermostat down 1°C', cut:.08, cost:0 },
+  { id:'flow',    label:'Lower boiler flow temperature to 55°C', cut:.05, cost:0 },
+  { id:'trv',     label:'Smart radiator valves, heat rooms only when used', cut:.06, cost:40000 }
 ];
 function insulationPlan(reg, chosen, gasRate){
   const yr = annualGas(reg); if (!yr) return null;
   const keep = chosen.reduce((k, id) => { const m = MEASURES.find(x => x.id === id); return m ? k*(1-m.cut) : k; }, 1);
   const saved = yr.heat * (1 - keep);
-  return { year: yr, saved, savedP: saved * gasRate, cutShare: 1 - keep };
+  const cost = chosen.reduce((c, id) => { const m = MEASURES.find(x => x.id === id); return m ? c + m.cost : c; }, 0);
+  return { year: yr, saved, savedP: saved * gasRate, cutShare: 1 - keep, cost };
 }
 
 /* ---------- money ---------- */

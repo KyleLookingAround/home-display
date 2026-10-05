@@ -8,23 +8,28 @@ import { boot } from './session.js';
 import { store } from '../lib/browser.js';
 import { NET } from '../lib/net.js';
 import { findHomeMini, liveReading } from '../lib/octopus.js';
-import { mergeSettings, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive } from '../lib/household.js';
+import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive } from '../lib/household.js';
 
 const MIN = 60e3;
-let started = null;
+let started = null, shared = null;
 
 /** Household settings: household.json (published with the site), then this device's own changes. */
 export function houseSettings(){ return started || (started = loadSettings()); }
 async function loadSettings(){
-  let shared = null;
+  shared = null;
   try { const r = await fetch('household.json', { cache: 'no-cache' }); if (r.ok) shared = await r.json(); } catch {}
   app.house = mergeSettings(shared, store.getJ('display', null));
   return app.house;
 }
-/** Saves this device's household changes (the same store the display uses on this device) and applies them. */
-export async function saveHouse(changes){
-  const mine = Object.assign({}, store.getJ('display', null) || {}, changes);
-  store.setJ('display', mine);
+/**
+ * Saves the household form on this device: only what differs from household.json is kept (in the same store the
+ * display uses), so later edits to the shared file still arrive. Other keys this device holds are left alone.
+ */
+export async function saveHouse(form){
+  await houseSettings();
+  const mine = Object.assign({}, store.getJ('display', null) || {});
+  Object.keys(form).forEach(k => { delete mine[k]; });
+  store.setJ('display', Object.assign(mine, deviceChanges(form, shared)));
   started = null; await houseSettings();
   loadTrains(true); loadEvents(true);
 }

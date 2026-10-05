@@ -153,7 +153,7 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
 
 - **Source:** a calendar's secret iCal address. In Google Calendar it's under Settings → the calendar → Integrate calendar.
 - **No browser calls:** Google's `calendar.google.com/calendar/ical/…` doesn't send CORS headers. With the helper present, the display fetches it through `/proxy/gcal/…`; the helper allows only `calendar/ical/` paths. Other providers are fetched directly and may or may not allow it.
-- **Parsing:** done in `src/display/sources.js`. It handles:
+- **Parsing:** done in `src/lib/household.js`. It handles:
   - folded lines and `TZID` times;
   - all-day events and `DURATION`;
   - `RRULE` with `FREQ` DAILY, WEEKLY (with `BYDAY`), MONTHLY (`BYDAY` like `2TU`, or `BYMONTHDAY`) and YEARLY, plus `INTERVAL`, `COUNT` and `UNTIL`;
