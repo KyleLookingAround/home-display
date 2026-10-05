@@ -33,7 +33,7 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
   await page.route(/^https:\/\//, r => r.abort());
   const errors = []; page.on('pageerror', e => errors.push(e.message));
   try {
-    await page.goto(base + '/display.html#home');
+    await page.goto(base + '/display.html#today');
     await page.waitForSelector('#staticrypt-password', { state: 'visible' });
     assert.equal(await page.isChecked('#staticrypt-remember'), true, 'remember is ticked, so a TV asks once');
     // A wrong PIN first, typed on the keypad with the arrows and Enter.
@@ -45,8 +45,8 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
     assert.equal(await page.inputValue('#staticrypt-password'), '');
     for (const k of ['2', '4', '6', '8']) await page.click(`[data-k="${k}"]`);
     await page.click('.go');
-    await page.waitForSelector('section[data-mode="home"]:not([hidden])');
-    assert.match(await page.evaluate(() => location.hash), /#home/);
+    await page.waitForSelector('section[data-mode="today"]:not([hidden])');
+    assert.match(await page.evaluate(() => location.hash), /#today/);
     await page.goto(base + '/index.html');
     await page.waitForSelector('.nav', { timeout: 10000 });     // no PIN asked again
     await page.waitForFunction(() => /Example data/.test((document.getElementById('status') || {}).textContent || ''), null, { timeout: 10000 });   // its islands run once unlocked

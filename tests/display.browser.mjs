@@ -233,7 +233,7 @@ test('display: content on the TV is real data, labelled examples only where noth
   assert.match(await page.textContent('#dHeads'), /Flood alert/);
   assert.match(await page.textContent('#dTrains'), /Manchester Piccadilly|London Euston/);
   assert.match(await page.textContent('#dDay'), /Parents' evening/);
-  assert.match(await page.textContent('#dDay'), /Bins out tonight\s*General waste/);
+  assert.match(await page.textContent('#dDay'), /General waste\s*Out tonight/);
   assert.match(await page.textContent('#dNow'), /Grid carbon/);
   assert.equal(await page.$$eval('#dStrip svg', s => s.length), 1, 'the next twelve hours are drawn');
   await page.keyboard.press('2');
