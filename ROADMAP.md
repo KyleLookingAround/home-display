@@ -83,6 +83,7 @@ The five tabs are Astro pages made of small Svelte islands ([decision 0009](docs
 - The islands share one state object. The account's data is cached in the browser, so moving between pages doesn't fetch it again.
 
 Still to do here:
+- **A full redesign of everything** (proposed, not started): one household app on phone, tablet and TV, sharing one look, one data service and one settings model. The plan, and the questions it needs answering first, are in [docs/redesign.md](docs/redesign.md).
 - **More islands:** the panels still mirror the old tabs one for one. Now they're components, they can grow on their own. For example, a period chooser on any chart, or a comparison that remembers its last run.
 - `src/display/sources.js` is pure apart from its loaders and could become modules too. It isn't urgent: the display builds fine as it is.
 
