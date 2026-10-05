@@ -4,3 +4,6 @@ dist/
 .astro/
 *.csv
 .env
+tests/screens/
+_site/
+__pycache__/

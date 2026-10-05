@@ -1,14 +1,4 @@
 /* ===================== interface ===================== */
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
-const store = {
-  get(k){ try { return localStorage.getItem('hse.' + k); } catch(e){ return null; } },
-  set(k, v){ try { localStorage.setItem('hse.' + k, v); } catch(e){} },
-  del(k){ try { localStorage.removeItem('hse.' + k); } catch(e){} },
-  getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
-  setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
-};
-
 const state = {
   gasUnit: store.get('gasUnit') || 'm3', pay: store.get('pay') || 'DIRECT_DEBIT',
   days: 30, unit: 'gbp', region: store.get('region') || 'G', tab: 'overview',
@@ -115,7 +105,6 @@ function renderAll(){
   state.model = buildModel(state.raw, state.days);
   state.reg = gasRegression(state.raw);
   renderTab(state.tab);
-  renderWall();
 }
 
 /* ---------- overview ---------- */
@@ -466,10 +455,9 @@ async function startLive(){
   if (state.live.deviceId && !liveTimer){ pollLive(); liveTimer = setInterval(pollLive, 60e3); }
 }
 async function pollLive(){
-  const wallOpen = !$('#wall').hidden;
-  if (document.hidden || (state.tab !== 'prices' && !wallOpen)){ clearInterval(liveTimer); liveTimer = null; return; }
+  if (document.hidden || state.tab !== 'prices'){ clearInterval(liveTimer); liveTimer = null; return; }
   try { state.live.data = await liveReading(state.live.deviceId); state.live.err = null; } catch(e){ state.live.err = e; }
-  renderLive(); renderWall();
+  renderLive();
 }
 function renderLive(){
   const out = $('#liveOut'), L = state.live;
@@ -483,7 +471,7 @@ function renderLive(){
       <div class="chip"><span class="big elec">${d.demand != null ? Math.round(d.demand).toLocaleString('en-GB') + ' W' : '—'}</span><span class="k">Drawing now${d.at ? ' · ' + hhmm(d.at) : ''}</span></div>
       <div class="chip"><span class="v">${d.today != null ? kwh(d.today) : '—'}</span><span class="k">Electricity used today</span></div>
       <div class="chip"><span class="v">${d.today != null && er != null ? gbp(d.today*er) : '—'}</span><span class="k">Today so far, before standing charge</span></div>
-    </div><p class="muted small">Updates every minute while this tab or the wall display is open.</p>`;
+    </div><p class="muted small">Updates every minute while this tab is open.</p>`;
 }
 
 /* ---------- compare ---------- */
@@ -659,52 +647,6 @@ function renderServer(){
     : `<p><b>Home server helper.</b> Some services, PVGIS solar data and the EPC register, don't let a browser page call them directly. Copy this file and <span class="mono">server.py</span> to your home server, run <span class="mono">python3 server.py</span>, then open <span class="mono">http://&lt;server address&gt;:8787</span> on any device at home. It also lets you add the app to your phone's home screen.</p>`;
 }
 
-/* ---------- wall display ---------- */
-let wallClock = null;
-function toggleFullscreen(){
-  try {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-    else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
-  } catch(e){}
-}
-function syncFsButton(){ const b = $('#wallFs'); if (b) b.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen'; }
-function openWall(){
-  $('#wall').hidden = false; document.body.classList.add('wall-on');
-  if (!document.fullscreenElement) toggleFullscreen();
-  try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch(e){}
-  const tick = () => { $('#wallClock').textContent = hhmm(Date.now()); };
-  tick(); wallClock = setInterval(() => { tick(); if (new Date().getSeconds() === 0) renderWall(); }, 1000);
-  renderWall(); startLive();
-  syncFsButton(); $('#wallFs').focus();
-}
-function closeWall(){
-  $('#wall').hidden = true; document.body.classList.remove('wall-on'); clearInterval(wallClock);
-  try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
-  $('#wallBtn').focus();
-}
-function renderWall(){
-  if ($('#wall').hidden) return;
-  const ag = state.agileToday?.unit?.filter(r => isFinite(r.to)) || [], now = Date.now();
-  const cur = ag.find(r => r.from <= now && now < r.to);
-  const el = $('#wallPrice');
-  if (cur){
-    const col = cur.p < 0 ? 'var(--neg)' : cur.p < 15 ? 'var(--good)' : cur.p < 25 ? 'var(--warn)' : 'var(--bad)';
-    el.textContent = pence(cur.p); el.style.color = col; el.style.textShadow = `0 0 40px ${col}`;
-    $('#wallLabel').textContent = cur.p < 0 ? 'Agile now · you\'re paid to use power' : cur.p < 15 ? 'Agile now · power is cheap' : 'Agile price now, per kWh';
-    const best = cheapestWindow(ag, 4);
-    $('#wallNext').textContent = best ? `Cheapest 2 hours ${dayKey(best.from) === dayKey(now) ? '' : DOW[new Date(best.from).getDay()] + ' '}${hhmm(best.from)}–${hhmm(best.to)} · ${pence(best.avg)}` : '';
-  } else { el.textContent = '--'; el.style.color = ''; el.style.textShadow = ''; $('#wallLabel').textContent = state.agileErr ? 'No signal from Octopus' : 'Waiting for Agile prices'; $('#wallNext').textContent = ''; }
-  const ci = state.carbonFc?.find(r => r.from <= now && now < r.to);
-  const L = state.live.data, er = eRateNow();
-  $('#wallRow').innerHTML = [
-    L && L.demand != null ? `<div class="chip"><span class="v elec">${Math.round(L.demand).toLocaleString('en-GB')} W</span><span class="k">Drawing now</span></div>` : '',
-    L && L.today != null ? `<div class="chip"><span class="v">${kwh(L.today)}</span><span class="k">Used today</span></div>` : '',
-    ci ? `<div class="chip"><span class="v">${ci.v} g</span><span class="k">Grid carbon · ${ci.index}</span></div>` : '',
-    er != null ? `<div class="chip"><span class="v">${pence(er)}</span><span class="k">Your tariff, per kWh</span></div>` : ''
-  ].join('');
-}
-
 /* ---------- loading ---------- */
 async function loadPrices(){
   const today = startOfDay(new Date());
@@ -714,7 +656,6 @@ async function loadPrices(){
   catch(e){ state.carbonFc = null; state.carbonErr = e; }
   if (state.tab === 'prices'){ renderAgile(); renderCarbon(); renderBest(); renderActivities(); }
   else if (state.agileToday) updateAlert(state.agileToday.unit.filter(r => isFinite(r.to) && r.to > Date.now() && r.p < 0));
-  renderWall();
 }
 async function loadExtras(){
   const raw = state.raw;
@@ -749,7 +690,7 @@ async function refresh(){
   } else { state.raw = makeDemo(); setStatus('demo'); }
   regionOptions();
   renderAll();
-  if (state.tab === 'prices' || !$('#wall').hidden) startLive();
+  if (state.tab === 'prices') startLive();
   loadPrices();
   loadExtras();
   loadSolarInputs();
@@ -841,21 +782,7 @@ $('#csvBtn').addEventListener('click', () => {
   a.download = `harold-street-energy-${dayKey(Date.now())}${isDemo() ? '-example' : ''}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 });
-$('#wallBtn').addEventListener('click', openWall);
-$('#wallClose').addEventListener('click', closeWall);
-// TV remotes send arrow keys, Enter and a Back key (Backspace, GoBack or BrowserBack depending on the TV).
-document.addEventListener('keydown', e => {
-  if ($('#wall').hidden) return;
-  if (['Escape', 'Backspace', 'GoBack', 'BrowserBack', 'XF86Back'].includes(e.key) || e.keyCode === 10009 || e.keyCode === 461){ e.preventDefault(); closeWall(); return; }
-  if (e.key === 'f' || e.key === 'F'){ toggleFullscreen(); return; }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown'){
-    const btns = [$('#wallFs'), $('#wallClose')], i = btns.indexOf(document.activeElement);
-    e.preventDefault(); btns[(i + 1) % btns.length].focus();
-  }
-});
-document.addEventListener('fullscreenchange', syncFsButton);
-$('#wallFs').addEventListener('click', toggleFullscreen);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (state.tab === 'prices' || !$('#wall').hidden)) startLive(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.tab === 'prices') startLive(); });
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => renderTab(state.tab), 150); });
 setInterval(() => { if (!document.hidden) loadPrices(); }, 30*60e3);
 

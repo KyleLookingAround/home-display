@@ -1,0 +1,1942 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Harold Street Display</title>
+<meta name="description" content="Household display: energy prices, home, travel, a screensaver and a night clock, for a wall tablet, phone or TV.">
+<meta name="theme-color" content="#04050d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Display">
+<link rel="manifest" href="display.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304050d'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='%234fd6ff' stroke-width='3'/%3E%3Cpath d='M35 14 24 35h9l-4 15 12-22h-9z' fill='%23ffb547'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Exo+2:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Household display. Ten-foot rules: on a 1080p TV the root font is about 27px and nothing is smaller than 0.9rem (24px);
+   focus rings are loud; every action works with arrows and Enter; a safe margin keeps clear of TV overscan.
+   Written for older TV browsers (Chromium 63+): no inset, no flex gap, no :focus-visible, clamp() only with a fallback. */
+:root{
+  --void:#04050d; --surface:rgba(14,18,40,.74); --surface-2:rgba(4,5,13,.6);
+  --ink:#e9ecff; --muted:#9aa2c9; --line:rgba(134,152,255,.2); --line-hot:rgba(134,152,255,.45);
+  --elec:#ffb547; --gas:#4fd6ff; --nebula:#8f6bff; --nebula-2:#ff5fae;
+  --good:#46e6a1; --warn:#ffd166; --bad:#ff6b7d; --neg:#b892ff;
+  --f-display:"Syncopate","Eurostile","Arial Black",ui-sans-serif,sans-serif;
+  --f-body:"Exo 2",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --edge-x:16px; --edge-y:14px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;font-size:16px}
+/* TV and big screens: scale with the screen, about 27px at 1920 x 1080, and keep 5% clear for overscan. */
+@media (min-width:1144px){
+  html{font-size:1.4vw;font-size:min(1.4vw,2.5vh)}
+  :root{--edge-x:4.5vw;--edge-y:4.5vh}
+}
+body{margin:0;color:var(--ink);font:1rem/1.4 var(--f-body);background-color:var(--void);min-height:100vh;overflow-x:hidden;
+  background-image:radial-gradient(60vw 45vw at 88% -8%, rgba(143,107,255,.2), transparent 70%),radial-gradient(50vw 40vw at -10% 35%, rgba(79,214,255,.1), transparent 70%),radial-gradient(45vw 35vw at 70% 105%, rgba(255,95,174,.1), transparent 70%)}
+[hidden]{display:none!important}
+#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block;transition:opacity 2s}
+a{color:var(--gas)}
+p{margin:0}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)} .neg{color:var(--neg)}
+.tag{display:inline-block;font:500 .9rem/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;padding:.25em .45em;border-radius:3px;border:1px solid currentColor;color:var(--warn);margin-left:.5em;vertical-align:.1em}
+
+/* the screen */
+.screen{position:relative;z-index:1;min-height:100vh;padding:calc(var(--edge-y) + env(safe-area-inset-top,0px)) calc(var(--edge-x) + env(safe-area-inset-right,0px)) calc(var(--edge-y) + env(safe-area-inset-bottom,0px)) calc(var(--edge-x) + env(safe-area-inset-left,0px));display:flex;flex-direction:column}
+.mode{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
+.mode-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;margin-bottom:.6rem}
+.eyebrow{font:500 .9rem/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.14em;color:var(--gas)}
+.eyebrow::before{content:"\25B8 ";opacity:.7}
+.clock-sm{font:500 1.6rem/1 var(--f-mono);letter-spacing:.04em}
+.mode-foot{margin-top:auto;padding-top:.8rem;font:500 .9rem/1.4 var(--f-mono);color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between}
+.mode-foot > *{margin-right:1.2rem}
+.mode-foot .warn{color:var(--warn)}
+
+/* toolbar: hidden until a key, tap or mouse move, then fades after a few seconds */
+.bar{position:fixed;z-index:20;top:0;left:0;right:0;padding:calc(var(--edge-y) * .6 + env(safe-area-inset-top,0px)) var(--edge-x) .7rem;background:rgba(4,5,13,.97);border-bottom:1px solid var(--line-hot);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;transform:translateY(-110%);opacity:0;transition:transform .3s,opacity .3s;visibility:hidden}
+.chrome-on .bar{transform:none;opacity:1;visibility:visible}
+.picker,.bar-actions{display:flex;flex-wrap:wrap;align-items:center}
+.picker{overflow-x:auto;max-width:100%;scrollbar-width:none}
+.picker::-webkit-scrollbar{display:none}
+.btn{font:500 .9rem/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);background:rgba(14,18,40,.7);border:2px solid var(--line-hot);border-radius:4px;padding:.65em .9em;margin:.2rem .5rem .2rem 0;cursor:pointer;text-decoration:none;display:inline-block;white-space:nowrap}
+.btn[aria-selected="true"],.btn.primary{background:var(--gas);border-color:var(--gas);color:#05060f;box-shadow:0 0 16px -3px var(--gas)}
+.btn .k{opacity:.6;margin-right:.4em}
+.btn:focus,select:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
+.btn::-moz-focus-inner{border:0}
+
+/* chips and panels */
+.row{display:flex;flex-wrap:wrap;margin:0 -.5rem}
+.row > *{margin:.5rem;flex:1 1 13rem;min-width:0}
+.chip{border:1px solid var(--line);border-radius:4px;padding:.7rem .9rem;background:var(--surface);min-width:0}
+.chip .v{display:block;font:500 1.7rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.chip .k{display:block;font-size:.9rem;color:var(--muted);margin-top:.2rem}
+.panel{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:.9rem 1.1rem;min-width:0}
+.panel::before,.panel::after{content:"";position:absolute;width:.9rem;height:.9rem;border:2px solid var(--gas);opacity:.75;pointer-events:none}
+.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+.panel h2{font-size:.95rem;margin-bottom:.6rem;color:var(--ink)}
+.empty{color:var(--muted);font:1rem/1.4 var(--f-mono)}
+.note{color:var(--muted);font-size:.9rem;margin-top:.5rem}
+
+/* energy */
+.price-wrap{text-align:center;margin:.6rem 0 1rem;animation:drift-sm 300s ease-in-out infinite alternate}
+.price-label{font:500 1.1rem/1.4 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
+.price{display:block;font:700 22vw/1 var(--f-mono);font-variant-numeric:tabular-nums;margin:.15em 0;transition:color .6s,text-shadow .6s}
+@media (min-width:700px){.price{font-size:8.5rem}}
+.price-sub{font:500 1.1rem/1.4 var(--f-mono);color:var(--muted)}
+.strip{position:relative;margin:.4rem 0 1.6rem;overflow:hidden}
+.strip svg{display:block;width:100%;height:5.5rem}
+.strip .ticks{position:relative;height:1.3rem}
+.strip .ticks span{position:absolute;top:.2rem;transform:translateX(-50%);font:500 .9rem/1 var(--f-mono);color:var(--muted);white-space:nowrap}
+.p-neg{fill:var(--neg)} .p-low{fill:var(--good)} .p-mid{fill:var(--warn)} .p-high{fill:var(--bad)}
+.strip .past{opacity:.3}
+.strip .nowl{stroke:var(--gas);stroke-width:2;stroke-dasharray:4 4}
+
+/* home */
+.home-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;margin-bottom:.8rem}
+.home-top > *{margin:0 1rem .6rem 0}
+.clock-xl{font:500 20vw/1 var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 0 30px rgba(143,107,255,.45)}
+@media (min-width:700px){.clock-xl{font-size:6.5rem}}
+.date-l{font:600 1.4rem/1.3 var(--f-body)}
+.sun{font:500 1rem/1.4 var(--f-mono);color:var(--muted);margin-top:.2rem}
+.wx-now{text-align:right}
+.wx-now .t{font:500 4rem/1 var(--f-mono)}
+.wx-now .i{font-size:3rem;margin-right:.3em;color:var(--elec);font-variant-emoji:text}
+.wx-now .d{font:500 1rem/1.4 var(--f-mono);color:var(--muted)}
+.hours{display:flex;overflow:hidden;border:1px solid var(--line);border-radius:4px;background:var(--surface-2);margin-bottom:1rem}
+.hours > div{flex:1 1 0;min-width:0;text-align:center;padding:.5rem .2rem;border-right:1px solid var(--line);font:500 1rem/1.35 var(--f-mono)}
+.hours > div:last-child{border-right:0}
+.hours .h{color:var(--muted);font-size:.9rem;display:block}
+.hours .i{display:block;font-size:1.4rem;color:var(--elec);font-variant-emoji:text}
+.hours .r{display:block;font-size:.9rem;color:var(--gas)}
+.cols{display:flex;flex-wrap:wrap;margin:0 -.5rem}
+.cols > *{margin:.5rem;flex:1 1 18rem;min-width:0}
+.list{list-style:none;margin:0;padding:0}
+.list li{display:flex;justify-content:space-between;align-items:baseline;padding:.35rem 0;border-bottom:1px solid var(--line)}
+.list li:last-child{border-bottom:0}
+.list li > *{min-width:0}
+.list .when{font:500 1rem/1.3 var(--f-mono);color:var(--muted);margin-left:1rem;text-align:right;max-width:60%;flex-shrink:0}
+.list .what{overflow-wrap:anywhere}
+.bin{display:inline-block;width:1.1rem;height:1.1rem;border-radius:3px;margin-right:.6rem;vertical-align:-.1rem;border:1px solid rgba(233,236,255,.5)}
+.soon{color:var(--elec);font-weight:600}
+
+/* travel */
+.deps{width:100%;border-collapse:collapse;font-size:1rem}
+.deps td,.deps th{padding:.4rem .5rem .4rem 0;border-bottom:1px solid var(--line);text-align:left;vertical-align:baseline}
+.deps th{font:500 .9rem/1.3 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.deps tr:last-child td{border-bottom:0}
+.deps .t{font-family:var(--f-mono);white-space:nowrap}
+.deps .dest{overflow-wrap:anywhere;width:45%}
+.deps .lv{font-family:var(--f-mono);white-space:nowrap;text-align:right}
+.deps .st{font-family:var(--f-mono);white-space:nowrap}
+@media (max-width:520px){.deps .opt{display:none}}
+
+/* screensaver */
+.mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden}
+.planet,.orbit-clock,.comet{position:absolute;top:0;left:0;will-change:transform}
+.planet{text-align:center;width:12rem;margin:-6rem 0 0 -6rem}
+.planet .orb{width:7rem;height:7rem;margin:0 auto .5rem;border-radius:50%;position:relative;box-shadow:0 0 40px -6px currentColor}
+.planet .ring{position:absolute;left:-30%;right:-30%;top:42%;height:16%;border:2px solid currentColor;border-radius:50%;opacity:.55;transform:rotate(-14deg)}
+.planet .val{display:block;font:500 1.7rem/1.1 var(--f-mono);color:var(--ink);text-shadow:0 0 12px rgba(0,0,0,.9)}
+.planet .lbl{display:block;font:500 .9rem/1.3 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
+.orbit-clock{z-index:3;font:500 4.5rem/1 var(--f-mono);margin:-2.2rem 0 0 -6.5rem;width:13rem;text-align:center;text-shadow:0 0 6px #04050d,0 0 14px #04050d,0 0 30px rgba(143,107,255,.6)}
+.planet{z-index:1}
+.comet{width:16rem;height:.35rem;margin-top:-.2rem;border-radius:.2rem;background:linear-gradient(90deg,rgba(79,214,255,0),rgba(79,214,255,.5) 70%,#fff)}
+.comet::after{content:"";position:absolute;right:-.5rem;top:-.4rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;box-shadow:0 0 22px 6px rgba(79,214,255,.8)}
+
+/* night: very dim, black background, slow drift so nothing burns in */
+body.night{background:#000}
+body.night #stars{opacity:.12}
+.night-wrap{margin:auto;text-align:center;animation:drift 420s ease-in-out infinite alternate;color:#4a4f6a}
+.night-clock{font:500 22vw/1 var(--f-mono);letter-spacing:.02em}
+@media (min-width:700px){.night-clock{font-size:8rem}}
+.night-sub{font:500 1.3rem/1.5 var(--f-mono)}
+@keyframes drift-sm{0%{transform:translate(-3vw,-1vh)}33%{transform:translate(2.5vw,1vh)}66%{transform:translate(-2vw,1.5vh)}100%{transform:translate(3vw,-.5vh)}}
+@keyframes drift{0%{transform:translate(-6vw,-4vh)}25%{transform:translate(5vw,-2vh)}50%{transform:translate(4vw,5vh)}75%{transform:translate(-5vw,3vh)}100%{transform:translate(6vw,-3vh)}}
+
+/* settings */
+.sheet{position:fixed;top:0;left:0;right:0;bottom:0;z-index:30;background:rgba(4,5,13,.94);overflow-y:auto;padding:var(--edge-y) var(--edge-x)}
+.sheet form{max-width:60rem;margin:0 auto}
+.sheet h2{font-size:1.1rem;margin:1.2rem 0 .6rem}
+.sheet h3{font-size:.95rem;margin:1rem 0 .4rem;color:var(--gas)}
+.fields{display:flex;flex-wrap:wrap;margin:0 -.5rem}
+.field{margin:.4rem .5rem;flex:1 1 13rem;min-width:0}
+.field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
+.field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--surface-2);border:2px solid var(--line-hot);border-radius:4px;padding:.5em .6em;width:100%}
+.field input[type=checkbox]{width:1.4rem;height:1.4rem;accent-color:var(--gas);vertical-align:middle}
+.help{font-size:.9rem;color:var(--muted);margin:.3rem 0;max-width:62ch}
+.actions{margin-top:1rem}
+.toast{position:fixed;z-index:40;left:50%;bottom:calc(var(--edge-y) + 1rem);transform:translateX(-50%);background:var(--surface);border:1px solid var(--gas);border-radius:4px;padding:.7rem 1rem;font:500 1rem/1.3 var(--f-mono);max-width:90vw;text-align:center}
+
+@media (max-width:699px){
+  .bar{display:block;padding-bottom:.4rem}
+  .picker,.bar-actions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .bar-actions::-webkit-scrollbar{display:none}
+  .wx-now{text-align:left}
+  .hours > div:nth-child(n+7){display:none}
+  .mode-saver .planet{width:8rem;margin:-4rem 0 0 -4rem}
+  .planet .orb{width:4rem;height:4rem}
+  .orbit-clock{font-size:2.6rem;width:8rem;margin:-1.3rem 0 0 -4rem}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+
+<header class="bar" id="bar">
+  <nav class="picker" id="picker" role="tablist" aria-label="Display mode"></nav>
+  <div class="bar-actions">
+    <button class="btn" id="setBtn" type="button">Settings</button>
+    <button class="btn" id="fsBtn" type="button">Full screen</button>
+    <a class="btn" id="dashBtn" href="index.html">Dashboard</a>
+  </div>
+</header>
+
+<div class="screen" id="screen">
+
+  <!-- ================= ENERGY ================= -->
+  <section class="mode" data-mode="energy" aria-label="Energy" hidden>
+    <div class="mode-head"><p class="eyebrow">Harold Street · energy</p><span class="clock-sm mono" data-clock>--:--</span></div>
+    <div class="price-wrap">
+      <span class="price-label" id="eLabel">Agile price now, per kWh</span>
+      <span class="price" id="ePrice">--</span>
+      <span class="price-sub" id="eNext"></span>
+    </div>
+    <div class="strip" id="eStrip"></div>
+    <div class="row" id="eChips"></div>
+    <p class="mode-foot" id="eFoot"></p>
+  </section>
+
+  <!-- ================= HOME ================= -->
+  <section class="mode" data-mode="home" aria-label="Home" hidden>
+    <div class="home-top">
+      <div>
+        <div class="clock-xl" data-clock>--:--</div>
+        <p class="date-l" id="hDate"></p>
+        <p class="sun" id="hSun"></p>
+      </div>
+      <div class="wx-now" id="hNow"></div>
+    </div>
+    <div class="hours" id="hHours"></div>
+    <div class="cols">
+      <section class="panel"><h2>Bins</h2><div id="hBins"></div></section>
+      <section class="panel"><h2>Coming up</h2><div id="hCal"></div></section>
+    </div>
+    <p class="mode-foot" id="hFoot"></p>
+  </section>
+
+  <!-- ================= TRAVEL ================= -->
+  <section class="mode" data-mode="travel" aria-label="Travel" hidden>
+    <div class="mode-head"><p class="eyebrow">Departures</p><span class="clock-sm mono" data-clock>--:--</span></div>
+    <div class="cols">
+      <section class="panel"><h2 id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
+      <section class="panel"><h2 id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
+    </div>
+    <p class="mode-foot" id="tFoot"></p>
+  </section>
+
+  <!-- ================= SCREENSAVER ================= -->
+  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver" hidden>
+    <div class="orbit-clock" id="sClock" data-clock>--:--</div>
+    <div id="sPlanets"></div>
+    <div class="comet" id="sComet" hidden></div>
+  </section>
+
+  <!-- ================= NIGHT ================= -->
+  <section class="mode" data-mode="night" aria-label="Night" hidden>
+    <div class="night-wrap">
+      <div class="night-clock" data-clock>--:--</div>
+      <p class="night-sub" id="nSub"></p>
+    </div>
+  </section>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <form id="setForm" autocomplete="off">
+    <h2 id="sheetTitle">Display settings</h2>
+    <p class="help">These are kept on this device only. Use the arrows to move, Enter to choose and Back to close. Set things up on a phone, then send the setup link to the TV.</p>
+
+    <h3>This screen</h3>
+    <div class="fields">
+      <div class="field"><label for="fMode">Opens on</label><select id="fMode"></select></div>
+      <div class="field"><label for="fRotate">Change mode every</label><select id="fRotate"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
+      <div class="field"><label for="fSaver">Screensaver after</label><select id="fSaver"><option value="0">Never</option><option value="5">5 idle minutes</option><option value="10">10 idle minutes</option><option value="15">15 idle minutes</option><option value="30">30 idle minutes</option><option value="60">An idle hour</option></select></div>
+    </div>
+    <div class="fields">
+      <div class="field"><label for="fNight">Night clock</label><select id="fNight"><option value="1">On</option><option value="0">Off</option></select></div>
+      <div class="field"><label for="fNightFrom">Night from</label><select id="fNightFrom" data-times></select></div>
+      <div class="field"><label for="fNightTo">Night until</label><select id="fNightTo" data-times></select></div>
+      <div class="field"><label for="fReload">Fresh start each night at</label><select id="fReload" data-times></select></div>
+    </div>
+
+    <h3>Energy</h3>
+    <div class="fields">
+      <div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div>
+    </div>
+    <p class="help" id="acctHelp"></p>
+
+    <h3>Bins</h3>
+    <p class="help">For each bin, give one collection date you know and how often it comes. Bank holiday changes aren't included.</p>
+    <div id="binRows"></div>
+
+    <h3>Calendar</h3>
+    <div class="fields">
+      <div class="field" style="flex-basis:30rem"><label for="fIcal">Secret iCal address</label><input id="fIcal" type="url" inputmode="url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div>
+    </div>
+    <p class="help">In Google Calendar: Settings → your calendar → Integrate calendar → Secret address in iCal format. Anyone with the address can read the calendar, so it stays on this device. Google's address needs the home server helper.</p>
+
+    <h3>Travel</h3>
+    <div class="fields">
+      <div class="field"><label for="fTrainFrom">Railway station code</label><input id="fTrainFrom" class="mono" maxlength="8" placeholder="SPT"></div>
+      <div class="field"><label for="fTrainTo">Only trains calling at</label><input id="fTrainTo" class="mono" maxlength="8" placeholder="e.g. MAN (optional)"></div>
+      <div class="field"><label for="fTrainWalk">Walk to the station (min)</label><select id="fTrainWalk" data-walk></select></div>
+    </div>
+    <div class="fields">
+      <div class="field"><label for="fTramStop">Metrolink stop</label><input id="fTramStop" placeholder="e.g. East Didsbury"></div>
+      <div class="field"><label for="fTramWalk">Walk to the stop (min)</label><select id="fTramWalk" data-walk></select></div>
+    </div>
+    <p class="help" id="travelHelp"></p>
+
+    <div class="actions">
+      <button class="btn primary" type="submit">Save</button>
+      <button class="btn" type="button" id="copySetup">Copy setup link</button>
+      <button class="btn" type="button" id="closeSheet">Close</button>
+    </div>
+    <p class="help" id="setupOut"></p>
+  </form>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<script>
+(() => {
+"use strict";
+/* ===================== core: constants, helpers, network, data loading ===================== */
+const REGIONS = {A:'Eastern England',B:'East Midlands',C:'London',D:'Merseyside & North Wales',E:'West Midlands',F:'North East England',G:'North West England',H:'Southern England',J:'South East England',K:'South Wales',L:'South West England',M:'Yorkshire',N:'South Scotland',P:'North Scotland'};
+// Octopus region letter -> Carbon Intensity API region id
+const CI_REGION = {A:10,B:9,C:13,D:6,E:8,F:4,G:3,H:12,J:14,K:7,L:11,M:5,N:2,P:1};
+const GAS_M3_TO_KWH = 1.02264 * 39.5 / 3.6;
+const CO2_ELEC_FALLBACK = 0.2;   // kg/kWh, used when regional intensity is unavailable
+const CO2_GAS = 0.183;           // kg/kWh, UK government conversion factor for natural gas (approx.)
+const HOME = { lat: 53.41, lon: -2.16 }; // Stockport
+// Long-term monthly mean temperatures near Manchester (°C), approximate
+const TEMP_NORMALS = [4.6,4.8,6.6,8.9,12.0,14.8,16.6,16.3,14.0,10.8,7.3,4.9];
+// Rough solar yield near Manchester, kWh per kWp per month, panels at ~35°. Used when PVGIS can't be reached.
+const SOLAR_SOUTH = [24,42,74,104,122,118,117,101,81,54,29,19];
+const SOLAR_NORTH = [6,13,32,60,82,88,84,66,40,19,8,5];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYS_IN_MONTH = m => new Date(2027, m + 1, 0).getDate();
+
+const pad2 = n => String(n).padStart(2, '0');
+const startOfDay = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; };
+const keyDate = k => new Date(`${k}T00:00:00`);
+const slotOf = t => { const d = new Date(t); return d.getHours()*2 + (d.getMinutes() >= 30 ? 1 : 0); };
+const hhmm = t => { const d = new Date(t); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const slotLabel = i => `${pad2(Math.floor((i % 48)/2))}:${i % 2 ? '30' : '00'}`;
+const fmtDate = d => `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`;
+const shortDate = d => `${d.getDate()} ${MON[d.getMonth()]}`;
+const longDate = d => `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
+const gbp = p => (p < 0 ? '−' : '') + '£' + Math.abs(p/100).toFixed(2);   // pence in, pounds out
+const gbp0 = p => (p < 0 ? '−' : '') + '£' + Math.round(Math.abs(p/100)).toLocaleString('en-GB');
+const kwh = v => `${v.toFixed(v >= 100 ? 0 : 1)} kWh`;
+const pence = p => `${Math.abs(p) < 10 ? p.toFixed(2) : p.toFixed(1)}p`;
+const kg = v => v >= 1000 ? `${(v/1000).toFixed(2)} t` : `${v.toFixed(v >= 100 ? 0 : 1)} kg`;
+const pct = v => `${Math.round(v*100)}%`;
+const fmtTick = v => { const r = Math.round(v*100)/100; return Math.abs(r) >= 10 ? String(Math.round(r)) : String(r); };
+const sum = a => a.reduce((x, y) => x + y, 0);
+const median = a => { if (!a.length) return 0; const s = a.slice().sort((x,y)=>x-y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// Nullish default, written out: shared code also runs on TV browsers older than Chromium 80.
+const nz = (v, d) => v == null ? d : v;
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+/* Per-device storage. The dashboard and the display share it, so a key entered on one works on the other. */
+const store = {
+  get(k){ try { return localStorage.getItem('hse.' + k); } catch(e){ return null; } },
+  set(k, v){ try { localStorage.setItem('hse.' + k, v); } catch(e){} },
+  del(k){ try { localStorage.removeItem('hse.' + k); } catch(e){} },
+  getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
+};
+
+function niceStep(x){ if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x/p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+function niceScale(min, max, n = 4){ if (!(max > min)) max = min + 1; const step = niceStep((max-min)/n); return { lo: Math.floor(min/step)*step, hi: Math.ceil(max/step)*step, step }; }
+
+/* ---------- network ---------- */
+class ApiError extends Error { constructor(code, msg){ super(msg || code); this.code = code; } }
+const NET = { proxy: false, creds: null, token: null, tokenAt: 0, keys: {} };
+const OCTO = 'https://api.octopus.energy';
+
+async function request(url, opts = {}){
+  let res;
+  try { res = await fetch(url, opts); }
+  catch(e){ throw new ApiError('NETWORK'); }
+  if (res.status === 401 || res.status === 403) throw new ApiError('AUTH');
+  if (res.status === 404) throw new ApiError('NOTFOUND');
+  if (res.status === 502 || res.status === 504) throw new ApiError('NETWORK');
+  if (!res.ok) throw new ApiError('HTTP', `The service returned an error (${res.status}).`);
+  return res.json();
+}
+const octoUrl = path => {
+  if (path.startsWith('http')) path = path.replace(/^http:/, 'https:').replace(OCTO, '');
+  return (NET.proxy ? './proxy/octopus' : OCTO) + path;
+};
+async function octoGet(path, auth = false){
+  const headers = { Accept: 'application/json' };
+  if (auth){ if (!NET.creds) throw new ApiError('AUTH'); headers.Authorization = 'Basic ' + btoa(NET.creds.key + ':'); }
+  return request(octoUrl(path), { headers });
+}
+async function octoAll(path, auth = false, maxPages = 8){
+  let out = [], next = path, n = 0;
+  while (next && n < maxPages){ const j = await octoGet(next, auth); out = out.concat(j.results || []); next = j.next; n++; }
+  return out;
+}
+async function detectProxy(){
+  if (location.protocol === 'file:') return false;
+  try { const r = await fetch('./proxy/ping', { cache: 'no-store' }); NET.proxy = r.ok && (await r.text()).trim() === 'ok'; }
+  catch(e){ NET.proxy = false; }
+  if (NET.proxy){
+    // Which service keys the helper holds (trains, trams). Older helpers don't answer this.
+    try { const r = await fetch('./proxy/status', { cache: 'no-store' }); if (r.ok) NET.keys = (await r.json()).keys || {}; } catch(e){}
+  }
+  return NET.proxy;
+}
+
+/* ---------- rates ---------- */
+const productOf = code => code.split('-').slice(2, -1).join('-');
+const regionOf = code => code ? code.slice(-1).toUpperCase() : null;
+function prepRates(list, pay = 'DIRECT_DEBIT'){
+  if (!list) return null;
+  let l = list.filter(r => r.payment_method === pay || r.payment_method == null);
+  if (!l.length) l = list;
+  return l.map(r => ({ from: +new Date(r.valid_from), to: r.valid_to ? +new Date(r.valid_to) : Infinity, p: r.value_inc_vat }))
+          .sort((a, b) => a.from - b.from);
+}
+function lookup(list, t){
+  if (!list || !list.length) return null;
+  let lo = 0, hi = list.length - 1, ans = -1;
+  while (lo <= hi){ const mid = (lo + hi) >> 1; if (list[mid].from <= t){ ans = mid; lo = mid + 1; } else hi = mid - 1; }
+  for (let i = ans; i >= 0 && i > ans - 6; i--){ const r = list[i]; if (r.from <= t && t < r.to) return r.p; }
+  return null;
+}
+function pickAgreement(list){
+  const now = Date.now();
+  const a = (list || []).slice().sort((x, y) => new Date(x.valid_from) - new Date(y.valid_from));
+  return a.find(g => +new Date(g.valid_from) <= now && (!g.valid_to || +new Date(g.valid_to) > now)) || a[a.length-1] || null;
+}
+const tariffAt = (sets, t) => (sets || []).find(s => s.aFrom <= t && t < s.aTo) || null;
+function unitPriceAt(sets, t){
+  const s = tariffAt(sets, t); if (!s) return null;
+  if (s.twoRate){ const d = new Date(t), m = d.getHours()*60 + d.getMinutes(); return lookup(m >= 30 && m < 450 ? s.night : s.day, t); }
+  return lookup(s.unit, t);
+}
+function standingAt(sets, t){ const s = tariffAt(sets, t); return s ? lookup(s.sc, t) : null; }
+function currentRates(sets){
+  const now = Date.now();
+  const s = tariffAt(sets, now) || (sets && sets[sets.length-1]);
+  if (!s) return null;
+  return { name: s.name, code: s.code, twoRate: s.twoRate,
+    unit: s.twoRate ? null : lookup(s.unit, now), day: s.twoRate ? lookup(s.day, now) : null,
+    night: s.twoRate ? lookup(s.night, now) : null, standing: lookup(s.sc, now) };
+}
+
+async function loadTariff(fuel, code, from, pay){
+  const product = productOf(code);
+  const base = `/v1/products/${product}/${fuel}-tariffs/${code}`;
+  const q = `?period_from=${from.toISOString()}&page_size=1500`;
+  const twoRate = /^E-2R/.test(code);
+  const t = { code, product, name: code, twoRate, unit: null, day: null, night: null, sc: null };
+  if (twoRate){
+    t.day = prepRates(await octoAll(`${base}/day-unit-rates/${q}`), pay);
+    t.night = prepRates(await octoAll(`${base}/night-unit-rates/${q}`), pay);
+  } else t.unit = prepRates(await octoAll(`${base}/standard-unit-rates/${q}`), pay);
+  t.sc = prepRates(await octoAll(`${base}/standing-charges/${q}`), pay);
+  try { const p = await octoGet(`/v1/products/${product}/`); t.name = p.display_name || p.full_name || code; } catch(e){}
+  return t;
+}
+async function loadTariffSets(fuel, agreements, from, pay){
+  const now = Date.now();
+  const rel = (agreements || []).filter(a => (!a.valid_to || +new Date(a.valid_to) > +from) && +new Date(a.valid_from) < now);
+  const sets = [];
+  for (const a of rel){
+    const t = await loadTariff(fuel, a.tariff_code, from, pay);
+    t.aFrom = +new Date(a.valid_from); t.aTo = a.valid_to ? +new Date(a.valid_to) : Infinity;
+    sets.push(t);
+  }
+  return sets;
+}
+async function loadConsumption(fuel, points, from, to){
+  const seg = fuel === 'electricity' ? 'electricity-meter-points' : 'gas-meter-points';
+  const map = new Map();
+  for (const pt of points) for (const serial of pt.serials){
+    let rows = [];
+    try {
+      rows = await octoAll(`/v1/${seg}/${encodeURIComponent(pt.id)}/meters/${encodeURIComponent(serial)}/consumption/?period_from=${from.toISOString()}&period_to=${to.toISOString()}&page_size=25000&order_by=period`, true, 3);
+    } catch(e){ if (e.code === 'AUTH' || e.code === 'NETWORK') throw e; continue; }
+    for (const r of rows){ const t = +new Date(r.interval_start); map.set(t, (map.get(t) || 0) + r.consumption); }
+  }
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([t, v]) => ({ t, v }));
+}
+
+let productsCache = null;
+async function listProducts(){
+  if (!productsCache) productsCache = await octoAll('/v1/products/?brand=OCTOPUS_ENERGY&is_business=false&page_size=100', false, 4);
+  return productsCache;
+}
+async function findProduct(re){
+  const list = (await listProducts()).filter(p => re.test(p.code));
+  list.sort((a, b) => new Date(b.available_from) - new Date(a.available_from));
+  return list[0] || null;
+}
+/** Unit rates + standing charges for any electricity product in a region. Public data. */
+async function loadProductRates(product, region, from, to, pages = 4, pay = 'DIRECT_DEBIT'){
+  const tariff = `E-1R-${product}-${region}`;
+  const base = `/v1/products/${product}/electricity-tariffs/${tariff}`;
+  const q = `?period_from=${from.toISOString()}${to ? '&period_to=' + to.toISOString() : ''}&page_size=1500`;
+  const unit = prepRates(await octoAll(`${base}/standard-unit-rates/${q}`, false, pages), pay);
+  let sc = null;
+  try { sc = prepRates(await octoAll(`${base}/standing-charges/${q}`, false, 1), pay); } catch(e){}
+  return { product, tariff, unit, sc };
+}
+async function loadAgile(region, from, to, pages = 4){
+  const p = await findProduct(/^AGILE-(?!OUTGOING)/);
+  if (!p) throw new ApiError('NOPRODUCT', 'Octopus isn\'t listing an Agile tariff right now.');
+  return loadProductRates(p.code, region, from, to, pages);
+}
+
+/* Tariffs to compare. Eligibility notes are general, Octopus has the final rules. */
+const COMPARE = [
+  { id:'agile',  re:/^AGILE-(?!OUTGOING)/, label:'Agile', note:'Price changes every half hour, capped at 100p.' },
+  { id:'go',     re:/^GO-VAR-/,            label:'Octopus Go', note:'Usually needs an electric vehicle.' },
+  { id:'iog',    re:/^INTELLI-VAR-/,       label:'Intelligent Octopus Go', note:'Needs a compatible EV, charger or home battery.' },
+  { id:'flux',   re:/^FLUX-IMPORT-/,       label:'Octopus Flux', note:'Needs solar panels and a home battery.' },
+  { id:'cosy',   re:/^COSY-/,              label:'Cosy Octopus', note:'Needs a heat pump.' },
+  { id:'tracker',re:/^SILVER-/,            label:'Octopus Tracker', note:'Price changes daily with wholesale costs.' }
+];
+const EXPORTS = [
+  { id:'agileOut', re:/^AGILE-OUTGOING-/, label:'Agile Outgoing' },
+  { id:'fluxOut',  re:/^FLUX-EXPORT-/,    label:'Flux export' },
+  { id:'outFix',   re:/^OUTGOING-(PRIME-)?FIX-/, label:'Outgoing Fixed' },
+  { id:'outVar',   re:/^OUTGOING-VAR-/,   label:'Outgoing Octopus' }
+];
+async function loadExportRates(region){
+  const out = [];
+  const from = addDays(startOfDay(new Date()), -1);
+  for (const e of EXPORTS){
+    try {
+      const p = await findProduct(e.re); if (!p) continue;
+      const r = await loadProductRates(p.code, region, from, null, 1);
+      const vals = (r.unit || []).filter(x => x.to > Date.now() - 864e5).map(x => x.p);
+      if (vals.length) out.push({ ...e, product: p.code, rate: sum(vals)/vals.length, variable: new Set(vals).size > 1 });
+    } catch(err){}
+  }
+  return out;
+}
+
+/* ---------- account ---------- */
+async function loadProperty(){
+  const acc = await octoGet(`/v1/accounts/${encodeURIComponent(NET.creds.account)}/`, true);
+  const props = acc.properties || [];
+  const prop = props.find(p => !p.moved_out_at) || props[props.length-1];
+  if (!prop) throw new ApiError('NOPROP', 'No property is listed on this account yet.');
+  return prop;
+}
+async function loadAccount({ gasUnit, pay, fallbackRegion }){
+  const prop = await loadProperty();
+  const pts = (list, idKey) => (list || []).map(m => ({
+    id: m[idKey], serials: (m.meters || []).map(x => x.serial_number).filter(Boolean),
+    agreements: m.agreements || [], agreement: pickAgreement(m.agreements)
+  }));
+  const elecPts = pts((prop.electricity_meter_points || []).filter(m => !m.is_export), 'mpan');
+  const gasPts = pts(prop.gas_meter_points, 'mprn');
+  const end = startOfDay(new Date()), from = addDays(end, -90);
+  const eSets = elecPts[0] ? await loadTariffSets('electricity', elecPts[0].agreements, from, pay) : [];
+  const gSets = gasPts[0] ? await loadTariffSets('gas', gasPts[0].agreements, from, pay) : [];
+  const elec = elecPts.length ? await loadConsumption('electricity', elecPts, from, end) : [];
+  let gas = gasPts.length ? await loadConsumption('gas', gasPts, from, end) : [];
+  if (gasUnit === 'm3') gas = gas.map(r => ({ t: r.t, v: r.v * GAS_M3_TO_KWH }));
+  const region = regionOf(elecPts[0] && elecPts[0].agreement && elecPts[0].agreement.tariff_code) || fallbackRegion;
+  return { demo: false, region: REGIONS[region] ? region : fallbackRegion, elecPts, gasPts, eSets, gSets, elec, gas };
+}
+/** Today's electricity tariff only, without readings: what the display needs to price the Home Mini's figures. */
+async function loadTodayTariff(pay){
+  const prop = await loadProperty();
+  const pt = (prop.electricity_meter_points || []).filter(m => !m.is_export)[0];
+  if (!pt) return { region: null, eSets: [] };
+  const a = pickAgreement(pt.agreements);
+  return { region: regionOf(a && a.tariff_code), eSets: await loadTariffSets('electricity', pt.agreements, startOfDay(new Date()), pay) };
+}
+
+/* ---------- Octopus GraphQL (Home Mini, Saving Sessions, Octoplus) ---------- */
+async function gql(query, variables = {}, auth = true){
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+  if (auth) headers.Authorization = 'JWT ' + await krakenToken();
+  const j = await request(octoUrl('/v1/graphql/'), { method: 'POST', headers, body: JSON.stringify({ query, variables }) });
+  if (j.errors && !j.data) throw new ApiError('GQL', j.errors.map(e => e.message).join('; '));
+  return j.data;
+}
+async function krakenToken(){
+  if (NET.token && Date.now() - NET.tokenAt < 50*60e3) return NET.token;
+  const d = await gql('mutation($k:String!){obtainKrakenToken(input:{APIKey:$k}){token}}', { k: NET.creds.key }, false);
+  NET.token = d.obtainKrakenToken.token; NET.tokenAt = Date.now();
+  return NET.token;
+}
+async function findHomeMini(){
+  const d = await gql(`query($a:String!){account(accountNumber:$a){electricityAgreements(active:true){meterPoint{meters(includeInactive:false){serialNumber smartImportElectricityMeter{deviceId}}}}}}`, { a: NET.creds.account });
+  for (const ag of (d.account && d.account.electricityAgreements) || [])
+    for (const m of (ag.meterPoint && ag.meterPoint.meters) || []) if (m.smartImportElectricityMeter && m.smartImportElectricityMeter.deviceId) return m.smartImportElectricityMeter.deviceId;
+  return null;
+}
+/** Live draw from the Home Mini. withToday adds the day's half hours: a second GraphQL call, so the display asks for it less often. */
+async function liveReading(deviceId, withToday = true){
+  const now = new Date(), q = `query($d:String!,$s:DateTime!,$e:DateTime!,$g:TelemetryGrouping){smartMeterTelemetry(deviceId:$d,grouping:$g,start:$s,end:$e){readAt consumptionDelta demand}}`;
+  const recent = await gql(q, { d: deviceId, s: new Date(now - 10*60e3).toISOString(), e: now.toISOString(), g: 'TEN_SECONDS' });
+  const tens = (recent.smartMeterTelemetry || []).filter(r => r.demand != null);
+  const last = tens[tens.length-1] || null;
+  let today = null, halfHours = null;
+  if (withToday) try {
+    const hh = await gql(q, { d: deviceId, s: startOfDay(now).toISOString(), e: now.toISOString(), g: 'HALF_HOURLY' });
+    halfHours = (hh.smartMeterTelemetry || []).map(r => ({ t: +new Date(r.readAt), v: (+r.consumptionDelta || 0) / 1000 }));
+    today = sum(halfHours.map(r => r.v));
+  } catch(e){}
+  return { demand: last ? +last.demand : null, at: last ? +new Date(last.readAt) : null, today, rows: halfHours };
+}
+async function loadRewards(){
+  const out = { sessions: null, points: null };
+  try {
+    const d = await gql(`query($a:String!){savingSessions{events(includeDev:false){id startAt endAt rewardPerKwhInOctoPoints} account(accountNumber:$a){hasJoinedCampaign joinedEvents{eventId startAt endAt rewardGivenInOctoPoints}}}}`, { a: NET.creds.account });
+    out.sessions = d.savingSessions || null;
+  } catch(e){}
+  try {
+    const d = await gql('{loyaltyPointLedgers{balanceCarriedForward}}');
+    const l = d.loyaltyPointLedgers || [];
+    if (l.length) out.points = +l[0].balanceCarriedForward;
+  } catch(e){}
+  return out;
+}
+
+/* ---------- other services ---------- */
+async function loadCarbonForecast(regionId){
+  const from = new Date(Math.floor(Date.now() / 1800e3) * 1800e3).toISOString().replace(/:\d\d\.\d+Z$/, 'Z');
+  const j = await request(`https://api.carbonintensity.org.uk/regional/intensity/${from}/fw48h/regionid/${regionId}`, { headers: { Accept: 'application/json' } });
+  return parseCarbon(j);
+}
+function parseCarbon(j){
+  const d = j && j.data;
+  const arr = Array.isArray(d) ? d.reduce((a, x) => a.concat(x.data || [x]), []) : (d && d.data) || [];
+  return arr.filter(x => x.intensity).map(x => ({ from: +new Date(x.from), to: +new Date(x.to), v: nz(x.intensity.forecast, x.intensity.actual), index: x.intensity.index }))
+            .filter(x => x.v != null).sort((a, b) => a.from - b.from);
+}
+async function loadCarbonHistory(regionId, from, to){
+  const out = [];
+  for (let s = new Date(from); s < to; s = addDays(s, 13)){
+    const e = new Date(Math.min(+addDays(s, 13), +to));
+    const iso = d => d.toISOString().replace(/:\d\d\.\d+Z$/, 'Z');
+    try { out.push(...parseCarbon(await request(`https://api.carbonintensity.org.uk/regional/intensity/${iso(s)}/${iso(e)}/regionid/${regionId}`))); } catch(err){}
+  }
+  return out.map(x => ({ from: x.from, to: x.to, p: x.v })).sort((a, b) => a.from - b.from);
+}
+async function loadWeather(){
+  const j = await request(`https://api.open-meteo.com/v1/forecast?latitude=${HOME.lat}&longitude=${HOME.lon}&daily=temperature_2m_mean&past_days=92&forecast_days=7&timezone=Europe%2FLondon`);
+  const map = new Map(), today = dayKey(Date.now());
+  ((j.daily && j.daily.time) || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
+  return map;
+}
+async function loadPVGIS(kwp, aspect, angle){
+  if (!NET.proxy) throw new ApiError('NOPROXY');
+  const j = await request(`./proxy/pvgis/v5_3/PVcalc?lat=${HOME.lat}&lon=${HOME.lon}&peakpower=${kwp}&loss=14&angle=${angle}&aspect=${aspect}&outputformat=json`);
+  const m = j.outputs && j.outputs.monthly && j.outputs.monthly.fixed;
+  if (!m || m.length !== 12) throw new ApiError('HTTP', 'PVGIS returned an unexpected answer.');
+  return m.map(x => x.E_m / kwp);
+}
+async function searchEPC(postcode, token){
+  if (!NET.proxy) throw new ApiError('NOPROXY');
+  return request(`./proxy/epc/domestic/search?postcode=${encodeURIComponent(postcode)}`, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
+}
+
+function errorText(e){
+  switch (e && e.code){
+    case 'NETWORK': return ['No signal.', NET.proxy ? 'The home server helper couldn\'t reach the service. Check its internet connection.' : 'Your browser couldn\'t reach the service. If this keeps happening, run the page through the home server helper (see the Home tab).'];
+    case 'AUTH': return ['Access was refused.', 'Check your Octopus API key. It starts with sk_live_ and the whole key is needed.'];
+    case 'NOTFOUND': return ['Not found.', 'Check your account number. It looks like A-1234ABCD.'];
+    case 'NOPROXY': return ['Needs the home server helper.', 'This service doesn\'t allow browsers to call it directly. Run server.py on your home server and open the page from there.'];
+    default: return ['Something went wrong.', (e && e.message) || ''];
+  }
+}
+/* ===================== analysis: pure functions, no DOM ===================== */
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function makeDemo(){
+  const rnd = mulberry32(19);
+  const end = startOfDay(new Date()), from = addDays(end, -90);
+  const elec = [], gas = [], agile = [], carbon = [];
+  const weather = new Map();
+  for (let d = new Date(from); d < addDays(end, 7); d = addDays(d, 1)){
+    const i = Math.round((d - from) / 864e5);
+    weather.set(dayKey(d), { t: +(15.5 - i * 0.09 + (rnd() - 0.5) * 4).toFixed(1), forecast: d >= end });
+  }
+  for (let t = +from; t < +end; t += 1800e3){
+    const d = new Date(t), h = d.getHours() + d.getMinutes()/60;
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    let e = 0.075 + rnd()*0.03;
+    if (h >= 7 && h < 9) e += 0.12 + rnd()*0.15;
+    if (h >= 12 && h < 14 && weekend) e += 0.15*rnd();
+    if (h >= 17 && h < 19.5) e += 0.30 + rnd()*0.35;
+    if (h >= 19.5 && h < 23) e += 0.15 + rnd()*0.12;
+    if (rnd() < 0.012) e += 0.9 + rnd();
+    elec.push({ t, v: +e.toFixed(3) });
+    const temp = weather.get(dayKey(t)).t;
+    const need = Math.max(0, 15.5 - temp) / 8;
+    let g = 0;
+    if ((h >= 6 && h < 8.5) || (h >= 17 && h < 22)) g = (0.5 + rnd()*0.5) * need * 1.4;
+    if (h >= 7 && h < 7.5) g += 0.6 + rnd()*0.4;
+    if (h >= 2 && h < 3 && rnd() < 0.08) g += 0.8;
+    gas.push({ t, v: +g.toFixed(3) });
+    let a = 16 + 6*Math.sin((h-4)/24*2*Math.PI) + (rnd()-0.5)*5;
+    if (h >= 16 && h < 19) a += 14;
+    if (h >= 1 && h < 5) a -= 6;
+    if (rnd() < 0.01) a = -2 - rnd()*4;
+    agile.push({ from: t, to: t + 1800e3, p: +a.toFixed(2) });
+    carbon.push({ from: t, to: t + 1800e3, p: Math.round(120 + 60*Math.sin((h-6)/24*2*Math.PI) + (rnd()-0.5)*60) });
+  }
+  const flat = (code, name, unit, sc) => ({ code, name, product:'EXAMPLE', twoRate:false, unit:[{from:0,to:Infinity,p:unit}], sc:[{from:0,to:Infinity,p:sc}], aFrom:0, aTo:Infinity });
+  const since = from.toISOString();
+  return {
+    demo: true, region: 'G',
+    elecPts: [{ id:'Example MPAN', serials:['Example meter'], agreement:{ tariff_code:'E-1R-EXAMPLE-G', valid_from: since } }],
+    gasPts: [{ id:'Example MPRN', serials:['Example meter'], agreement:{ tariff_code:'G-1R-EXAMPLE-G', valid_from: since } }],
+    eSets: [flat('E-1R-EXAMPLE-G','Example flexible tariff', 24.86, 53.80)],
+    gSets: [flat('G-1R-EXAMPLE-G','Example flexible tariff', 6.29, 32.67)],
+    elec, gas, weather,
+    agileHist: { product:'EXAMPLE', unit: agile, sc:[{from:0,to:Infinity,p:48.0}] },
+    carbonHist: carbon
+  };
+}
+
+/* ---------- main roll-up for the selected period ---------- */
+function buildModel(raw, days){
+  const end = startOfDay(new Date()), start = addDays(end, -days);
+  const s = +start, e = +end;
+  const list = [], idx = new Map();
+  for (let d = new Date(start); d < end; d = addDays(d, 1)){
+    idx.set(dayKey(d), list.length);
+    list.push({ k: dayKey(d), date: new Date(d), e:0, ec:0, g:0, gc:0, eHas:false, gHas:false, co2:0 });
+  }
+  const eProf = new Array(48).fill(0), gProf = new Array(48).fill(0), eDays = new Set(), gDays = new Set();
+  const ehh = [], ghh = [];
+  const ch = raw.carbonHist && raw.carbonHist.length ? raw.carbonHist : null;
+  let co2e = 0, co2g = 0, ciCovered = 0;
+  for (const x of raw.elec){
+    if (x.t < s || x.t >= e) continue;
+    const d = list[idx.get(dayKey(x.t))]; if (!d) continue;
+    d.e += x.v; d.eHas = true;
+    const p = unitPriceAt(raw.eSets, x.t); if (p != null) d.ec += x.v * p;
+    eProf[slotOf(x.t)] += x.v; eDays.add(d.k); ehh.push(x);
+    const ci = ch ? lookup(ch, x.t) : null;
+    const c = x.v * (ci != null ? ci/1000 : CO2_ELEC_FALLBACK);
+    if (ci != null) ciCovered++;
+    co2e += c; d.co2 += c;
+  }
+  for (const x of raw.gas){
+    if (x.t < s || x.t >= e) continue;
+    const d = list[idx.get(dayKey(x.t))]; if (!d) continue;
+    d.g += x.v; d.gHas = true;
+    const p = unitPriceAt(raw.gSets, x.t); if (p != null) d.gc += x.v * p;
+    gProf[slotOf(x.t)] += x.v; gDays.add(d.k); ghh.push(x);
+    co2g += x.v * CO2_GAS; d.co2 += x.v * CO2_GAS;
+  }
+  for (const d of list){
+    const mid = +d.date + 12*3600e3;
+    if (d.eHas){ const sc = standingAt(raw.eSets, mid); if (sc != null) d.ec += sc; }
+    if (d.gHas){ const sc = standingAt(raw.gSets, mid); if (sc != null) d.gc += sc; }
+  }
+  const tot = { e: sum(list.map(d=>d.e)), ec: sum(list.map(d=>d.ec)), g: sum(list.map(d=>d.g)), gc: sum(list.map(d=>d.gc)),
+                nE: list.filter(d=>d.eHas).length, nG: list.filter(d=>d.gHas).length };
+  const nE = eDays.size, nG = gDays.size;
+  const profile = eProf.map(v => nE ? v/nE : 0);
+  const gasProfile = gProf.map(v => nG ? v/nG : 0);
+  const totalE = sum(ehh.map(x=>x.v));
+  const inSlots = (lo, hi) => sum(ehh.filter(x => { const i = slotOf(x.t); return i >= lo && i <= hi; }).map(x=>x.v));
+  const sorted = ehh.map(x=>x.v).sort((a,b)=>a-b);
+  const insights = nE && totalE > 0 ? {
+    baseW: sorted[Math.floor(sorted.length*0.1)] * 2000,
+    overnightShare: inSlots(1, 10)/totalE, peakShare: inSlots(32, 37)/totalE,
+    evening: inSlots(32, 47)/nE, perDay: totalE/nE, rateNow: unitPriceAt(raw.eSets, Date.now())
+  } : null;
+
+  // Agile versus your tariff over the same readings
+  let agileCmp = null;
+  const ah = raw.agileHist;
+  if (ah && ah.unit && ehh.length){
+    let aP = 0, yP = 0; const cov = new Set();
+    for (const x of ehh){ const a = lookup(ah.unit, x.t), y = unitPriceAt(raw.eSets, x.t); if (a == null || y == null) continue; aP += x.v*a; yP += x.v*y; cov.add(dayKey(x.t)); }
+    for (const k of cov){ const mid = +keyDate(k) + 12*3600e3; aP += nz(lookup(ah.sc, mid), 0); yP += nz(standingAt(raw.eSets, mid), 0); }
+    if (cov.size) agileCmp = { agile: aP, yours: yP, days: cov.size };
+  }
+
+  return { start, end, days: list, tot, profile, gasProfile, profDays: nE, gasDays: nG, insights, agileCmp,
+           spikes: findSpikes(ehh), oddDays: oddDays(list), heating: heatingWindows(gasProfile, ghh),
+           co2: { e: co2e, g: co2g, regional: ch && ciCovered > ehh.length*0.8 } };
+}
+
+/* ---------- patterns ---------- */
+function findSpikes(ehh){
+  if (ehh.length < 48*5) return [];
+  const bySlot = Array.from({length:48}, () => []);
+  for (const x of ehh) bySlot[slotOf(x.t)].push(x.v);
+  const med = bySlot.map(median);
+  return ehh.map(x => ({ ...x, base: med[slotOf(x.t)] }))
+    .filter(x => x.v > 3*x.base && x.v - x.base > 0.35)
+    .sort((a, b) => (b.v - b.base) - (a.v - a.base)).slice(0, 8);
+}
+function oddDays(list){
+  const e = list.filter(d => d.eHas), g = list.filter(d => d.gHas);
+  const me = median(e.map(d => d.e)), mg = median(g.map(d => d.g));
+  const out = [];
+  for (const d of e) if (me > 0 && d.e > me*1.4) out.push({ date: d.date, fuel:'Electricity', v: d.e, ratio: d.e/me });
+  for (const d of g) if (mg > 1 && d.g > mg*1.5) out.push({ date: d.date, fuel:'Gas', v: d.g, ratio: d.g/mg });
+  return out.sort((a, b) => b.ratio - a.ratio).slice(0, 6);
+}
+function heatingWindows(gasProfile, ghh){
+  const max = Math.max(...gasProfile);
+  if (!(max > 0.05)) return null;
+  const on = gasProfile.map(v => v > max*0.3);
+  const runs = []; let st = null;
+  for (let i = 0; i <= 48; i++){ if (i < 48 && on[i]){ if (st == null) st = i; } else if (st != null){ runs.push([st, i]); st = null; } }
+  const nights = new Map();
+  for (const x of ghh){ if (slotOf(x.t) < 10){ const k = dayKey(x.t); nights.set(k, (nights.get(k) || 0) + x.v); } }
+  const nightDays = [...nights.entries()].filter(([, v]) => v > 0.3).map(([k]) => k);
+  return { runs, nightDays, totalNights: nights.size };
+}
+
+/* ---------- weather and gas ---------- */
+function gasRegression(raw){
+  if (!raw.weather) return null;
+  const byDay = new Map();
+  for (const x of raw.gas) byDay.set(dayKey(x.t), (byDay.get(dayKey(x.t)) || 0) + x.v);
+  const pts = [];
+  for (const [k, g] of byDay){ const w = raw.weather.get(k); if (w && !w.forecast) pts.push({ k, temp: w.t, hdd: Math.max(0, 15.5 - w.t), g }); }
+  if (pts.length < 10) return pts.length ? { pts, a: null, b: null } : null;
+  const n = pts.length, mx = sum(pts.map(p=>p.hdd))/n, my = sum(pts.map(p=>p.g))/n;
+  const sxx = sum(pts.map(p => (p.hdd-mx)**2)), sxy = sum(pts.map(p => (p.hdd-mx)*(p.g-my)));
+  let b = sxx > 0 ? sxy/sxx : 0, a = my - b*mx;
+  if (a < 0){ a = 0; b = sum(pts.map(p=>p.hdd*p.g)) / Math.max(1e-9, sum(pts.map(p=>p.hdd**2))); }
+  const ssr = sum(pts.map(p => (p.g - (a + b*p.hdd))**2)), sst = sum(pts.map(p => (p.g-my)**2));
+  return { pts, a, b: Math.max(0, b), r2: sst > 0 ? 1 - ssr/sst : 0 };
+}
+/** Typical-year gas use from the regression: base (hot water, cooking) + heating × degree days. */
+function annualGas(reg, heatScale = 1){
+  if (!reg || reg.a == null) return null;
+  let base = 0, heat = 0;
+  for (let m = 0; m < 12; m++){ const dm = DAYS_IN_MONTH(m); base += reg.a*dm; heat += reg.b * Math.max(0, 15.5 - TEMP_NORMALS[m]) * dm * heatScale; }
+  return { base, heat, total: base + heat };
+}
+const MEASURES = [
+  { id:'loft',    label:'Top up loft insulation to 270mm', cut:.10 },
+  { id:'cavity',  label:'Cavity wall insulation', cut:.20 },
+  { id:'draught', label:'Draught-proof doors, windows and floors', cut:.07 },
+  { id:'glazing', label:'Replace remaining single glazing', cut:.08 },
+  { id:'thermo',  label:'Turn the thermostat down 1°C', cut:.08 },
+  { id:'flow',    label:'Lower boiler flow temperature to 55°C', cut:.05 },
+  { id:'trv',     label:'Smart radiator valves, heat rooms only when used', cut:.06 }
+];
+function insulationPlan(reg, chosen, gasRate){
+  const yr = annualGas(reg); if (!yr) return null;
+  const keep = chosen.reduce((k, id) => { const m = MEASURES.find(x => x.id === id); return m ? k*(1-m.cut) : k; }, 1);
+  const saved = yr.heat * (1 - keep);
+  return { year: yr, saved, savedP: saved * gasRate, cutShare: 1 - keep };
+}
+
+/* ---------- money ---------- */
+function monthProjection(raw){
+  const today = startOfDay(new Date()), first = new Date(today.getFullYear(), today.getMonth(), 1);
+  const dim = DAYS_IN_MONTH(today.getMonth());
+  const m = buildModelRange(raw, first, today);
+  const recent = buildModelRange(raw, addDays(today, -14), today);
+  const avg = (recent.nE ? recent.ec/recent.nE : 0) + (recent.nG ? recent.gc/recent.nG : 0);
+  const remaining = dim - (today.getDate() - 1);
+  return { soFar: m.ec + m.gc, daysSoFar: today.getDate() - 1, remaining, projected: m.ec + m.gc + avg*remaining, avgDay: avg, month: MON[today.getMonth()] };
+}
+function buildModelRange(raw, from, to){
+  const s = +from, e = +to; let ec = 0, gc = 0; const ed = new Set(), gd = new Set();
+  for (const x of raw.elec) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; ed.add(dayKey(x.t)); }
+  for (const x of raw.gas) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; gd.add(dayKey(x.t)); }
+  for (const k of ed) ec += nz(standingAt(raw.eSets, +keyDate(k) + 432e5), 0);
+  for (const k of gd) gc += nz(standingAt(raw.gSets, +keyDate(k) + 432e5), 0);
+  return { ec, gc, nE: ed.size, nG: gd.size };
+}
+function annualProjection(raw, reg){
+  const now = Date.now(), end = startOfDay(new Date());
+  const r30 = buildModelRange(raw, addDays(end, -30), end);
+  const eRate = unitPriceAt(raw.eSets, now), gRate = unitPriceAt(raw.gSets, now);
+  const eSc = nz(standingAt(raw.eSets, now), 0), gSc = nz(standingAt(raw.gSets, now), 0);
+  if (!r30.nE && !r30.nG) return null;
+  const eUse = r30.nE ? sum(raw.elec.filter(x => x.t >= +addDays(end,-30) && x.t < +end).map(x=>x.v)) / r30.nE * 365 : 0;
+  const elecP = r30.nE ? (eRate != null ? eUse*eRate : r30.ec/r30.nE*365) + eSc*365 : 0;
+  const yr = annualGas(reg);
+  let gasP = 0, gasMethod = 'none';
+  if (raw.gasPts.length){
+    if (yr && gRate != null){ gasP = yr.total*gRate + gSc*365; gasMethod = 'weather'; }
+    else if (r30.nG){ gasP = r30.gc/r30.nG*365; gasMethod = 'recent'; }
+  }
+  return { elecP, gasP, total: elecP + gasP, gasMethod, eUse, gasUse: yr ? yr.total : null };
+}
+function nextCapChange(now = new Date()){
+  const y = now.getFullYear();
+  const cands = [0,3,6,9].map(m => new Date(y, m, 1)).concat([new Date(y+1, 0, 1)]).filter(d => d > now);
+  const next = cands[0];
+  const announce = addDays(next, -36);
+  return { next, announce, days: Math.ceil((next - now)/864e5), announceDays: Math.ceil((announce - now)/864e5) };
+}
+
+/* ---------- comparisons and simulations ---------- */
+function compareTariffs(raw, options, days = 90){
+  const end = +startOfDay(new Date()), start = +addDays(end, -days);
+  const rows = raw.elec.filter(x => x.t >= start && x.t < end);
+  if (!rows.length) return null;
+  const plans = [{ id:'current', label:'Your tariff now', note:'', price: t => unitPriceAt(raw.eSets, t), sc: t => standingAt(raw.eSets, t) }]
+    .concat(options.map(o => ({ ...o, price: t => lookup(o.unit, t), sc: t => lookup(o.sc, t) })));
+  const per = plans.map(() => new Map());
+  const dayOK = new Map();
+  for (const x of rows){
+    const k = dayKey(x.t);
+    plans.forEach((p, i) => {
+      const r = p.price(x.t);
+      const m = per[i];
+      const cur = m.get(k) || { p: 0, ok: true };
+      if (r == null) cur.ok = false; else cur.p += x.v * r;
+      m.set(k, cur);
+    });
+  }
+  const keys = [...per[0].keys()].filter(k => per.every(m => m.get(k) && m.get(k).ok));
+  if (!keys.length) return null;
+  const res = plans.map((p, i) => {
+    let tot = 0;
+    for (const k of keys){ tot += per[i].get(k).p + nz(p.sc(+keyDate(k) + 432e5), 0); }
+    return { id: p.id, label: p.label, note: p.note, product: p.product, total: tot, year: tot / keys.length * 365 };
+  });
+  return { days: keys.length, rows: res.sort((a, b) => a.total - b.total) };
+}
+
+/** One charge-discharge cycle a day: buy cheap slots, cover dearer later demand. Estimate only. */
+function simulateBattery(raw, priceAt, cap, powerKw, eff, days = 90){
+  const end = +startOfDay(new Date()), start = +addDays(end, -days);
+  const byDay = new Map();
+  for (const x of raw.elec){ if (x.t < start || x.t >= end) continue; const p = priceAt(x.t); if (p == null) continue; const k = dayKey(x.t); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push({ t: x.t, d: x.v, p }); }
+  const lim = powerKw * 0.5;
+  let base = 0, saved = 0, cycled = 0;
+  for (const slots of byDay.values()){
+    slots.sort((a, b) => a.t - b.t);
+    base += sum(slots.map(s => s.d*s.p));
+    const chargeLeft = slots.map(() => lim), disLeft = slots.map(s => Math.min(s.d, lim));
+    let budget = cap;
+    const order = slots.map((s, i) => i).sort((a, b) => slots[b].p - slots[a].p);
+    for (const j of order){
+      while (disLeft[j] > 1e-6 && budget > 1e-6){
+        let best = -1;
+        for (let i = 0; i < j; i++) if (chargeLeft[i] > 1e-6 && slots[i].p/eff < slots[j].p && (best < 0 || slots[i].p < slots[best].p)) best = i;
+        if (best < 0) break;
+        const deliver = Math.min(disLeft[j], chargeLeft[best]*eff, budget*eff);
+        const grid = deliver/eff;
+        chargeLeft[best] -= grid; disLeft[j] -= deliver; budget -= grid;
+        saved += deliver*slots[j].p - grid*slots[best].p; cycled += deliver;
+      }
+    }
+  }
+  const n = byDay.size;
+  return n ? { days: n, base, saved, year: saved/n*365, cycledPerDay: cycled/n } : null;
+}
+
+/** Share of a day's sunshine falling in each half hour, for a mid-month day. */
+function solarShape(month){
+  const n = Math.round(30.4*month + 15), lat = HOME.lat * Math.PI/180;
+  const dec = 23.44*Math.PI/180 * Math.sin(2*Math.PI*(284+n)/365);
+  const w0 = Math.acos(clamp(-Math.tan(lat)*Math.tan(dec), -1, 1));
+  const len = 2*w0*180/Math.PI/15;
+  const noon = (month >= 3 && month <= 9) ? 13.1 : 12.1;   // clock time, BST in summer months
+  const rise = noon - len/2;
+  const w = Array.from({length:48}, (_, i) => { const t = i/2 + 0.25; return t > rise && t < rise + len ? Math.pow(Math.sin(Math.PI*(t-rise)/len), 1.5) : 0; });
+  const s = sum(w) || 1;
+  return w.map(v => v/s);
+}
+function simulateSolar({ profile, monthlyKwh, importP, exportP, batteryKwh = 0, eff = 0.9 }){
+  let gen = 0, self = 0, fromBatt = 0, exp = 0;
+  const months = [];
+  for (let m = 0; m < 12; m++){
+    const dm = DAYS_IN_MONTH(m), daily = monthlyKwh[m]/dm, shape = solarShape(m);
+    let s = 0, b = 0, x = 0, soc = 0;
+    for (let i = 0; i < 48; i++){
+      const g = daily*shape[i], d = profile[i];
+      if (g >= d){ s += d; let sur = g - d; const c = Math.min(sur, batteryKwh - soc); soc += c; sur -= c; x += sur; }
+      else { s += g; const out = Math.min(d - g, soc*eff); b += out; soc -= out/eff; }
+    }
+    gen += monthlyKwh[m]; self += s*dm; fromBatt += b*dm; exp += x*dm;
+    months.push({ m, gen: monthlyKwh[m], used: (s+b)*dm, exported: x*dm });
+  }
+  const savedP = (self + fromBatt)*importP + exp*exportP;
+  return { gen, self, fromBatt, exp, savedP, useShare: gen ? (self+fromBatt)/gen : 0, months };
+}
+
+function cheapestWindow(rates, slots, now = Date.now()){
+  const fut = rates.filter(r => r.to > now && r.from >= now - 1800e3);
+  let best = null;
+  for (let i = 0; i + slots - 1 < fut.length; i++){
+    const w = fut.slice(i, i + slots);
+    if (w.some((r, j) => j && r.from !== w[j-1].to)) continue;
+    const avg = sum(w.map(r => nz(r.p, r.v))) / slots;
+    if (!best || avg < best.avg) best = { avg, from: w[0].from, to: w[slots-1].to };
+  }
+  return best;
+}
+
+/* ---------- weekly log ---------- */
+function weekLog(raw){
+  const end = startOfDay(new Date());
+  const wk = (a, b) => {
+    const s = +addDays(end, a), e = +addDays(end, b);
+    const dayE = new Map(), dayG = new Map();
+    let ec = 0, gc = 0;
+    for (const x of raw.elec) if (x.t >= s && x.t < e){ dayE.set(dayKey(x.t), (dayE.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; }
+    for (const x of raw.gas) if (x.t >= s && x.t < e){ dayG.set(dayKey(x.t), (dayG.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; }
+    for (const k of dayE.keys()) ec += nz(standingAt(raw.eSets, +keyDate(k)+432e5), 0);
+    for (const k of dayG.keys()) gc += nz(standingAt(raw.gSets, +keyDate(k)+432e5), 0);
+    const tot = new Map([...dayE.keys(), ...dayG.keys()].map(k => [k, 0]));
+    for (const [k, v] of dayE) tot.set(k, tot.get(k) + v);
+    for (const [k, v] of dayG) tot.set(k, tot.get(k) + v);
+    const ranked = [...tot.entries()].sort((a, b) => a[1] - b[1]);
+    return { e: sum([...dayE.values()]), g: sum([...dayG.values()]), cost: ec + gc, days: tot.size,
+             best: ranked[0] || null, worst: ranked[ranked.length-1] || null, from: addDays(end, a), to: addDays(end, b-1) };
+  };
+  return { cur: wk(-7, 0), prev: wk(-14, -7) };
+}
+
+/* ---------- activities ---------- */
+const ACTIVITIES = [
+  { id:'kettle', label:'Kettle, full boil', fuel:'e', kwh:0.11 },
+  { id:'wash', label:'Washing machine, 40°C load', fuel:'e', kwh:0.8, hours:2 },
+  { id:'dish', label:'Dishwasher, eco cycle', fuel:'e', kwh:0.9, hours:3 },
+  { id:'dryer', label:'Tumble dryer load', fuel:'e', kwh:2.4, hours:1.5 },
+  { id:'oven', label:'Electric oven, 1 hour', fuel:'e', kwh:1.6, hours:1 },
+  { id:'hob', label:'Electric hob, 30 minutes', fuel:'e', kwh:0.7, hours:0.5 },
+  { id:'fridge', label:'Fridge-freezer, a day', fuel:'e', kwh:0.6 },
+  { id:'tv', label:'TV, 3 hours', fuel:'e', kwh:0.25 },
+  { id:'laptop', label:'Laptop, a working day', fuel:'e', kwh:0.3 },
+  { id:'phone', label:'Phone charge', fuel:'e', kwh:0.015 },
+  { id:'shower', label:'Shower, 8 minutes (gas combi)', fuel:'g', kwh:3.0 },
+  { id:'bath', label:'Bath (gas)', fuel:'g', kwh:5.0 },
+  { id:'heat', label:'Central heating, 1 hour', fuel:'g', kwh:4.0 }
+];
+
+function toCSV(raw){
+  const g = new Map(raw.gas.map(x => [x.t, x.v]));
+  const times = [...new Set([...raw.elec.map(x=>x.t), ...raw.gas.map(x=>x.t)])].sort((a,b)=>a-b);
+  const e = new Map(raw.elec.map(x => [x.t, x.v]));
+  const lines = ['interval_start,electricity_kwh,electricity_p_per_kwh,gas_kwh,gas_p_per_kwh'];
+  for (const t of times){
+    const ep = unitPriceAt(raw.eSets, t), gp = unitPriceAt(raw.gSets, t);
+    lines.push([new Date(t).toISOString(), nz(e.get(t), ''), nz(ep, ''), g.has(t) ? g.get(t).toFixed(4) : '', nz(gp, '')].join(','));
+  }
+  return lines.join('\n');
+}
+/* ===================== display sources: household data, pure parsing, example data ===================== */
+// Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
+
+const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const longDay = d => `${DAY_NAMES[d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+const minsBetween = (a, b) => Math.round((b - a) / 60e3);
+function relDay(t, now){
+  const d = Math.round((+startOfDay(new Date(t)) - +startOfDay(new Date(now))) / 864e5);
+  return d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : d === -1 ? 'Yesterday' : d > 1 && d < 7 ? DAY_NAMES[new Date(t).getDay()] : shortDate(new Date(t));
+}
+
+/* ---------- display modes ---------- */
+const MODES = [
+  { id: 'energy', label: 'Energy', key: '1' },
+  { id: 'home', label: 'Home', key: '2' },
+  { id: 'travel', label: 'Travel', key: '3' },
+  { id: 'screensaver', label: 'Screensaver', key: '4' },
+  { id: 'night', label: 'Night', key: '5' }
+];
+const ROTATING = ['energy', 'home', 'travel'];
+const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+function stepMode(id, dir){ const i = MODES.findIndex(m => m.id === id); return MODES[(Math.max(0, i) + dir + MODES.length) % MODES.length].id; }
+/** Is the clock time inside a window like 23:00–06:30? Windows may cross midnight. */
+function inWindow(now, from, to){
+  const m = t => { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); };
+  const d = new Date(now), x = d.getHours()*60 + d.getMinutes(), a = m(from), b = m(to);
+  if (a === b) return false;
+  return a < b ? x >= a && x < b : x >= a || x < b;
+}
+
+const DISPLAY_DEFAULTS = {
+  mode: 'energy', rotate: 0, saver: 15, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
+  bins: [], ical: '',
+  trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
+};
+function displaySettings(saved){
+  const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
+  s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
+  return s;
+}
+
+/* ---------- bins ---------- */
+const BIN_COLOURS = { black:'#2a2d3a', blue:'#2f7bff', brown:'#8a5a32', green:'#2fb36b', grey:'#8a90a8', purple:'#8f6bff', red:'#e5484d', yellow:'#ffd166' };
+/** Next collection of each bin, from one known collection date and a repeat in weeks. Bank holiday changes aren't known. */
+function nextCollections(bins, now = Date.now()){
+  const today = +startOfDay(new Date(now));
+  return bins.map(b => {
+    const every = Math.max(1, Math.round(+b.every || 1)) * 7;
+    let d = keyDate(b.date);
+    const gap = Math.round((today - +d) / 864e5);
+    if (gap > 0) d = addDays(d, Math.ceil(gap / every) * every);
+    return { name: b.name, colour: b.colour || 'grey', date: d, days: Math.round((+d - today) / 864e5) };
+  }).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
+}
+function exampleBins(now = Date.now()){
+  const t = startOfDay(new Date(now)), toThu = (4 - t.getDay() + 7) % 7;
+  const thu = addDays(t, toThu);
+  return [{ name: 'General waste', colour: 'black', date: dayKey(thu), every: 2 },
+          { name: 'Paper and card', colour: 'blue', date: dayKey(addDays(thu, 7)), every: 2 },
+          { name: 'Garden waste', colour: 'brown', date: dayKey(addDays(thu, 7)), every: 2 }];
+}
+
+/* ---------- weather (Open-Meteo, no key, allows browser calls) ---------- */
+const WMO = [
+  [[0], 'Clear', '☀'], [[1], 'Mostly clear', '☀'], [[2], 'Partly cloudy', '⛅'], [[3], 'Overcast', '☁'],
+  [[45, 48], 'Fog', '▒'], [[51, 53, 55, 56, 57], 'Drizzle', '☂'], [[61, 63, 65, 66, 67], 'Rain', '☂'],
+  [[71, 73, 75, 77], 'Snow', '❄'], [[80, 81, 82], 'Showers', '☂'], [[85, 86], 'Snow showers', '❄'], [[95, 96, 99], 'Thunder', '⚡']
+];
+function weatherText(code){ const w = WMO.find(x => x[0].indexOf(+code) >= 0); return w ? { text: w[1], icon: w[2] } : { text: '—', icon: '·' }; }
+const METEO_Q = `latitude=${HOME.lat}&longitude=${HOME.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min&forecast_days=2&timezone=Europe%2FLondon&wind_speed_unit=mph`;
+function parseWeather(j, now = Date.now()){
+  const c = j.current || {}, h = j.hourly || {}, d = j.daily || {};
+  const hours = [];
+  (h.time || []).forEach((k, i) => {
+    const t = +new Date(k);
+    if (t >= now - 3600e3 + 1 && hours.length < 12) hours.push({ t, temp: h.temperature_2m[i], rain: h.precipitation_probability ? h.precipitation_probability[i] : null, code: h.weather_code[i] });
+  });
+  const days = (d.time || []).map((k, i) => ({ k, rise: +new Date(d.sunrise[i]), set: +new Date(d.sunset[i]), max: d.temperature_2m_max[i], min: d.temperature_2m_min[i] }));
+  return { now: { temp: c.temperature_2m, feels: c.apparent_temperature, code: c.weather_code, wind: c.wind_speed_10m }, hours, days };
+}
+async function loadDisplayWeather(){
+  try { return parseWeather(await request(`https://api.open-meteo.com/v1/forecast?${METEO_Q}`)); }
+  catch(e){ if (e.code === 'NETWORK' && NET.proxy) return parseWeather(await request(`./proxy/meteo/v1/forecast?${METEO_Q}`)); throw e; }
+}
+
+/* ---------- calendar (iCal) ---------- */
+function icalLines(text){
+  const out = [];
+  for (const raw of String(text).split(/\r?\n/)){
+    if (/^[ \t]/.test(raw) && out.length) out[out.length - 1] += raw.slice(1); else if (raw) out.push(raw);
+  }
+  return out.map(l => {
+    const c = l.indexOf(':'); const head = c < 0 ? l : l.slice(0, c), value = c < 0 ? '' : l.slice(c + 1);
+    const parts = head.split(';'), params = {};
+    parts.slice(1).forEach(p => { const e = p.indexOf('='); if (e > 0) params[p.slice(0, e).toUpperCase()] = p.slice(e + 1).replace(/^"|"$/g, ''); });
+    return { name: parts[0].toUpperCase(), params, value };
+  });
+}
+const icalText = v => v.replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim();
+/** Wall-clock time in an IANA zone to epoch ms. Falls back to the device's own zone. */
+function zonedTime(y, mo, d, h, mi, s, tz){
+  const guess = Date.UTC(y, mo, d, h, mi, s);
+  if (!tz) return +new Date(y, mo, d, h, mi, s);
+  try {
+    const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    const off = t => { const p = {}; f.formatToParts(new Date(t)).forEach(x => { p[x.type] = +x.value; }); return Date.UTC(p.year, p.month - 1, p.day, p.hour % 24, p.minute, p.second) - t; };
+    let t = guess - off(guess); t = guess - off(t);
+    return t;
+  } catch(e){ return +new Date(y, mo, d, h, mi, s); }
+}
+function icalDate(prop){
+  if (!prop) return null;
+  const v = prop.value.trim(), m = /^(\d{4})(\d\d)(\d\d)(?:T(\d\d)(\d\d)(\d\d)(Z)?)?$/.exec(v);
+  if (!m) return null;
+  const y = +m[1], mo = +m[2] - 1, d = +m[3];
+  if (!m[4]) return { t: +new Date(y, mo, d), allDay: true };
+  if (m[7]) return { t: Date.UTC(y, mo, d, +m[4], +m[5], +m[6]), allDay: false };
+  return { t: zonedTime(y, mo, d, +m[4], +m[5], +m[6], prop.params.TZID), allDay: false };
+}
+function icalDuration(v){
+  const m = /^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(String(v || '').trim());
+  if (!m) return 0;
+  return (m[1] === '-' ? -1 : 1) * (((+m[2] || 0)*7 + (+m[3] || 0))*864e5 + (+m[4] || 0)*3600e3 + (+m[5] || 0)*60e3 + (+m[6] || 0)*1e3);
+}
+function parseICal(text){
+  const events = []; let ev = null;
+  for (const l of icalLines(text)){
+    if (l.name === 'BEGIN' && l.value === 'VEVENT'){ ev = { props: {}, exdates: [] }; continue; }
+    if (l.name === 'END' && l.value === 'VEVENT'){ if (ev) events.push(ev); ev = null; continue; }
+    if (!ev) continue;
+    if (l.name === 'EXDATE') l.value.split(',').forEach(v => { const x = icalDate({ value: v, params: l.params }); if (x) ev.exdates.push(x.t); });
+    else if (!ev.props[l.name]) ev.props[l.name] = l;
+  }
+  return events.map(e => {
+    const p = e.props, start = icalDate(p.DTSTART);
+    if (!start || (p.STATUS && p.STATUS.value === 'CANCELLED')) return null;
+    const end = icalDate(p.DTEND);
+    const dur = end ? end.t - start.t : p.DURATION ? icalDuration(p.DURATION.value) : start.allDay ? 864e5 : 0;
+    const rec = icalDate(p['RECURRENCE-ID']);
+    return { uid: p.UID ? p.UID.value : '', title: p.SUMMARY ? icalText(p.SUMMARY.value) : 'Busy', where: p.LOCATION ? icalText(p.LOCATION.value) : '',
+             start: start.t, allDay: start.allDay, dur, rrule: p.RRULE ? p.RRULE.value : null, exdates: e.exdates, recurrenceId: rec ? rec.t : null };
+  }).filter(Boolean);
+}
+const WD = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+/** Start times of a recurring event, in the device's local wall time. Covers the common RRULE forms. */
+function expandRule(ev, from, to, cap = 20000){
+  const r = {};
+  ev.rrule.split(';').forEach(p => { const e = p.indexOf('='); if (e > 0) r[p.slice(0, e).toUpperCase()] = p.slice(e + 1); });
+  const freq = r.FREQ, step = Math.max(1, +r.INTERVAL || 1), count = r.COUNT ? +r.COUNT : Infinity;
+  const until = r.UNTIL ? icalDate({ value: r.UNTIL, params: {} }).t : Infinity;
+  const s0 = new Date(ev.start), out = [], skip = new Set(ev.exdates);
+  const byday = r.BYDAY ? r.BYDAY.split(',').map(x => { const m = /^([+-]?\d+)?([A-Z]{2})$/.exec(x); return m ? { n: m[1] ? +m[1] : 0, wd: WD[m[2]] } : null; }).filter(Boolean) : [];
+  const bymd = r.BYMONTHDAY ? r.BYMONTHDAY.split(',').map(Number) : [];
+  const at = (y, mo, d) => new Date(y, mo, d, s0.getHours(), s0.getMinutes(), s0.getSeconds());
+  let n = 0, guard = 0;
+  const take = d => {
+    const t = +d;
+    if (t < ev.start || t > until || n >= count) return t <= until && n < count;
+    n++;
+    if (t + ev.dur > from && t < to && !skip.has(t)) out.push(t);
+    return true;
+  };
+  const nthWeekday = (y, mo, wd, nth) => {
+    const days = [];
+    for (let d = 1; d <= new Date(y, mo + 1, 0).getDate(); d++) if (new Date(y, mo, d).getDay() === wd) days.push(d);
+    return nth > 0 ? days[nth - 1] : days[days.length + nth];
+  };
+  for (let k = 0; guard++ < cap; k += step){
+    let cands = [];
+    if (freq === 'DAILY') cands = [at(s0.getFullYear(), s0.getMonth(), s0.getDate() + k)];
+    else if (freq === 'WEEKLY'){
+      const wk = at(s0.getFullYear(), s0.getMonth(), s0.getDate() - s0.getDay() + 7*k);
+      cands = (byday.length ? byday.map(b => b.wd) : [s0.getDay()]).slice().sort((a, b) => a - b).map(wd => at(wk.getFullYear(), wk.getMonth(), wk.getDate() + wd));
+    } else if (freq === 'MONTHLY'){
+      const y = s0.getFullYear(), mo = s0.getMonth() + k;
+      if (byday.length) cands = byday.map(b => { const d = nthWeekday(y, mo, b.wd, b.n || 1); return d ? at(y, mo, d) : null; });
+      else cands = (bymd.length ? bymd : [s0.getDate()]).map(d => { const last = new Date(y, mo + 1, 0).getDate(), dd = d < 0 ? last + d + 1 : d; return dd >= 1 && dd <= last ? at(y, mo, dd) : null; });
+      cands = cands.filter(Boolean).sort((a, b) => a - b);
+    } else if (freq === 'YEARLY'){
+      const d = at(s0.getFullYear() + k, s0.getMonth(), s0.getDate());
+      cands = d.getDate() === s0.getDate() ? [d] : [];
+    } else return [ev.start].filter(t => t + ev.dur > from && t < to);
+    let more = true;
+    for (const d of cands){ if (!take(d)){ more = false; break; } }
+    if (!more || (cands.length && +cands[0] >= to)) break;
+  }
+  return out;
+}
+/** Events overlapping [from, to), recurring ones expanded, moved or cancelled instances applied. */
+function calendarWindow(events, from, to){
+  const moved = new Set(events.filter(e => e.recurrenceId != null).map(e => e.uid + '@' + e.recurrenceId));
+  const out = [];
+  for (const e of events){
+    const starts = e.rrule && e.recurrenceId == null ? expandRule(e, from, to) : (e.start + e.dur > from && e.start < to ? [e.start] : []);
+    for (const t of starts){
+      if (e.rrule && e.recurrenceId == null && moved.has(e.uid + '@' + t)) continue;
+      out.push({ title: e.title, where: e.where, start: t, end: t + e.dur, allDay: e.allDay });
+    }
+  }
+  return out.sort((a, b) => a.start - b.start || (b.allDay - a.allDay));
+}
+/** Google's secret iCal address doesn't allow browser calls, so it goes through the home server helper when there is one. */
+function calendarUrl(url){
+  const u = String(url || '').trim().replace(/^webcal:/i, 'https:');
+  const m = /^https:\/\/calendar\.google\.com(\/.*)$/i.exec(u);
+  return NET.proxy && m ? './proxy/gcal' + m[1] : u;
+}
+async function loadCalendar(url, now = Date.now()){
+  let res;
+  try { res = await fetch(calendarUrl(url), { cache: 'no-store' }); }
+  catch(e){ throw new ApiError(NET.proxy ? 'NETWORK' : 'NOPROXY'); }
+  if (!res.ok) throw new ApiError(res.status === 404 || res.status === 403 ? 'CALFAIL' : 'HTTP', `The calendar returned an error (${res.status}).`);
+  const text = await res.text();
+  if (!/BEGIN:VCALENDAR/.test(text)) throw new ApiError('CALFAIL');
+  return calendarWindow(parseICal(text), +startOfDay(new Date(now)), +addDays(startOfDay(new Date(now)), 8));
+}
+function exampleCalendar(now = Date.now()){
+  const t = startOfDay(new Date(now)), at = (d, h, m) => +addDays(t, d) + (h*60 + m)*60e3;
+  return [
+    { title: 'Bins out tonight', start: at(0, 19, 0), end: at(0, 19, 30), allDay: false },
+    { title: 'Dentist', start: at(1, 10, 15), end: at(1, 11, 0), allDay: false },
+    { title: 'Football practice', start: at(2, 17, 30), end: at(2, 19, 0), allDay: false },
+    { title: 'Grandparents visiting', start: +addDays(t, 4), end: +addDays(t, 5), allDay: true }
+  ].filter(e => e.end > now);
+}
+
+/* ---------- trains (Realtime Trains, through the home server helper, which holds the token) ---------- */
+function parseTrains(j){
+  const services = (j && j.services) || [];
+  return services.map(s => {
+    const td = s.temporalData || {}, dep = td.departure || {}, meta = s.scheduleMetadata || {}, loc = s.locationMetadata || {};
+    const sched = dep.scheduleAdvertised || dep.scheduleInternal;
+    if (!sched) return null;
+    const exp = dep.realtimeActual || dep.realtimeForecast || dep.realtimeEstimate || null;
+    const dest = (s.destination || []).map(x => x.location && x.location.description).filter(Boolean).join(' & ');
+    const plat = loc.platform ? (loc.platform.actual || loc.platform.planned) : null;
+    const cancelled = !!dep.isCancelled || td.displayAs === 'CANCELLED';
+    return { sched: +new Date(sched), exp: exp ? +new Date(exp) : null, dest: dest || 'Unknown', platform: plat || null, cancelled,
+             operator: meta.operator ? meta.operator.name : '', status: td.status || null, bus: meta.modeType && meta.modeType !== 'TRAIN' };
+  }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
+}
+const trainStation = j => (j && j.query && j.query.location && j.query.location.description) || null;
+async function loadTrains(from, to){
+  if (!NET.proxy) throw new ApiError('NOPROXY');
+  if (NET.keys.rtt === false) throw new ApiError('NOKEY', 'Add a Realtime Trains token to the home server helper (see the README).');
+  const q = `code=${encodeURIComponent(from)}${to ? '&filterTo=' + encodeURIComponent(to) : ''}&timeWindow=120`;
+  const res = await fetch(`./proxy/rtt/gb-nr/location?${q}`, { headers: { Accept: 'application/json' } }).catch(() => { throw new ApiError('NETWORK'); });
+  if (res.status === 204) return { station: null, list: [] };
+  if (res.status === 503) throw new ApiError('NOKEY', 'Add a Realtime Trains token to the home server helper (see the README).');
+  if (res.status === 401 || res.status === 403) throw new ApiError('AUTH', 'Realtime Trains refused the token on the home server helper.');
+  if (!res.ok) throw new ApiError('HTTP', `Realtime Trains returned an error (${res.status}).`);
+  const j = await res.json();
+  return { station: trainStation(j), list: parseTrains(j) };
+}
+
+/* ---------- trams (TfGM Metrolink, through the home server helper, which holds the key) ---------- */
+function parseTrams(j, stop, now = Date.now()){
+  const want = String(stop || '').trim().toLowerCase(), out = [], msgs = new Set();
+  for (const r of (j && j.value) || []){
+    if (String(r.StationLocation || '').toLowerCase() !== want) continue;
+    if (r.MessageBoard && !/^<no message>$/i.test(r.MessageBoard)) msgs.add(String(r.MessageBoard).trim());
+    for (let i = 0; i < 4; i++){
+      const dest = r['Dest' + i]; if (!dest || /^(terminates here|see tram front|not in service)$/i.test(dest)) continue;
+      const wait = parseInt(r['Wait' + i], 10);
+      if (!(wait >= 0)) continue;
+      out.push({ dest, wait, at: now + wait*60e3, status: r['Status' + i] || '', carriages: r['Carriages' + i] || '', platform: r.Direction || '' });
+    }
+  }
+  const seen = new Set();
+  return { trams: out.sort((a, b) => a.wait - b.wait).filter(t => { const k = t.dest + t.wait + t.platform; if (seen.has(k)) return false; seen.add(k); return true; }), messages: [...msgs] };
+}
+async function loadTrams(stop){
+  if (!NET.proxy) throw new ApiError('NOPROXY');
+  if (NET.keys.tfgm === false) throw new ApiError('NOKEY', 'Add a TfGM API key to the home server helper (see the README).');
+  const res = await fetch('./proxy/tfgm/odata/Metrolinks', { headers: { Accept: 'application/json' } }).catch(() => { throw new ApiError('NETWORK'); });
+  if (res.status === 503) throw new ApiError('NOKEY', 'Add a TfGM API key to the home server helper (see the README).');
+  if (res.status === 401 || res.status === 403) throw new ApiError('AUTH', 'TfGM refused the key on the home server helper.');
+  if (!res.ok) throw new ApiError('HTTP', `TfGM returned an error (${res.status}).`);
+  return parseTrams(await res.json(), stop);
+}
+
+/** "Leave by" for a departure: how many minutes until you need to set off, given the walk. */
+function leaveBy(depart, walkMin, now = Date.now()){
+  const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
+  return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
+}
+function exampleTrains(now = Date.now()){
+  const base = Math.ceil(now / 300e3) * 300e3, rnd = mulberry32(Math.floor(now / 3600e3));
+  const dests = ['Manchester Piccadilly', 'London Euston', 'Buxton', 'Hazel Grove', 'Sheffield', 'Manchester Airport'];
+  return dests.map((dest, i) => {
+    const sched = base + (6 + i*9) * 60e3, late = rnd() < 0.3 ? Math.round(rnd()*6) * 60e3 : 0;
+    return { sched, exp: sched + late, dest, platform: String(1 + (i % 4)), cancelled: i === 4 && rnd() < 0.5, operator: '' };
+  });
+}
+function exampleTrams(now = Date.now()){
+  return { trams: [['Rochdale Town Centre', 3], ['Shaw and Crompton', 9], ['Rochdale Town Centre', 15], ['Shaw and Crompton', 21]].map(([dest, wait]) => ({ dest, wait, at: now + wait*60e3, status: wait < 4 ? 'Due' : '', carriages: 'Double', platform: 'Outgoing' })), messages: [] };
+}
+
+/* ---------- prices for the display ---------- */
+/** Cost of the Home Mini's half hours today on your tariff, with the standing charge. */
+function todayCost(rows, eSets, now = Date.now()){
+  if (!rows || !rows.length || !eSets || !eSets.length) return null;
+  let p = 0, ok = 0;
+  for (const r of rows){ const rate = unitPriceAt(eSets, r.t); if (rate != null){ p += r.v * rate; ok++; } }
+  if (!ok) return null;
+  return p + nz(standingAt(eSets, now), 0);
+}
+
+/* ---------- unattended screens ---------- */
+/** Next reload time: the set clock time tomorrow (or later today), plus a few minutes' jitter so screens don't all reload together. */
+function nextReload(now, at, jitterMin){
+  const p = String(at || '03:30').split(':'), d = new Date(now);
+  d.setHours(+p[0] || 0, +p[1] || 0, 0, 0);
+  if (+d <= now + 60e3) d.setDate(d.getDate() + 1);
+  return +d + Math.round(jitterMin || 0)*60e3;
+}
+/** Is a source's data too old to trust? Twice its refresh period, with a floor. */
+const isStale = (src, every, now = Date.now()) => !src.at || now - src.at > Math.max(2*every, 5*60e3);
+/* ===================== display: modes, remote control, scheduling, rendering ===================== */
+// Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
+
+const D = {
+  set: displaySettings(store.getJ('display', null)),
+  mode: 'energy', override: null, resume: null,
+  lastInput: Date.now(), lastPick: 0, chromeUntil: 0, rotateAt: 0, reloadAt: 0,
+  deviceId: null, wake: null, ticks: 0
+};
+const shown = () => D.override || D.mode;
+const region = () => { const r = store.get('region'); return REGIONS[r] ? r : 'G'; };
+const exTag = '<span class="tag">Example</span>';
+
+/* ---------- data sources: each refreshes on its own clock, backs off when it fails, and keeps its last good data ---------- */
+const MIN = 60e3;
+const SRC = {
+  agile:   { label: 'Prices',  every: () => 15*MIN, need: () => true,
+             run: () => { const t = startOfDay(new Date()); return loadAgile(region(), t, addDays(t, 2), 1).then(a => a.unit.filter(r => isFinite(r.to))); } },
+  carbon:  { label: 'Grid',    every: () => 30*MIN, need: () => true, run: () => loadCarbonForecast(CI_REGION[region()]) },
+  tariff:  { label: 'Tariff',  every: () => 6*60*MIN, need: () => !!NET.creds, run: () => loadTodayTariff(store.get('pay') || 'DIRECT_DEBIT') },
+  // Octopus allows about 100 GraphQL calls an hour, shared with its app: at most ~37 an hour from here.
+  live:    { label: 'Home Mini', every: () => SRC.live.data && SRC.live.data.none ? 6*60*MIN : shown() === 'night' ? 30*MIN : (shown() === 'energy' || shown() === 'screensaver') ? 2*MIN : 10*MIN, need: () => !!NET.creds, run: pollMini },
+  weather: { label: 'Weather', every: () => 15*MIN, need: () => true, run: loadDisplayWeather },
+  cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
+  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.trainFrom, run: () => loadTrains(D.set.trainFrom, D.set.trainTo) },
+  trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) }
+};
+Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
+
+async function pollMini(){
+  if (!D.deviceId){
+    D.deviceId = store.get('mini.' + NET.creds.account) || await findHomeMini();
+    if (!D.deviceId) return { none: true };
+    store.set('mini.' + NET.creds.account, D.deviceId);
+  }
+  const prev = SRC.live.data, fresh = !prev || prev.none || !prev.todayAt || Date.now() - prev.todayAt > 10*MIN || dayKey(prev.todayAt) !== dayKey(Date.now());
+  const r = await liveReading(D.deviceId, fresh);
+  if (fresh) r.todayAt = Date.now(); else { r.today = prev.today; r.rows = prev.rows; r.todayAt = prev.todayAt; }
+  return r;
+}
+function due(s, now){
+  if (!s.need() || s.busy) return false;
+  const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
+  return now - s.last >= wait;
+}
+function runSource(key){
+  const s = SRC[key];
+  s.busy = true; s.last = Date.now();
+  Promise.resolve().then(s.run).then(d => { s.data = d; s.at = Date.now(); s.err = null; s.fails = 0; },
+    e => { s.err = e; s.fails++; if (e && e.code === 'AUTH' && key === 'live') D.deviceId = null; })
+    .then(() => { s.busy = false; render(); });
+}
+function retryAll(){ Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.err || isStale(s, s.every())){ s.last = 0; s.fails = 0; } }); }
+
+/* ---------- modes ---------- */
+function setMode(id, opts){
+  opts = opts || {};
+  D.mode = id; D.override = null;
+  if (!opts.keepHash) try { history.replaceState(null, '', '#' + id); } catch(e){}
+  if (!opts.rotation) D.lastPick = Date.now();
+  D.rotateAt = Date.now() + D.set.rotate * MIN;
+  applyMode();
+}
+function setOverride(id){ if (D.override === id) return; D.override = id; applyMode(); }
+function applyMode(){
+  const m = shown();
+  $$('.mode').forEach(s => { s.hidden = s.getAttribute('data-mode') !== m; });
+  $$('#picker .btn').forEach(b => b.setAttribute('aria-selected', String(b.getAttribute('data-mode') === D.mode)));
+  document.body.classList.toggle('night', m === 'night');
+  document.title = `${MODES.find(x => x.id === m).label} · Harold Street Display`;
+  Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.at && !s.err && Date.now() - s.at > s.every()) s.last = 0; });
+  if (m === 'screensaver') startSaver(); else stopSaver();
+  render();
+}
+/** Once a second: night window, idle screensaver, rotation, the nightly fresh start, and any data that's due. */
+function tick(){
+  const now = Date.now(), set = D.set;
+  const clock = hhmm(now);
+  $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
+  const idle = now - D.lastInput;
+  const night = set.night && inWindow(now, set.nightFrom, set.nightTo);
+  if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
+  else if (!night && D.override === 'night') setOverride(null);
+  else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open()) setOverride('screensaver');
+  if (set.rotate > 0 && !D.override && ROTATING.indexOf(D.mode) >= 0 && now >= D.rotateAt && now - D.lastPick > 2*MIN && !open()){
+    const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
+  }
+  if (now >= D.reloadAt){
+    if (navigator.onLine !== false && !open()){ store.set('display.reloaded', String(now)); location.reload(); return; }
+    D.reloadAt = now + 5*MIN;
+  }
+  if (D.chromeUntil && now > D.chromeUntil && !open() && (!$('#bar').contains(document.activeElement) || idle > 30e3)) hideChrome();
+  Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
+  if (++D.ticks % 30 === 0) render();
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  const m = shown();
+  if (m === 'energy') renderEnergy();
+  else if (m === 'home') renderHome();
+  else if (m === 'travel') renderTravel();
+  else if (m === 'screensaver') renderSaver();
+  else if (m === 'night') renderNight();
+}
+function priceColour(p){ return p < 0 ? 'var(--neg)' : p < 15 ? 'var(--good)' : p < 25 ? 'var(--warn)' : 'var(--bad)'; }
+function priceCls(p){ return p < 0 ? 'p-neg' : p < 15 ? 'p-low' : p < 25 ? 'p-mid' : 'p-high'; }
+function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
+function foot(keys){
+  const now = Date.now(), parts = [], offline = navigator.onLine === false;
+  let latest = 0;
+  keys.forEach(k => {
+    const s = SRC[k]; if (!s.need()) return;
+    if (s.at) latest = Math.max(latest, s.at);
+    if (s.data && (s.err || isStale(s, s.every(), now))) parts.push(`<span class="warn">${s.label} last updated ${relDay(s.at, now) === 'Today' ? '' : relDay(s.at, now) + ' '}${hhmm(s.at)}</span>`);
+    else if (!s.data && s.err) parts.push(`<span class="warn">${s.label}: ${esc(errorText(s.err)[0])}</span>`);
+  });
+  if (offline) parts.unshift('<span class="warn">Offline, will retry</span>');
+  return parts.join('') + (latest ? `<span>Updated ${hhmm(latest)}</span>` : '');
+}
+
+function renderEnergy(){
+  const now = Date.now(), cur = agileNow(now), a = SRC.agile.data, el = $('#ePrice');
+  if (cur){
+    const col = priceColour(cur.p);
+    el.textContent = pence(cur.p); el.style.color = col; el.style.textShadow = `0 0 40px ${col}`;
+    $('#eLabel').textContent = cur.p < 0 ? 'Agile now · you\'re paid to use power' : cur.p < 15 ? 'Agile now · power is cheap' : 'Agile price now, per kWh';
+    const best = cheapestWindow(a, 4, now);
+    $('#eNext').textContent = best ? `Cheapest 2 hours ${dayKey(best.from) === dayKey(now) ? '' : DOW[new Date(best.from).getDay()] + ' '}${hhmm(best.from)}–${hhmm(best.to)} · ${pence(best.avg)}` : '';
+  } else {
+    el.textContent = '--'; el.style.color = ''; el.style.textShadow = '';
+    $('#eLabel').textContent = SRC.agile.err ? 'No signal from Octopus' : 'Waiting for Agile prices';
+    $('#eNext').textContent = SRC.agile.err ? 'Trying again shortly' : '';
+  }
+  $('#eStrip').innerHTML = a && a.length ? priceStrip(a, now) : '';
+  const chips = [], L = SRC.live.data, T = SRC.tariff.data;
+  if (!NET.creds) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">Live draw: connect your account on the dashboard on this device</span></div>`);
+  else if (L && L.none) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">No Home Mini found for live draw</span></div>`);
+  else chips.push(`<div class="chip"><span class="v" style="color:var(--elec)">${L && L.demand != null ? Math.round(L.demand).toLocaleString('en-GB') + ' W' : '—'}</span><span class="k">Drawing now${L && L.at ? ' · ' + hhmm(L.at) : ''}</span></div>`);
+  if (L && L.today != null){
+    const c = todayCost(L.rows, T && T.eSets, now);
+    chips.push(`<div class="chip"><span class="v">${kwh(L.today)}</span><span class="k">Used today${c != null ? ' · ' + gbp(c) + ' with standing charge' : ''}</span></div>`);
+  }
+  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
+  if (cin){
+    const g = cheapestWindow(ci.map(r => ({ from: r.from, to: r.to, p: r.v })), 6, now);
+    chips.push(`<div class="chip"><span class="v">${cin.v} g</span><span class="k">Grid carbon · ${esc(cin.index)}${g ? ` · greenest ${hhmm(g.from)}–${hhmm(g.to)}` : ''}</span></div>`);
+  }
+  const er = T ? unitPriceAt(T.eSets, now) : null;
+  if (er != null) chips.push(`<div class="chip"><span class="v">${pence(er)}</span><span class="k">Your tariff now, per kWh</span></div>`);
+  else if (a){
+    const fut = a.filter(r => r.to > now), max = fut.length ? fut.reduce((x, y) => y.p > x.p ? y : x) : null;
+    if (max) chips.push(`<div class="chip"><span class="v">${pence(max.p)}</span><span class="k">Highest to come, at ${hhmm(max.from)}</span></div>`);
+  }
+  $('#eChips').innerHTML = chips.join('');
+  $('#eFoot').innerHTML = `<span>Region ${region()} · ${REGIONS[region()]}</span>` + foot(['agile', 'carbon', 'live', 'tariff']);
+}
+/** Next 24 hours of Agile as a strip of bars, coloured by price, with a line at now. */
+function priceStrip(rates, now){
+  const start = Math.floor(now / 1800e3) * 1800e3 - 2*3600e3, list = rates.filter(r => r.from >= start).slice(0, 52);
+  if (!list.length) return '';
+  const n = list.length, W = 1000, H = 100, lo = Math.min(0, Math.min.apply(null, list.map(r => r.p))), hi = Math.max(10, Math.max.apply(null, list.map(r => r.p)));
+  const y = v => H - (v - lo) / (hi - lo) * H, bw = W / n;
+  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Agile prices for the next day">`;
+  list.forEach((r, i) => {
+    const top = Math.min(y(r.p), y(0)), h = Math.max(1, Math.abs(y(r.p) - y(0)));
+    s += `<rect class="${priceCls(r.p)}${r.to <= now ? ' past' : ''}" x="${(i*bw + bw*0.12).toFixed(1)}" y="${top.toFixed(1)}" width="${(bw*0.76).toFixed(1)}" height="${h.toFixed(1)}"/>`;
+  });
+  const nx = ((now - list[0].from) / 1800e3) * bw;
+  s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="0" y2="${H}" vector-effect="non-scaling-stroke"/></svg><div class="ticks">`;
+  list.forEach((r, i) => {
+    const d = new Date(r.from);
+    if (d.getMinutes() === 0 && d.getHours() % 6 === 0 && i > 1 && i < n - 3) s += `<span style="left:${(i / n * 100).toFixed(2)}%">${d.getHours() === 0 ? DOW[d.getDay()] : pad2(d.getHours()) + ':00'}</span>`;
+  });
+  return s + '</div>';
+}
+
+function renderHome(){
+  const now = Date.now(), W = SRC.weather.data;
+  $('#hDate').textContent = longDay(new Date(now));
+  if (W){
+    const today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0], wn = weatherText(W.now.code);
+    $('#hSun').textContent = today ? `Sunrise ${hhmm(today.rise)} · sunset ${hhmm(today.set)}` : '';
+    $('#hNow').innerHTML = `<div><span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span></div>
+      <p class="d">${esc(wn.text)} · feels ${Math.round(W.now.feels)}° · wind ${Math.round(W.now.wind)} mph</p>
+      ${today ? `<p class="d">High ${Math.round(today.max)}° · low ${Math.round(today.min)}°</p>` : ''}`;
+    $('#hHours').innerHTML = W.hours.map(h => { const w = weatherText(h.code); return `<div><span class="h">${pad2(new Date(h.t).getHours())}:00</span><span class="i" title="${esc(w.text)}">${w.icon}</span>${Math.round(h.temp)}°<span class="r">${h.rain != null ? h.rain + '%' : ''}</span></div>`; }).join('');
+  } else {
+    $('#hSun').textContent = '';
+    $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
+    $('#hHours').innerHTML = '';
+  }
+  const own = D.set.bins.length > 0, bins = nextCollections(own ? D.set.bins : exampleBins(now), now), hour = new Date(now).getHours();
+  $('#hBins').innerHTML = `<ul class="list">${bins.map(b => {
+    const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
+    return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
+  }).join('')}</ul>${own ? '' : `<p class="note">${exTag} Add your bins in settings.</p>`}`;
+  const C = SRC.cal;
+  let evs = null, note = '';
+  if (!D.set.ical){ evs = exampleCalendar(now); note = `${exTag} Add your calendar's secret iCal address in settings.`; }
+  else if (C.data) evs = C.data.filter(e => e.end > now);
+  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Open the display from the home server helper.' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
+  else note = 'Reading the calendar…';
+  $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
+  $('#hFoot').innerHTML = '<span>Weather from Open-Meteo</span>' + foot(['weather', 'cal']);
+}
+
+function travelNote(src, needKey){
+  if (!NET.proxy) return 'Live departures need the home server helper, which holds the API keys. Showing an example.';
+  if (src.err && src.err.code === 'NOKEY') return esc(src.err.message) + ' Showing an example.';
+  if (needKey && NET.keys[needKey] === false) return 'The home server helper has no key for this yet. Showing an example.';
+  return '';
+}
+function renderTravel(){
+  const now = Date.now(), s = D.set;
+  // trains
+  const T = SRC.trains;
+  let html = '', ex = false, list = null;
+  if (!s.trainFrom) html = '<p class="empty">Set a railway station in settings.</p>';
+  else if (T.data) list = T.data.list;
+  else if (!T.need() || (T.err && T.err.code === 'NOKEY')){ list = exampleTrains(now); ex = true; }
+  else if (T.err) html = `<p class="empty">${esc(errorText(T.err).join(' '))}</p>`;
+  else html = '<p class="empty">Checking departures…</p>';
+  const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
+  $('#tTrainTitle').innerHTML = `Trains from ${esc(stn)}${s.trainTo ? ' calling at ' + esc(s.trainTo) : ''}${ex ? exTag : ''}`;
+  if (list){
+    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 6);
+    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th>Status</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
+      const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
+      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
+      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}</td><td class="t opt">${esc(d.platform || '—')}</td><td class="st">${st}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
+    }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
+    if (ex) html += `<p class="note">${travelNote(T, 'rtt')}</p>`;
+  }
+  $('#tTrains').innerHTML = html;
+  // trams
+  const M = SRC.trams;
+  html = ''; ex = false; let tr = null;
+  if (!s.tramStop) html = '<p class="empty">Set a Metrolink stop in settings.</p>';
+  else if (M.data) tr = M.data;
+  else if (!M.need() || (M.err && M.err.code === 'NOKEY')){ tr = exampleTrams(now); ex = true; }
+  else if (M.err) html = `<p class="empty">${esc(errorText(M.err).join(' '))}</p>`;
+  else html = '<p class="empty">Checking trams…</p>';
+  $('#tTramTitle').innerHTML = `Trams${s.tramStop ? ' from ' + esc(s.tramStop) : ''}${ex ? exTag : ''}`;
+  if (tr){
+    const age = M.at && !ex ? Math.max(0, Math.floor((now - M.at) / MIN)) : 0;
+    const rows = tr.trams.map(t => ({ dest: t.dest, wait: t.wait - age, status: t.status, carriages: t.carriages })).filter(t => t.wait >= 0).slice(0, 6);
+    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Tram</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(t => {
+      const lv = leaveBy(now + t.wait*MIN, s.tramWalk, now);
+      return `<tr><td class="t">${t.wait === 0 ? 'Due' : t.wait + ' min'}</td><td class="dest">${esc(t.dest)}</td><td class="t opt">${esc(t.carriages || '')}</td><td class="lv ${lv.cls}">${lv.text}</td></tr>`;
+    }).join('')}</tbody></table>` : '<p class="empty">No trams listed right now.</p>';
+    if (tr.messages && tr.messages.length) html += `<p class="note">${esc(tr.messages[0])}</p>`;
+    if (ex) html += `<p class="note">${travelNote(M, 'tfgm')}</p>`;
+  }
+  $('#tTrams').innerHTML = html;
+  $('#tFoot').innerHTML = '<span>Trains from Realtime Trains · trams from TfGM</span>' + foot(['trains', 'trams']);
+}
+
+function renderNight(){
+  const now = Date.now(), cur = agileNow(now), W = SRC.weather.data;
+  $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : ''].filter(Boolean).join(' · ');
+}
+
+/* ---------- screensaver: planets carrying live numbers, the odd comet, an orbiting clock ---------- */
+// Each planet wanders round its own quarter of the screen, so they rarely meet but every pixel still changes.
+const PLANETS = [
+  { id: 'price', hue: ['#ffd27a', '#c46a12'], ring: false, cx: .27, cy: .28, ax: .17, ay: .14, fx: 1/310, fy: 1/230, px: 0, py: 1.1 },
+  { id: 'temp',  hue: ['#8fe8ff', '#1f5fa8'], ring: true,  cx: .73, cy: .28, ax: .17, ay: .14, fx: 1/270, fy: 1/350, px: 2.2, py: 0.2 },
+  { id: 'go',    hue: ['#d9c4ff', '#5a2fc2'], ring: false, cx: .27, cy: .72, ax: .17, ay: .14, fx: 1/380, fy: 1/260, px: 4.1, py: 2.7 },
+  { id: 'grid',  hue: ['#a6f5cf', '#1b8a5a'], ring: false, cx: .73, cy: .72, ax: .17, ay: .14, fx: 1/240, fy: 1/300, px: 5.3, py: 4.4 }
+];
+let saverRaf = null, saverStill = null, comet = null, nextComet = 0;
+const reducedMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function planetValues(now){
+  const cur = agileNow(now), W = SRC.weather.data, s = D.set, out = {};
+  out.price = cur ? { v: pence(cur.p), l: 'Agile now', c: priceColour(cur.p) } : { v: '--', l: 'Agile now' };
+  out.temp = W ? { v: Math.round(W.now.temp) + '°', l: weatherText(W.now.code).text } : { v: '--', l: 'Outside' };
+  const T = SRC.trains.data, next = T ? T.list.filter(d => !d.cancelled && (d.exp || d.sched) - s.trainWalk*MIN > now)[0] : null;
+  const M = SRC.trams.data, tram = M ? M.trams.filter(t => t.at - s.tramWalk*MIN > now)[0] : null;
+  out.go = next ? { v: leaveBy(next.exp || next.sched, s.trainWalk, now).text.replace('Leave in ', ''), l: 'Leave for the ' + hhmm(next.sched) }
+        : tram ? { v: leaveBy(tram.at, s.tramWalk, now).text.replace('Leave in ', ''), l: 'Leave for the tram' }
+        : { v: longDay(new Date(now)).split(' ')[0].slice(0, 3) + ' ' + new Date(now).getDate(), l: MONTH_NAMES[new Date(now).getMonth()] };
+  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
+  out.grid = cin ? { v: cin.v + ' g', l: 'Grid · ' + cin.index } : { v: '--', l: 'Grid carbon' };
+  return out;
+}
+function renderSaver(){
+  const box = $('#sPlanets'), vals = planetValues(Date.now());
+  if (!box.children.length) box.innerHTML = PLANETS.map(p => `<div class="planet" data-p="${p.id}"><div class="orb" style="background:radial-gradient(circle at 32% 30%, ${p.hue[0]}, ${p.hue[1]} 70%, #05060f);color:${p.hue[0]}">${p.ring ? '<i class="ring"></i>' : ''}</div><span class="val"></span><span class="lbl"></span></div>`).join('');
+  PLANETS.forEach(p => {
+    const el = box.querySelector(`[data-p="${p.id}"]`), v = vals[p.id];
+    el.querySelector('.val').textContent = v.v; el.querySelector('.val').style.color = v.c || '';
+    el.querySelector('.lbl').textContent = v.l;
+  });
+  if (saverStill) placeSaver(Date.now());
+}
+function placeSaver(t){
+  const W = innerWidth, H = innerHeight, s = t / 1000;
+  PLANETS.forEach(p => {
+    const el = document.querySelector(`#sPlanets [data-p="${p.id}"]`); if (!el) return;
+    const x = W * (p.cx + Math.sin(s * 2*Math.PI * p.fx + p.px) * p.ax), y = H * (p.cy + Math.sin(s * 2*Math.PI * p.fy + p.py) * p.ay);
+    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
+  });
+  const a = s / 600 * 2*Math.PI, c = $('#sClock');
+  c.style.transform = `translate(${(W/2 + Math.cos(a) * W * .12).toFixed(1)}px,${(H/2 + Math.sin(a) * H * .1).toFixed(1)}px)`;
+}
+function frameSaver(t){
+  const now = Date.now();
+  placeSaver(now);
+  const el = $('#sComet');
+  if (!comet && now > nextComet){
+    const W = innerWidth, H = innerHeight, ltr = Math.random() < .5, y0 = H * (.1 + Math.random()*.5);
+    comet = { start: now, dur: 3500 + Math.random()*2500, x0: ltr ? -W*.2 : W*1.2, x1: ltr ? W*1.2 : -W*.2, y0, y1: y0 + H*(.15 + Math.random()*.3) };
+    el.hidden = false;
+  }
+  if (comet){
+    const p = (now - comet.start) / comet.dur;
+    if (p >= 1){ comet = null; el.hidden = true; nextComet = now + 45e3 + Math.random()*105e3; }
+    else {
+      const x = comet.x0 + (comet.x1 - comet.x0)*p, y = comet.y0 + (comet.y1 - comet.y0)*p, ang = Math.atan2(comet.y1 - comet.y0, comet.x1 - comet.x0);
+      el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${ang}rad) translateX(-100%)`;
+      el.style.opacity = String(Math.min(1, 4*p, 4*(1 - p)));
+    }
+  }
+  saverRaf = requestAnimationFrame(frameSaver);
+}
+function startSaver(){
+  renderSaver();
+  nextComet = Date.now() + 15e3;
+  if (reducedMotion()){ placeSaver(Date.now()); if (!saverStill) saverStill = setInterval(() => placeSaver(Date.now() * 40), 60e3); return; }
+  if (!saverRaf) saverRaf = requestAnimationFrame(frameSaver);
+}
+function stopSaver(){
+  if (saverRaf) cancelAnimationFrame(saverRaf); saverRaf = null;
+  if (saverStill) clearInterval(saverStill); saverStill = null;
+  comet = null; const el = $('#sComet'); if (el) el.hidden = true;
+}
+
+/* ---------- toolbar, settings and remote control ---------- */
+const open = () => !$('#sheet').hidden;
+function showChrome(focus){
+  document.body.classList.add('chrome-on'); D.chromeUntil = Date.now() + 8000;
+  if (focus){ const b = $(`#picker [data-mode="${D.mode}"]`) || $('#picker .btn'); if (b) b.focus(); }
+}
+function hideChrome(){ document.body.classList.remove('chrome-on'); D.chromeUntil = 0; if ($('#bar').contains(document.activeElement)) document.activeElement.blur(); }
+function toast(msg, ms){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, ms || 4000);
+}
+function focusables(root){
+  return [].slice.call(root.querySelectorAll('button, a[href], input, select, textarea')).filter(el => !el.disabled && (el.offsetWidth || el.offsetHeight));
+}
+/** Spatial navigation for remotes: move focus to the nearest control in the arrow's direction. */
+function moveFocus(root, key){
+  const list = focusables(root), cur = document.activeElement;
+  if (list.indexOf(cur) < 0){ if (list[0]) list[0].focus(); return; }
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+  let best = null, score = Infinity;
+  list.forEach(el => {
+    if (el === cur) return;
+    const b = el.getBoundingClientRect(), dx = b.left + b.width/2 - cx, dy = b.top + b.height/2 - cy;
+    const along = key === 'ArrowRight' ? dx : key === 'ArrowLeft' ? -dx : key === 'ArrowDown' ? dy : -dy;
+    const across = key === 'ArrowRight' || key === 'ArrowLeft' ? Math.abs(dy) : Math.abs(dx);
+    if (along < 2) return;
+    const sc = along + across * 2.5;
+    if (sc < score){ score = sc; best = el; }
+  });
+  if (best){ best.focus(); if (best.scrollIntoView) best.scrollIntoView({ block: 'nearest' }); }
+}
+const isBack = e => ['Escape', 'GoBack', 'BrowserBack', 'XF86Back'].indexOf(e.key) >= 0 || e.keyCode === 10009 || e.keyCode === 461 || (e.key === 'Backspace' && !editable(e.target));
+const editable = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['checkbox', 'radio', 'button', 'submit'].indexOf(el.type) < 0));
+const COLOUR_KEYS = { 403: 'energy', 404: 'home', 405: 'travel', 406: 'screensaver', ColorF0Red: 'energy', ColorF1Green: 'home', ColorF2Yellow: 'travel', ColorF3Blue: 'screensaver' };
+function onKey(e){
+  const woke = !!D.override && D.override !== D.mode;
+  D.lastInput = Date.now();
+  if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
+  if (open()){
+    if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
+    if (/^Arrow/.test(e.key)){
+      const t = e.target, txt = editable(t) && t.type !== 'date';
+      const atEdge = txt && t.selectionStart != null ? (e.key === 'ArrowLeft' ? t.selectionStart === 0 : e.key === 'ArrowRight' ? t.selectionEnd === t.value.length : true) : !(t && t.type === 'date');
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || atEdge){ e.preventDefault(); moveFocus($('#sheet'), e.key); }
+      return;
+    }
+    if (e.key === 'Enter' && e.target && e.target.type === 'checkbox'){ e.preventDefault(); e.target.click(); }
+    return;
+  }
+  if (isBack(e)){ if (document.body.classList.contains('chrome-on')){ e.preventDefault(); hideChrome(); } return; }
+  const inBar = $('#bar').contains(document.activeElement);
+  if (inBar){
+    D.chromeUntil = Date.now() + 8000;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); moveFocus($('#bar'), e.key); return; }
+    if (e.key === 'ArrowDown'){ e.preventDefault(); hideChrome(); return; }
+    if (e.key === 'ArrowUp'){ e.preventDefault(); return; }
+  } else {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); setMode(stepMode(D.mode, e.key === 'ArrowRight' ? 1 : -1)); return; }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter'){ e.preventDefault(); showChrome(true); return; }
+  }
+  const pick = MODES.filter(m => m.key === e.key)[0];
+  const colour = COLOUR_KEYS[e.keyCode] || COLOUR_KEYS[e.key];
+  if (pick || colour){ e.preventDefault(); setMode(pick ? pick.id : colour); return; }
+  // preventDefault stops the letter also landing in the first settings box.
+  if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
+  if (e.key === 's' || e.key === 'S'){ e.preventDefault(); openSheet(); }
+}
+function toggleFullscreen(){
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else { const d = document.documentElement, r = d.requestFullscreen || d.webkitRequestFullscreen; if (r){ const p = r.call(d); if (p && p.catch) p.catch(() => {}); } }
+  } catch(e){}
+}
+function syncFs(){ $('#fsBtn').textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; }
+async function keepAwake(){
+  try { if ('wakeLock' in navigator && !document.hidden && (!D.wake || D.wake.released)) D.wake = await navigator.wakeLock.request('screen'); } catch(e){}
+}
+
+/* ---------- settings sheet ---------- */
+function timeOptions(){ const o = []; for (let m = 0; m < 1440; m += 30) o.push(`${pad2(Math.floor(m/60))}:${pad2(m % 60)}`); return o; }
+function buildSheet(){
+  $('#fMode').innerHTML = MODES.map(m => `<option value="${m.id}">${m.label}</option>`).join('');
+  $$('[data-times]').forEach(s => { s.innerHTML = timeOptions().map(t => `<option>${t}</option>`).join(''); });
+  $$('[data-walk]').forEach(s => { s.innerHTML = [0, 2, 3, 5, 8, 10, 12, 15, 20, 25, 30, 40].map(m => `<option value="${m}">${m} minutes</option>`).join(''); });
+  $('#fRegion').innerHTML = Object.keys(REGIONS).map(k => `<option value="${k}">${k} · ${REGIONS[k]}</option>`).join('');
+  const colours = Object.keys(BIN_COLOURS).map(c => `<option value="${c}">${c[0].toUpperCase() + c.slice(1)}</option>`).join('');
+  $('#binRows').innerHTML = [0, 1, 2, 3].map(i => `<div class="fields" data-bin="${i}">
+    <div class="field"><label for="bN${i}">Bin ${i + 1}</label><input id="bN${i}" placeholder="${['General waste', 'Paper and card', 'Garden waste', 'Glass and cans'][i]}"></div>
+    <div class="field"><label for="bC${i}">Colour</label><select id="bC${i}">${colours}</select></div>
+    <div class="field"><label for="bD${i}">A collection date</label><input id="bD${i}" type="date"></div>
+    <div class="field"><label for="bE${i}">Comes every</label><select id="bE${i}"><option value="1">Week</option><option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option></select></div></div>`).join('');
+}
+function fillSheet(){
+  const s = D.set, setv = (id, v) => { const el = $('#' + id); if (el) el.value = String(v); };
+  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fNight', s.night ? 1 : 0);
+  const near = t => { const p = String(t).split(':'); const m = Math.round(((+p[0] || 0)*60 + (+p[1] || 0)) / 30) * 30 % 1440; return `${pad2(Math.floor(m/60))}:${pad2(m % 60)}`; };
+  setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
+  [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date); setv('bE' + i, b.every || 2); });
+  setv('fIcal', s.ical); setv('fTrainFrom', s.trainFrom); setv('fTrainTo', s.trainTo); setv('fTrainWalk', s.trainWalk); setv('fTramStop', s.tramStop); setv('fTramWalk', s.tramWalk);
+  $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on the dashboard on this device.` : 'For live draw and today\'s cost, connect your Octopus account once on the dashboard on this device.';
+  $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
+    : `Home server helper found. Trains: ${NET.keys.rtt ? 'token set' : 'no Realtime Trains token yet'}. Trams: ${NET.keys.tfgm ? 'key set' : 'no TfGM key yet'}.`;
+  $('#setupOut').textContent = '';
+}
+function readSheet(){
+  const v = id => $('#' + id).value.trim();
+  const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: v('bD' + i), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
+  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
+    bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
+}
+function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }
+function closeSheet(){ $('#sheet').hidden = true; D.lastInput = Date.now(); $('#setBtn').blur(); }
+function applySettings(s, regionCode){
+  const old = D.set; D.set = s; store.setJ('display', s);
+  if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
+  if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
+  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
+  if (old.tramStop !== s.tramStop){ SRC.trams.data = null; SRC.trams.err = null; SRC.trams.last = 0; }
+  D.rotateAt = Date.now() + s.rotate * MIN;
+  D.reloadAt = nextReload(Date.now(), s.reloadAt, Math.random()*10);
+  render();
+}
+/* Setup links carry settings from one device to another: display.html#setup=<base64 JSON>. */
+const b64 = { enc: s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+              dec: s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))) };
+function setupLink(s, withRegion){ return location.href.split('#')[0] + '#setup=' + b64.enc(JSON.stringify(Object.assign({}, s, { region: withRegion }))); }
+function importSetup(hash){
+  const m = /^#setup=([A-Za-z0-9_-]+)$/.exec(hash || '');
+  if (!m) return false;
+  try { const j = JSON.parse(b64.dec(m[1])); applySettings(displaySettings(j), REGIONS[j.region] ? j.region : null); toast('Settings saved on this device.'); }
+  catch(e){ toast('That setup link didn\'t work. Copy it again from the settings.'); }
+  return true;
+}
+
+/* ---------- events ---------- */
+function wire(){
+  $('#picker').innerHTML = MODES.map(m => `<button class="btn" type="button" role="tab" data-mode="${m.id}" aria-selected="false"><span class="k">${m.key}</span>${m.label}</button>`).join('');
+  $('#picker').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-mode]'); if (b){ setMode(b.getAttribute('data-mode')); showChrome(); } });
+  $('#setBtn').addEventListener('click', openSheet);
+  $('#fsBtn').addEventListener('click', toggleFullscreen);
+  $('#closeSheet').addEventListener('click', closeSheet);
+  $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });
+  $('#copySetup').addEventListener('click', () => {
+    const link = setupLink(readSheet(), $('#fRegion').value), out = $('#setupOut');
+    const done = ok => { out.textContent = (ok ? 'Copied. ' : '') + 'Open this link on the other screen to copy these settings there' + (readSheet().ical ? ' (it includes your secret calendar address, so only send it to yourself)' : '') + ': ' + link; };
+    try { navigator.clipboard.writeText(link).then(() => done(true), () => done(false)); } catch(e){ done(false); }
+  });
+  document.addEventListener('keydown', onKey);
+  const wake = () => { D.lastInput = Date.now(); if (D.override && D.override !== D.mode){ D.override = null; applyMode(); return true; } return false; };
+  let lastMove = 0;
+  document.addEventListener('mousemove', () => { const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });
+  let tx = null, ty = null;
+  document.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (wake() || open() || tx == null) return;
+    const t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty; tx = null;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 50 && !$('#bar').contains(e.target)) setMode(stepMode(D.mode, dx < 0 ? 1 : -1));
+    else showChrome();
+  }, { passive: true });
+  window.addEventListener('hashchange', () => { if (importSetup(location.hash)){ try { history.replaceState(null, '', '#' + D.mode); } catch(e){} return; } const m = modeFromHash(location.hash, null); if (m && m !== D.mode) setMode(m, { keepHash: true }); });
+  window.addEventListener('online', () => { retryAll(); render(); });
+  window.addEventListener('offline', render);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden){ keepAwake(); retryAll(); } });
+  document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
+  document.addEventListener('click', () => keepAwake(), true);
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 200); });
+}
+
+/* ---------- start ---------- */
+(async () => {
+  const k = store.get('key'), a = store.get('account');
+  if (k && a) NET.creds = { account: a, key: k };
+  buildSheet(); wire();
+  const imported = importSetup(location.hash);
+  D.mode = modeFromHash(imported ? '' : location.hash, D.set.mode);
+  try { history.replaceState(null, '', '#' + D.mode); } catch(e){}
+  D.rotateAt = Date.now() + D.set.rotate * MIN;
+  D.reloadAt = nextReload(Date.now(), D.set.reloadAt, Math.random()*10);
+  applyMode();
+  if (store.get('display.reloaded')){ store.del('display.reloaded'); } else { showChrome(); }
+  keepAwake();
+  await detectProxy();
+  tick(); setInterval(tick, 1000);
+})();
+
+})();
+</script>
+<script>
+/* Starfield: three depth layers drifting slowly, gentle twinkle, the odd shooting star. Static when reduced motion is on. */
+(() => {
+  const cv = document.getElementById('stars'); if (!cv || !cv.getContext) return;
+  const ctx = cv.getContext('2d');
+  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const tints = ['233,236,255','255,214,170','170,210,255','210,190,255'];
+  let W = 0, H = 0, stars = [], shoot = null, last = 0;
+  function seed(){
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    cv.width = W*dpr; cv.height = H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    const n = Math.round(W*H/2600);
+    stars = Array.from({length:n}, () => { const z = Math.random(); return { x:Math.random()*W, y:Math.random()*H, z, r:.35 + z*z*1.5, a:.35 + z*.6, tw:Math.random()*Math.PI*2, ts:.5 + Math.random()*1.6, c:tints[(Math.random()*tints.length)|0] }; });
+  }
+  function draw(t){
+    const dt = Math.min(64, t - last || 16); last = t;
+    ctx.clearRect(0,0,W,H);
+    for (const s of stars){
+      if (!still){ s.x -= (0.004 + s.z*s.z*0.03)*dt; if (s.x < -2){ s.x = W + 2; s.y = Math.random()*H; } s.tw += s.ts*dt/1000; }
+      const a = s.a*(still ? 1 : 0.7 + 0.3*Math.sin(s.tw));
+      ctx.fillStyle = `rgba(${s.c},${a})`; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+      if (s.r > 1.45){ ctx.fillStyle = `rgba(${s.c},${a*.12})`; ctx.beginPath(); ctx.arc(s.x, s.y, s.r*4, 0, Math.PI*2); ctx.fill(); }
+    }
+    if (!still){
+      if (!shoot && Math.random() < dt/9000) shoot = { x: Math.random()*W*.8 + W*.2, y: Math.random()*H*.4, life: 0 };
+      if (shoot){
+        shoot.life += dt;
+        const p = shoot.life/900, len = 140, x = shoot.x - p*W*.35, y = shoot.y + p*W*.12;
+        const g = ctx.createLinearGradient(x, y, x + len, y - len*.34);
+        g.addColorStop(0, `rgba(233,236,255,${.85*(1 - p)})`); g.addColorStop(1, 'rgba(233,236,255,0)');
+        ctx.strokeStyle = g; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + len, y - len*.34); ctx.stroke();
+        if (p >= 1) shoot = null;
+      }
+      if (!document.hidden) requestAnimationFrame(draw); else document.addEventListener('visibilitychange', () => requestAnimationFrame(draw), { once: true });
+    }
+  }
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { seed(); if (still) draw(0); }, 200); });
+  seed(); still ? draw(0) : requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

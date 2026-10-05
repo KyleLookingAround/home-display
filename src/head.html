@@ -56,6 +56,7 @@ a{color:var(--gas)}
 .top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
 .top > div:first-child{display:grid;gap:6px;min-width:0}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+a.btn{display:inline-block;text-decoration:none}
 .btn{font:500 12.5px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);background:rgba(14,18,40,.6);border:1px solid var(--line-hot);border-radius:3px;padding:10px 14px;cursor:pointer}
 .btn:hover{border-color:var(--gas);box-shadow:0 0 14px -4px var(--gas)}
 .btn.primary{background:linear-gradient(135deg,rgba(143,107,255,.92),rgba(79,214,255,.86));color:#05060f;border-color:transparent}
@@ -191,24 +192,7 @@ td input.kwh{width:5.5em;font:13px var(--f-mono);color:var(--ink);background:var
 .measures .check{justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:8px}
 .measures .check span:last-child{font-family:var(--f-mono);color:var(--muted);font-size:12.5px}
 
-/* wall display */
-.wall{position:fixed;inset:0;z-index:50;background:radial-gradient(70vw 60vw at 50% 40%, rgba(143,107,255,.16), transparent 70%),var(--void);display:grid;grid-template-rows:auto 1fr auto;padding:calc(20px + env(safe-area-inset-top,0px)) 24px calc(20px + env(safe-area-inset-bottom,0px));gap:16px}
-.wall-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.wall-clock{font:500 clamp(1.4rem,4vw,2.4rem)/1 var(--f-mono);letter-spacing:.04em}
-.wall-main{display:grid;place-items:center;text-align:center;gap:10px;align-content:center;animation:drift 240s ease-in-out infinite alternate}
-/* Screensaver drift: the readout wanders slowly so a TV or tablet never holds one image in place. */
-@keyframes drift{0%{transform:translate(-9vw,-7vh)}25%{transform:translate(8vw,-4vh)}50%{transform:translate(6vw,8vh)}75%{transform:translate(-7vw,5vh)}100%{transform:translate(9vw,-6vh)}}
-#stars{z-index:0} .wall-on #stars{z-index:51;opacity:.9}
-.wall > *{position:relative;z-index:52}
-.wall-price{font:700 clamp(4rem,18vw,11rem)/1 var(--f-mono);font-variant-numeric:tabular-nums;transition:color .6s,text-shadow .6s}
-.wall-sub{font:500 clamp(.9rem,2.4vw,1.3rem)/1.4 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
-.wall-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.wall-row .chip .v{font-size:clamp(1.1rem,3vw,1.7rem)}
-
 @media (max-width:480px){.tabs button{padding:10px 7px;letter-spacing:.03em;font-size:11px}}
-.wall .btn{font-size:clamp(12px,1.6vw,18px);padding:clamp(10px,1.4vw,16px) clamp(14px,2vw,24px)}
-.wall .btn:focus,.wall .btn:focus-visible{outline:3px solid var(--elec);outline-offset:4px;box-shadow:0 0 24px -4px var(--elec)}
-.wall-actions{display:flex;gap:10px}
 footer{font:11.5px/1.55 var(--f-mono);color:var(--muted);display:grid;gap:6px;max-width:84ch}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>

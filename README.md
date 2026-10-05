@@ -1,21 +1,83 @@
 # Harold Street Energy
 
-A home energy dashboard for your Octopus account: usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
+A home energy dashboard for your Octopus account, and a household display for the wall tablet, phones and the TV.
+
+- **Dashboard** (`index.html`): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
+- **Display** (`display.html`): five full-screen modes made for a screen across the room.
+  - **Energy:** Agile price now, the next day's prices, the cheapest two hours, grid carbon, Home Mini live draw and today's cost.
+  - **Home:** clock, date, weather now and for the next 12 hours, sunrise and sunset, bin day and your calendar.
+  - **Travel:** next trains and trams, with "leave in 6 min" countdowns that allow for the walk.
+  - **Screensaver:** planets carrying live numbers drift across the stars, with the odd comet and a slowly orbiting clock. It starts after a few idle minutes and any key wakes it.
+  - **Night:** a very dim clock and price, from a set time.
+
+## The display
+
+Open `display.html`, or use the Wall display button on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
+
+| On a TV remote or keyboard | What it does |
+|---|---|
+| Left and right | Previous or next mode |
+| 1 to 5, or the red, green, yellow and blue buttons | Jump to a mode |
+| Up, down or Enter | Show the toolbar: mode picker, settings, full screen |
+| Back | Close settings or the toolbar |
+| S, F | Settings, full screen |
+
+On a phone or tablet, swipe left or right to change mode and tap to show the toolbar.
+
+Settings are kept on each device. Set a screen up on your phone, then use **Copy setup link** in the settings and open that link on the TV to copy everything across. In the settings you can:
+- choose the mode the screen opens on;
+- rotate between energy, home and travel;
+- set when the screensaver and night clock start;
+- add your bins (one known collection date and how often each comes);
+- add your calendar's secret iCal address;
+- pick your station and tram stop, and how long the walk is.
+
+Unattended screens look after themselves:
+- They reload once a night (03:30 by default).
+- They keep the screen awake where the browser allows it.
+- They retry quietly when the wifi drops.
+- They say "last updated 13:10" when something is out of date.
+
+Live draw and today's cost come from your Octopus Home Mini. They use the account you connected on the dashboard in the same browser.
 
 ## Two ways to run it
 
-**Quick: open the file.** Double-click `index.html`. It opens with example data. Click **Connect account**, paste your Octopus account number and API key, and your own data loads. PVGIS solar data and the EPC search won't work this way, and some browsers may refuse the Octopus connection from a local file.
+**Quick: open the file, or the published site.** Double-click `index.html` or `display.html`, or open the GitHub Pages site. Octopus, the grid forecast and the weather work straight from the browser. Trains, trams, Google Calendar, PVGIS solar data and the EPC search need the home server helper, so they show labelled examples until then.
 
-**Better: run it on your home server.**
+**Everything: run it on your home server.**
 
 1. Copy this whole folder to the server.
 2. Run `python3 server.py` (Python 3.8+, nothing to install).
-3. Open the address it prints, such as `http://192.168.1.20:8787`, on any device at home.
-4. On your phone, use Add to Home Screen to install it like an app.
+3. Open the address it prints, such as `http://192.168.1.20:8787`, or `http://192.168.1.20:8787/display.html` for the display, on any device at home.
+4. On your phone, use Add to Home Screen to install either one like an app.
 
-The helper only forwards requests to Octopus, PVGIS, the EPC register, National Grid's carbon API and Open-Meteo. Keep it on your home network and don't forward its port on your router.
+The helper only forwards requests to a fixed list of services:
+- Octopus
+- PVGIS
+- the EPC register
+- National Grid's carbon API
+- Open-Meteo
+- Google Calendar's iCal feeds
+- Realtime Trains
+- TfGM
 
-To keep it running after you log out, add it as a service. For example, with systemd, create `/etc/systemd/system/harold-energy.service`:
+It never serves dotfiles, its own code or notes. Keep it on your home network and don't forward its port on your router.
+
+### Train and tram keys
+
+These stay on the server and never reach a browser. Realtime Trains doesn't allow its token in a web page. Create a file called `.env` next to `server.py`:
+
+```
+RTT_TOKEN=your Realtime Trains access token
+TFGM_KEY=your TfGM subscription key
+```
+
+- **Realtime Trains:** sign up at https://api-portal.rtt.io. If you're given a refresh token instead of an access token, use `RTT_REFRESH_TOKEN=` and the helper swaps it for access tokens as needed.
+- **TfGM (Metrolink):** register at https://developer.tfgm.com and subscribe to the Open Data product.
+
+`.env` is ignored by git. Restart the helper after changing it; it prints whether each key is set.
+
+To keep the helper running after you log out, add it as a service. For example, with systemd, create `/etc/systemd/system/harold-energy.service`:
 
 ```
 [Unit]
@@ -23,7 +85,7 @@ Description=Harold Street Energy
 After=network-online.target
 
 [Service]
-WorkingDirectory=/path/to/harold-street-energy-app
+WorkingDirectory=/path/to/home-display
 ExecStart=/usr/bin/python3 server.py
 Restart=on-failure
 User=youruser
@@ -34,30 +96,45 @@ WantedBy=multi-user.target
 
 Then run `sudo systemctl enable --now harold-energy`.
 
+## Publishing
+
+Every push to `main` is checked and published to GitHub Pages by `.github/workflows/pages.yml`. Only the two pages, their manifests and icons are published, not the source or the helper.
+
+**The lock.** Add a repository secret called `SITE_PASSWORD` (Settings → Secrets and variables → Actions). It can be a numeric PIN. From the next push, the published pages are encrypted with StatiCrypt. They open with an on-screen keypad you can drive with the TV remote's arrows, and "Remember this screen" means each device asks only once. Without the secret the site is published unlocked, and the workflow says so.
+
+What the lock does and doesn't do:
+- It keeps visitors out of the published site.
+- It can't hide the code, because the repository is public.
+- A short PIN could be guessed offline by someone determined. Nothing private is in the pages anyway: your API key, calendar address and settings stay in each device's browser.
+
 ## Your data
 
-Your API key, Direct Debit amount, change log, appliance figures and EPC notes are stored in the browser you use, not on the server. Each device needs connecting once. Download readings to CSV from the Home tab if you want a permanent record.
+Your API key, Direct Debit amount, change log, appliance figures, EPC notes and display settings are stored in the browser you use, not on the server. Each device needs connecting once. Download readings to CSV from the Home tab if you want a permanent record.
 
 ## What may need adjusting
 
-These parts use Octopus features that aren't fully documented, so they're the most likely to need a tweak:
+These parts use features that aren't fully documented, so they're the most likely to need a tweak:
 
 - Live readings from an Octopus Home Mini
 - Saving Sessions and Octoplus points
 - The EPC search (the government moved to a new data service in 2026)
+- Metrolink departures (TfGM's field names come from community code)
 
-If one of these shows an error, the rest of the dashboard keeps working.
+If one of these shows an error, the rest keeps working.
 
 ## What's in the folder
 
 | Path | What it is |
 |---|---|
-| `index.html` | The app. Built from `src/`; don't edit it directly. |
-| `src/` | Source: styles, markup, data code, analysis, interface, starfield. |
-| `build.py` | `python3 build.py` rebuilds `index.html` from `src/`. |
+| `index.html`, `display.html` | The dashboard and the display. Built from `src/`; don't edit them directly. |
+| `src/` | Dashboard source: styles, markup, data code, analysis, interface, starfield. |
+| `src/display/` | Display source: styles, markup, household data sources, modes and remote control. |
+| `build.py` | `python3 build.py` rebuilds both pages from `src/`. |
 | `server.py` | Home server helper. |
-| `tests/` | `node --test tests/analysis.test.mjs` checks the maths. |
+| `lock/` | The lock screen template and `publish.sh`, which builds the folder Pages publishes. |
+| `tests/` | `node --test tests/*.test.mjs` checks the maths and the display's logic. The `*.browser.mjs` files check phone and TV layouts, the remote and the lock (they need Playwright). |
+| `.github/workflows/` | Checks every push; publishes `main` to GitHub Pages. |
 | `CLAUDE.md` | Brief for a Claude Code session. |
-| `ROADMAP.md` | Next steps: household display site, TV, password lock, Astro. |
+| `ROADMAP.md` | What's built and what's next. |
 | `docs/` | Stack options and API notes. |
-| `manifest.webmanifest`, `icon-*.png` | For installing on a phone. |
+| `manifest.webmanifest`, `display.webmanifest`, `icon-*.png` | For installing on a phone. |

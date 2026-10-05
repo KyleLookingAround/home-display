@@ -1,4 +1,4 @@
-// Runs the pure analysis code on example data. Usage: node --test tests/
+// Runs the pure analysis code on example data. Usage: node --test tests/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

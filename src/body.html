@@ -9,7 +9,7 @@
     </div>
     <div class="actions">
       <span id="status" class="pill demo">Example data</span>
-      <button class="btn" id="wallBtn" type="button">Wall display</button>
+      <a class="btn" id="wallBtn" href="display.html#energy">Wall display</a>
       <button class="btn" id="refreshBtn" type="button">Refresh</button>
       <button class="btn primary" id="settingsBtn" type="button">Connect account</button>
     </div>
@@ -258,7 +258,7 @@
       <div class="actions"><button class="btn small" id="csvBtn" type="button">Download readings (CSV)</button></div>
       <div class="prose small muted">
         <p><b>Put it on your phone.</b> Open the page from your home server, then use Share → Add to Home Screen on iPhone, or the menu → Install app / Add to home screen in Chrome on Android.</p>
-        <p><b>Wall display.</b> The Wall display button gives a full-screen view for an old tablet or a spare screen. It refreshes itself every minute.</p>
+        <p><b>Wall display.</b> The Wall display button opens the household display: energy, home, travel, a screensaver and a night clock, made for a wall tablet or the TV. Each mode has its own link, such as <span class="mono">display.html#home</span>, so each screen can open its favourite.</p>
       </div>
     </section>
   </section>
@@ -267,14 +267,4 @@
     <p>All prices include VAT. Gas in cubic metres is converted to kWh with a volume correction of 1.02264 and a calorific value of 39.5 MJ/m³, so gas figures are close estimates. Smart meter readings arrive a day behind, so charts cover full days up to yesterday.</p>
     <p>Simulations, projections and savings are estimates to help you decide what to look into. They aren't financial advice or quotes.</p>
   </footer>
-</div>
-
-<div class="wall" id="wall" hidden>
-  <div class="wall-top"><span class="eyebrow">Harold Street · live</span><span class="wall-clock" id="wallClock">--:--</span><div class="wall-actions"><button class="btn" id="wallFs" type="button">Full screen</button><button class="btn" id="wallClose" type="button">Close</button></div></div>
-  <div class="wall-main">
-    <span class="wall-sub" id="wallLabel">Agile price now</span>
-    <span class="wall-price" id="wallPrice">--</span>
-    <span class="wall-sub" id="wallNext"></span>
-  </div>
-  <div class="wall-row" id="wallRow"></div>
 </div>

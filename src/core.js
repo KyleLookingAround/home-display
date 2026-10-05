@@ -35,15 +35,28 @@ const pct = v => `${Math.round(v*100)}%`;
 const fmtTick = v => { const r = Math.round(v*100)/100; return Math.abs(r) >= 10 ? String(Math.round(r)) : String(r); };
 const sum = a => a.reduce((x, y) => x + y, 0);
 const median = a => { if (!a.length) return 0; const s = a.slice().sort((x,y)=>x-y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// Nullish default, written out: shared code also runs on TV browsers older than Chromium 80.
+const nz = (v, d) => v == null ? d : v;
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+/* Per-device storage. The dashboard and the display share it, so a key entered on one works on the other. */
+const store = {
+  get(k){ try { return localStorage.getItem('hse.' + k); } catch(e){ return null; } },
+  set(k, v){ try { localStorage.setItem('hse.' + k, v); } catch(e){} },
+  del(k){ try { localStorage.removeItem('hse.' + k); } catch(e){} },
+  getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
+};
 
 function niceStep(x){ if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x/p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
 function niceScale(min, max, n = 4){ if (!(max > min)) max = min + 1; const step = niceStep((max-min)/n); return { lo: Math.floor(min/step)*step, hi: Math.ceil(max/step)*step, step }; }
 
 /* ---------- network ---------- */
 class ApiError extends Error { constructor(code, msg){ super(msg || code); this.code = code; } }
-const NET = { proxy: false, creds: null, token: null, tokenAt: 0 };
+const NET = { proxy: false, creds: null, token: null, tokenAt: 0, keys: {} };
 const OCTO = 'https://api.octopus.energy';
 
 async function request(url, opts = {}){
@@ -74,6 +87,10 @@ async function detectProxy(){
   if (location.protocol === 'file:') return false;
   try { const r = await fetch('./proxy/ping', { cache: 'no-store' }); NET.proxy = r.ok && (await r.text()).trim() === 'ok'; }
   catch(e){ NET.proxy = false; }
+  if (NET.proxy){
+    // Which service keys the helper holds (trains, trams). Older helpers don't answer this.
+    try { const r = await fetch('./proxy/status', { cache: 'no-store' }); if (r.ok) NET.keys = (await r.json()).keys || {}; } catch(e){}
+  }
   return NET.proxy;
 }
 
@@ -209,11 +226,15 @@ async function loadExportRates(region){
 }
 
 /* ---------- account ---------- */
-async function loadAccount({ gasUnit, pay, fallbackRegion }){
+async function loadProperty(){
   const acc = await octoGet(`/v1/accounts/${encodeURIComponent(NET.creds.account)}/`, true);
   const props = acc.properties || [];
   const prop = props.find(p => !p.moved_out_at) || props[props.length-1];
   if (!prop) throw new ApiError('NOPROP', 'No property is listed on this account yet.');
+  return prop;
+}
+async function loadAccount({ gasUnit, pay, fallbackRegion }){
+  const prop = await loadProperty();
   const pts = (list, idKey) => (list || []).map(m => ({
     id: m[idKey], serials: (m.meters || []).map(x => x.serial_number).filter(Boolean),
     agreements: m.agreements || [], agreement: pickAgreement(m.agreements)
@@ -226,8 +247,16 @@ async function loadAccount({ gasUnit, pay, fallbackRegion }){
   const elec = elecPts.length ? await loadConsumption('electricity', elecPts, from, end) : [];
   let gas = gasPts.length ? await loadConsumption('gas', gasPts, from, end) : [];
   if (gasUnit === 'm3') gas = gas.map(r => ({ t: r.t, v: r.v * GAS_M3_TO_KWH }));
-  const region = regionOf(elecPts[0]?.agreement?.tariff_code) || fallbackRegion;
+  const region = regionOf(elecPts[0] && elecPts[0].agreement && elecPts[0].agreement.tariff_code) || fallbackRegion;
   return { demo: false, region: REGIONS[region] ? region : fallbackRegion, elecPts, gasPts, eSets, gSets, elec, gas };
+}
+/** Today's electricity tariff only, without readings: what the display needs to price the Home Mini's figures. */
+async function loadTodayTariff(pay){
+  const prop = await loadProperty();
+  const pt = (prop.electricity_meter_points || []).filter(m => !m.is_export)[0];
+  if (!pt) return { region: null, eSets: [] };
+  const a = pickAgreement(pt.agreements);
+  return { region: regionOf(a && a.tariff_code), eSets: await loadTariffSets('electricity', pt.agreements, startOfDay(new Date()), pay) };
 }
 
 /* ---------- Octopus GraphQL (Home Mini, Saving Sessions, Octoplus) ---------- */
@@ -246,21 +275,23 @@ async function krakenToken(){
 }
 async function findHomeMini(){
   const d = await gql(`query($a:String!){account(accountNumber:$a){electricityAgreements(active:true){meterPoint{meters(includeInactive:false){serialNumber smartImportElectricityMeter{deviceId}}}}}}`, { a: NET.creds.account });
-  for (const ag of d.account?.electricityAgreements || [])
-    for (const m of ag.meterPoint?.meters || []) if (m.smartImportElectricityMeter?.deviceId) return m.smartImportElectricityMeter.deviceId;
+  for (const ag of (d.account && d.account.electricityAgreements) || [])
+    for (const m of (ag.meterPoint && ag.meterPoint.meters) || []) if (m.smartImportElectricityMeter && m.smartImportElectricityMeter.deviceId) return m.smartImportElectricityMeter.deviceId;
   return null;
 }
-async function liveReading(deviceId){
+/** Live draw from the Home Mini. withToday adds the day's half hours: a second GraphQL call, so the display asks for it less often. */
+async function liveReading(deviceId, withToday = true){
   const now = new Date(), q = `query($d:String!,$s:DateTime!,$e:DateTime!,$g:TelemetryGrouping){smartMeterTelemetry(deviceId:$d,grouping:$g,start:$s,end:$e){readAt consumptionDelta demand}}`;
   const recent = await gql(q, { d: deviceId, s: new Date(now - 10*60e3).toISOString(), e: now.toISOString(), g: 'TEN_SECONDS' });
-  const rows = (recent.smartMeterTelemetry || []).filter(r => r.demand != null);
-  const last = rows[rows.length-1] || null;
-  let today = null;
-  try {
+  const tens = (recent.smartMeterTelemetry || []).filter(r => r.demand != null);
+  const last = tens[tens.length-1] || null;
+  let today = null, halfHours = null;
+  if (withToday) try {
     const hh = await gql(q, { d: deviceId, s: startOfDay(now).toISOString(), e: now.toISOString(), g: 'HALF_HOURLY' });
-    today = sum((hh.smartMeterTelemetry || []).map(r => +r.consumptionDelta || 0)) / 1000;
+    halfHours = (hh.smartMeterTelemetry || []).map(r => ({ t: +new Date(r.readAt), v: (+r.consumptionDelta || 0) / 1000 }));
+    today = sum(halfHours.map(r => r.v));
   } catch(e){}
-  return { demand: last ? +last.demand : null, at: last ? +new Date(last.readAt) : null, today };
+  return { demand: last ? +last.demand : null, at: last ? +new Date(last.readAt) : null, today, rows: halfHours };
 }
 async function loadRewards(){
   const out = { sessions: null, points: null };
@@ -284,8 +315,8 @@ async function loadCarbonForecast(regionId){
 }
 function parseCarbon(j){
   const d = j && j.data;
-  const arr = Array.isArray(d) ? d.flatMap(x => x.data || [x]) : (d && d.data) || [];
-  return arr.filter(x => x.intensity).map(x => ({ from: +new Date(x.from), to: +new Date(x.to), v: x.intensity.forecast ?? x.intensity.actual, index: x.intensity.index }))
+  const arr = Array.isArray(d) ? d.reduce((a, x) => a.concat(x.data || [x]), []) : (d && d.data) || [];
+  return arr.filter(x => x.intensity).map(x => ({ from: +new Date(x.from), to: +new Date(x.to), v: nz(x.intensity.forecast, x.intensity.actual), index: x.intensity.index }))
             .filter(x => x.v != null).sort((a, b) => a.from - b.from);
 }
 async function loadCarbonHistory(regionId, from, to){
@@ -300,13 +331,13 @@ async function loadCarbonHistory(regionId, from, to){
 async function loadWeather(){
   const j = await request(`https://api.open-meteo.com/v1/forecast?latitude=${HOME.lat}&longitude=${HOME.lon}&daily=temperature_2m_mean&past_days=92&forecast_days=7&timezone=Europe%2FLondon`);
   const map = new Map(), today = dayKey(Date.now());
-  (j.daily?.time || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
+  ((j.daily && j.daily.time) || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
   return map;
 }
 async function loadPVGIS(kwp, aspect, angle){
   if (!NET.proxy) throw new ApiError('NOPROXY');
   const j = await request(`./proxy/pvgis/v5_3/PVcalc?lat=${HOME.lat}&lon=${HOME.lon}&peakpower=${kwp}&loss=14&angle=${angle}&aspect=${aspect}&outputformat=json`);
-  const m = j.outputs?.monthly?.fixed;
+  const m = j.outputs && j.outputs.monthly && j.outputs.monthly.fixed;
   if (!m || m.length !== 12) throw new ApiError('HTTP', 'PVGIS returned an unexpected answer.');
   return m.map(x => x.E_m / kwp);
 }

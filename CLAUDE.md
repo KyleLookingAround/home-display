@@ -6,18 +6,39 @@ Read `ROADMAP.md` for what's next and `docs/` for the stack choices and API deta
 
 ## What exists now
 
-- `index.html`: the built app. One self-contained file, no dependencies, opens straight from disk.
-- `src/`: the source it's built from. `python3 build.py` concatenates these into `index.html`.
-  - `head.html`: meta tags and all CSS. Design tokens live on `:root`.
-  - `body.html`: markup for the five tabs and the wall display overlay.
-  - `core.js`: constants, formatting helpers, the network layer and all API loaders (Octopus REST and GraphQL, Carbon Intensity, Open-Meteo, PVGIS, EPC).
-  - `analysis.js`: pure functions with no DOM. Example data, the period roll-up, spikes, weather regression, projections, tariff comparison, battery and solar simulators.
-  - `dom.js`: state, rendering, the generic SVG `barChart`, event wiring and the wall display.
-  - `starfield.js`: the animated background.
-- `server.py`: optional stdlib-only home server helper. It serves the folder and proxies a fixed allowlist of hosts under `/proxy/<name>/…`. The page detects it with `GET ./proxy/ping`, and from then on all Octopus calls go through it.
-- `tests/analysis.test.mjs`: runs the analysis functions on example data with `node --test tests/analysis.test.mjs`.
+- `index.html` (the dashboard) and `display.html` (the household display): built pages. Each is one self-contained file with no dependencies that opens straight from disk. Never edit them directly.
+- `src/`: the source. `python3 build.py` concatenates it into both pages.
+  - `head.html`, `body.html`: the dashboard's CSS (design tokens on `:root`) and markup for its five tabs.
+  - `core.js`: shared by both pages. It holds:
+    - constants and formatting helpers;
+    - `$`, `$$` and `store` (per-device `localStorage`, keys prefixed `hse.`);
+    - the network layer and the API loaders: Octopus REST and GraphQL, Carbon Intensity, Open-Meteo, PVGIS and EPC.
+  - `analysis.js`: pure functions with no DOM, shared by both pages. Example data, the period roll-up, spikes, weather regression, projections, tariff comparison, battery and solar simulators, and `cheapestWindow`.
+  - `dom.js`: the dashboard's state, rendering, the generic SVG `barChart` and event wiring.
+  - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
+  - `display/sources.js`: the display's household data, mostly pure.
+    - Modes, night window and settings defaults.
+    - Bins, weather, and the iCal parser and `RRULE` expansion.
+    - Realtime Trains and TfGM parsing, leave-by countdowns, today's cost.
+    - Nightly reload and staleness, and the example data.
+  - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure), mode switching, remote control and spatial navigation, screensaver motion, night mode and the settings sheet.
+  - `starfield.js`: the animated background, on both pages.
+- `server.py`: optional stdlib-only home server helper.
+  - It serves the folder (never dotfiles, `.py` or `.md`) and proxies a fixed allowlist of hosts under `/proxy/<name>/…`.
+  - It holds the train and tram keys from `.env` or the environment: `RTT_TOKEN` or `RTT_REFRESH_TOKEN`, and `TFGM_KEY`. `GET /proxy/status` says which are set.
+  - Pages detect it with `GET ./proxy/ping`, and from then on all Octopus calls go through it.
+- `lock/`: `template.html` is the StatiCrypt lock screen (PIN keypad, remote-friendly). `publish.sh` builds `_site/` for Pages and locks it when `SITE_PASSWORD` is set.
+- `.github/workflows/pages.yml`: checks every push, and publishes `main` to GitHub Pages.
+- `tests/`:
+  - `*.test.mjs`: unit tests with no dependencies. `analysis.test.mjs` covers the maths. `display.test.mjs` covers the display's logic, the TV syntax check and "built pages match the source".
+  - `display.browser.mjs`: Playwright, on fixed fake data with the clock held. Phone and 1080p layouts, 24px text, the remote, the idle screensaver, the night clock, setup links, and the dashboard at both sizes.
+  - `lock.browser.mjs`: builds a locked site with a test PIN and unlocks it.
 
-## Tabs
+## Display modes
+
+Energy, Home, Travel, Screensaver, Night. The mode comes from the link (`display.html#home`) or the screen's own setting. The screensaver and night clock also take over automatically as overrides that don't change the link. Settings live in `localStorage` under `hse.display` on each device, and a setup link (`#setup=<base64 JSON>`) copies them between devices.
+
+## Dashboard tabs
 
 - **Overview**: tariffs, period totals, daily chart with change-log markers, bill tracker and Direct Debit check, price cap countdown, Saving Sessions and Octoplus, weekly log.
 - **Patterns**: electricity and gas by time of day, boiler schedule check, spike detective, carbon footprint, gas against temperature.
@@ -31,20 +52,25 @@ Read `ROADMAP.md` for what's next and `docs/` for the stack choices and API deta
 - **Units:** money is held in pence internally and formatted with `gbp()` or `gbp0()`. Rates are p/kWh including VAT.
 - **Readings:** half-hourly records are `{ t: epochMs, v: kWh }`. Rate lists are `{ from, to, p }`, sorted, and looked up with `lookup()` (a binary search).
 - **Gas units:** gas from SMETS2 meters arrives in m³ and is converted with `GAS_M3_TO_KWH`.
-- **Example data:** with no account connected the app runs on `makeDemo()`, and every figure derived from it is labelled as an example.
-- **Secrets:** never commit secrets. The Octopus API key is entered per device and kept in `localStorage`. Any hosted version should hold it in a server-side secret (see `docs/STACK.md`).
+- **Example data:** with no account connected the dashboard runs on `makeDemo()`, and every figure derived from it is labelled as an example. The display does the same for bins, calendar, trains and trams that aren't set up: they show an "Example" tag and say how to set them up. It never shows an example price.
+- **TV browsers:** code in `core.js`, `analysis.js` and `src/display/` must parse on Chromium 63. Don't use `?.`, `??`, `flatMap`, `.at()`, optional catch binding or `Object.fromEntries`; use `nz(value, fallback)` for nullish defaults. The display's CSS must avoid `inset`, flex `gap` and `:focus-visible`, and give `clamp()`/`min()` a fallback. `dom.js` only runs on the dashboard and may use newer syntax.
+- **Ten-foot rules (display):** size text in `rem`, nothing under `0.9rem` (24px at 1080p); keep the 4.5% overscan margin; every control must be reachable with arrows, Enter and Back.
+- **Secrets:** never commit secrets. The Octopus API key is entered per device and kept in `localStorage`. Train and tram keys live only in the helper's `.env`, because Realtime Trains forbids tokens in browser apps. Any hosted version should hold keys in a server-side secret (see `docs/STACK.md`). The repository is public: don't commit the house number or other personal details either.
 - **Copy:** plain British English, written from the user's side. Estimates are labelled as estimates, not advice.
 
 ## Known gaps
 
-- Octopus has no documented CORS support, so direct browser calls to `api.octopus.energy` are unconfirmed. They go through `server.py` when it's present. Test direct calls first, and plan a proxy (a Cloudflare Worker) for the hosted site.
+- Octopus allows browser calls, including authenticated ones (checked October 2026), so the published site works without a proxy. Trains, trams and Google Calendar don't: on the published site they show labelled examples until the backend in `ROADMAP.md` item 3 exists.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
 - The EPC register moved to a new government service in 2026. The search endpoint and its parameters in `searchEPC()` are a best guess.
 - The tariff comparison covers electricity only.
+- Realtime Trains' new API and TfGM's Metrolink fields are coded from the spec and community code, and haven't been tried with live keys yet.
+- Bin days are entered by hand. Bank holiday changes aren't known.
 
 ## Checking changes
 
-1. `python3 build.py`, then open `index.html`.
-2. `python3 server.py`, then open http://localhost:8787 to exercise the proxy path.
-3. `node --test tests/analysis.test.mjs` for the maths.
-4. Screenshot at 390×844 (phone) and 1920×1080 (TV), and confirm nothing scrolls sideways.
+1. `python3 build.py`, then open `index.html` and `display.html`. Commit the built pages with the source: CI fails if they differ.
+2. `node --test tests/*.test.mjs` for the maths and the display's logic.
+3. `npm i --no-save playwright` (once), then `node --test tests/display.browser.mjs tests/lock.browser.mjs`. These check phone (390×844) and TV (1920×1080) layouts, 24px text, the remote and the lock. Add `SHOTS=1` to save screenshots to `tests/screens/` and look at them.
+4. `python3 server.py`, then open http://localhost:8787/display.html to exercise the proxy path.
+5. Pushing to `main` publishes to GitHub Pages once the checks pass. Check the workflow run and the live site afterwards.

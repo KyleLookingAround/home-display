@@ -105,7 +105,7 @@ function buildModel(raw, days){
   if (ah && ah.unit && ehh.length){
     let aP = 0, yP = 0; const cov = new Set();
     for (const x of ehh){ const a = lookup(ah.unit, x.t), y = unitPriceAt(raw.eSets, x.t); if (a == null || y == null) continue; aP += x.v*a; yP += x.v*y; cov.add(dayKey(x.t)); }
-    for (const k of cov){ const mid = +keyDate(k) + 12*3600e3; aP += lookup(ah.sc, mid) ?? 0; yP += standingAt(raw.eSets, mid) ?? 0; }
+    for (const k of cov){ const mid = +keyDate(k) + 12*3600e3; aP += nz(lookup(ah.sc, mid), 0); yP += nz(standingAt(raw.eSets, mid), 0); }
     if (cov.size) agileCmp = { agile: aP, yours: yP, days: cov.size };
   }
 
@@ -196,15 +196,15 @@ function buildModelRange(raw, from, to){
   const s = +from, e = +to; let ec = 0, gc = 0; const ed = new Set(), gd = new Set();
   for (const x of raw.elec) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; ed.add(dayKey(x.t)); }
   for (const x of raw.gas) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; gd.add(dayKey(x.t)); }
-  for (const k of ed) ec += standingAt(raw.eSets, +keyDate(k) + 432e5) ?? 0;
-  for (const k of gd) gc += standingAt(raw.gSets, +keyDate(k) + 432e5) ?? 0;
+  for (const k of ed) ec += nz(standingAt(raw.eSets, +keyDate(k) + 432e5), 0);
+  for (const k of gd) gc += nz(standingAt(raw.gSets, +keyDate(k) + 432e5), 0);
   return { ec, gc, nE: ed.size, nG: gd.size };
 }
 function annualProjection(raw, reg){
   const now = Date.now(), end = startOfDay(new Date());
   const r30 = buildModelRange(raw, addDays(end, -30), end);
   const eRate = unitPriceAt(raw.eSets, now), gRate = unitPriceAt(raw.gSets, now);
-  const eSc = standingAt(raw.eSets, now) ?? 0, gSc = standingAt(raw.gSets, now) ?? 0;
+  const eSc = nz(standingAt(raw.eSets, now), 0), gSc = nz(standingAt(raw.gSets, now), 0);
   if (!r30.nE && !r30.nG) return null;
   const eUse = r30.nE ? sum(raw.elec.filter(x => x.t >= +addDays(end,-30) && x.t < +end).map(x=>x.v)) / r30.nE * 365 : 0;
   const elecP = r30.nE ? (eRate != null ? eUse*eRate : r30.ec/r30.nE*365) + eSc*365 : 0;
@@ -243,11 +243,11 @@ function compareTariffs(raw, options, days = 90){
       m.set(k, cur);
     });
   }
-  const keys = [...per[0].keys()].filter(k => per.every(m => m.get(k)?.ok));
+  const keys = [...per[0].keys()].filter(k => per.every(m => m.get(k) && m.get(k).ok));
   if (!keys.length) return null;
   const res = plans.map((p, i) => {
     let tot = 0;
-    for (const k of keys){ tot += per[i].get(k).p + (p.sc(+keyDate(k) + 432e5) ?? 0); }
+    for (const k of keys){ tot += per[i].get(k).p + nz(p.sc(+keyDate(k) + 432e5), 0); }
     return { id: p.id, label: p.label, note: p.note, product: p.product, total: tot, year: tot / keys.length * 365 };
   });
   return { days: keys.length, rows: res.sort((a, b) => a.total - b.total) };
@@ -318,7 +318,7 @@ function cheapestWindow(rates, slots, now = Date.now()){
   for (let i = 0; i + slots - 1 < fut.length; i++){
     const w = fut.slice(i, i + slots);
     if (w.some((r, j) => j && r.from !== w[j-1].to)) continue;
-    const avg = sum(w.map(r => r.p ?? r.v)) / slots;
+    const avg = sum(w.map(r => nz(r.p, r.v))) / slots;
     if (!best || avg < best.avg) best = { avg, from: w[0].from, to: w[slots-1].to };
   }
   return best;
@@ -333,8 +333,8 @@ function weekLog(raw){
     let ec = 0, gc = 0;
     for (const x of raw.elec) if (x.t >= s && x.t < e){ dayE.set(dayKey(x.t), (dayE.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; }
     for (const x of raw.gas) if (x.t >= s && x.t < e){ dayG.set(dayKey(x.t), (dayG.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; }
-    for (const k of dayE.keys()) ec += standingAt(raw.eSets, +keyDate(k)+432e5) ?? 0;
-    for (const k of dayG.keys()) gc += standingAt(raw.gSets, +keyDate(k)+432e5) ?? 0;
+    for (const k of dayE.keys()) ec += nz(standingAt(raw.eSets, +keyDate(k)+432e5), 0);
+    for (const k of dayG.keys()) gc += nz(standingAt(raw.gSets, +keyDate(k)+432e5), 0);
     const tot = new Map([...dayE.keys(), ...dayG.keys()].map(k => [k, 0]));
     for (const [k, v] of dayE) tot.set(k, tot.get(k) + v);
     for (const [k, v] of dayG) tot.set(k, tot.get(k) + v);
@@ -369,7 +369,7 @@ function toCSV(raw){
   const lines = ['interval_start,electricity_kwh,electricity_p_per_kwh,gas_kwh,gas_p_per_kwh'];
   for (const t of times){
     const ep = unitPriceAt(raw.eSets, t), gp = unitPriceAt(raw.gSets, t);
-    lines.push([new Date(t).toISOString(), e.get(t) ?? '', ep ?? '', g.has(t) ? g.get(t).toFixed(4) : '', gp ?? ''].join(','));
+    lines.push([new Date(t).toISOString(), nz(e.get(t), ''), nz(ep, ''), g.has(t) ? g.get(t).toFixed(4) : '', nz(gp, '')].join(','));
   }
   return lines.join('\n');
 }

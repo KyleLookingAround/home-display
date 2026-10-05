@@ -1,6 +1,6 @@
 # API notes
 
-What the app calls, and how sure we are of each detail. Researched October 2026. **Unconfirmed** means it's taken from community code or an educated guess rather than official documentation.
+What the dashboard and the display call, and how sure we are of each detail. Researched October 2026. **Unconfirmed** means it's taken from community code or an educated guess rather than official documentation.
 
 ## Octopus Energy REST: `https://api.octopus.energy/v1/`
 
@@ -32,7 +32,7 @@ Docs: https://docs.octopus.energy/rest/guides/endpoints/
   | Outgoing Fixed | `OUTGOING-FIX-` / `OUTGOING-PRIME-FIX-` |
 
 - **Product list:** `/products/?brand=OCTOPUS_ENERGY&is_business=false`. A `direction` field (IMPORT/EXPORT) is **unconfirmed**.
-- **CORS: unconfirmed.** Browser projects found online route through a Cloudflare Worker. Test with `fetch('https://api.octopus.energy/v1/products/')` in a browser console.
+- **CORS: allowed** (checked 5 October 2026). Responses carry `Access-Control-Allow-Origin: *`, and preflights allow the `Authorization` header for account, consumption and GraphQL calls, so the published site can call Octopus directly. The home server helper is still used when present.
 
 ## Octopus GraphQL: `POST https://api.octopus.energy/v1/graphql/`
 
@@ -65,6 +65,10 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
 - **Call:** `https://api.open-meteo.com/v1/forecast?latitude=53.41&longitude=-2.16&daily=temperature_2m_mean&past_days=92&forecast_days=7&timezone=Europe%2FLondon`
 - `past_days` goes up to 92. The response holds `daily.time[]` and `daily.temperature_2m_mean[]`.
 - No key needed, for non-commercial use.
+- **The display's call:** `forecast?latitude&longitude&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min&forecast_days=2&timezone=Europe%2FLondon&wind_speed_unit=mph`.
+  - Times come back as local time without an offset, such as `2026-10-05T14:00`.
+  - `weather_code` uses WMO codes.
+- Allows browser calls (`Access-Control-Allow-Origin: *`).
 
 ## PVGIS (EU JRC)
 
@@ -86,3 +90,40 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
   - Gas: 7.97p/kWh, standing charge 29.68p/day.
   - Typical bill: £1,723 a year.
 - Regional figures are in Ofgem's downloadable tables. The app shows the account's actual rates instead.
+
+## Realtime Trains (display: travel)
+
+- **The old API is gone.** `api.rtt.io` stopped on 30 September 2026 and now answers 418 with a pointer to the new one. `secure.realtimetrains.co.uk` follows on 31 March 2027.
+- **New API:** `https://data.rtt.io`, with an OpenAPI spec at https://realtimetrains.github.io/api-specification. Sign up at https://api-portal.rtt.io.
+- **Auth:** `Authorization: Bearer <token>`. You get either a long-life access token, or a refresh token swapped for short-life access tokens at `GET /api/get_access_token` (answers `{ token, validUntil }`).
+- **Rule:** no token may be placed in a distributable user application; it must sit behind a server-side proxy, or it's revoked. So trains only come through `server.py`, which adds the token from `RTT_TOKEN` or `RTT_REFRESH_TOKEN`.
+- **Rate limits:** 30 a minute, 750 an hour, 9,000 a day and 30,000 a week. The display asks once a minute in travel mode and every five minutes otherwise.
+- **Departures:** `GET /gb-nr/location?code=SPT&filterTo=MAN&timeWindow=120`. It returns 204 when there are no services.
+  - The response holds `query.location.description` (the station name) and `services[]`.
+  - Each service has:
+    - `temporalData.departure`: `scheduleAdvertised`, `realtimeForecast`, `realtimeActual`, `realtimeEstimate` and `isCancelled`, all ISO 8601 times;
+    - `temporalData.displayAs`, such as `CANCELLED`;
+    - `locationMetadata.platform`, with `planned` and `actual`;
+    - `destination[].location.description`;
+    - `scheduleMetadata.operator.name`.
+  - Taken from the spec. The display hasn't yet been tried against a live token.
+
+## TfGM Metrolink (display: travel)
+
+- **Call:** `GET https://api.tfgm.com/odata/Metrolinks` with header `Ocp-Apim-Subscription-Key`. Get a key at https://developer.tfgm.com.
+- **No browser calls:** a preflight is refused with 403, so trams come through `server.py`, which adds the key from `TFGM_KEY`.
+- **Response (unconfirmed, from community code):** `value[]`, one row per platform display. The display groups rows by `StationLocation` (the stop name you set).
+  - `StationLocation`, `Direction` and `MessageBoard`.
+  - `Dest0`–`Dest3`, `Wait0`–`Wait3` (minutes, as strings), `Status0`–`Status3` and `Carriages0`–`Carriages3`.
+  - Rows saying "Terminates Here" are left out.
+
+## Calendars (display: home)
+
+- **Source:** a calendar's secret iCal address. In Google Calendar it's under Settings → the calendar → Integrate calendar.
+- **No browser calls:** Google's `calendar.google.com/calendar/ical/…` doesn't send CORS headers. With the helper present, the display fetches it through `/proxy/gcal/…`; the helper allows only `calendar/ical/` paths. Other providers are fetched directly and may or may not allow it.
+- **Parsing:** done in `src/display/sources.js`. It handles:
+  - folded lines and `TZID` times;
+  - all-day events and `DURATION`;
+  - `RRULE` with `FREQ` DAILY, WEEKLY (with `BYDAY`), MONTHLY (`BYDAY` like `2TU`, or `BYMONTHDAY`) and YEARLY, plus `INTERVAL`, `COUNT` and `UNTIL`;
+  - `EXDATE`, moved instances (`RECURRENCE-ID`) and cancelled events.
+- **Not handled:** rarer rules such as `BYSETPOS` and `BYWEEKNO`.

@@ -56,6 +56,7 @@ a{color:var(--gas)}
 .top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
 .top > div:first-child{display:grid;gap:6px;min-width:0}
 .actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+a.btn{display:inline-block;text-decoration:none}
 .btn{font:500 12.5px/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);background:rgba(14,18,40,.6);border:1px solid var(--line-hot);border-radius:3px;padding:10px 14px;cursor:pointer}
 .btn:hover{border-color:var(--gas);box-shadow:0 0 14px -4px var(--gas)}
 .btn.primary{background:linear-gradient(135deg,rgba(143,107,255,.92),rgba(79,214,255,.86));color:#05060f;border-color:transparent}
@@ -191,24 +192,7 @@ td input.kwh{width:5.5em;font:13px var(--f-mono);color:var(--ink);background:var
 .measures .check{justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:8px}
 .measures .check span:last-child{font-family:var(--f-mono);color:var(--muted);font-size:12.5px}
 
-/* wall display */
-.wall{position:fixed;inset:0;z-index:50;background:radial-gradient(70vw 60vw at 50% 40%, rgba(143,107,255,.16), transparent 70%),var(--void);display:grid;grid-template-rows:auto 1fr auto;padding:calc(20px + env(safe-area-inset-top,0px)) 24px calc(20px + env(safe-area-inset-bottom,0px));gap:16px}
-.wall-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
-.wall-clock{font:500 clamp(1.4rem,4vw,2.4rem)/1 var(--f-mono);letter-spacing:.04em}
-.wall-main{display:grid;place-items:center;text-align:center;gap:10px;align-content:center;animation:drift 240s ease-in-out infinite alternate}
-/* Screensaver drift: the readout wanders slowly so a TV or tablet never holds one image in place. */
-@keyframes drift{0%{transform:translate(-9vw,-7vh)}25%{transform:translate(8vw,-4vh)}50%{transform:translate(6vw,8vh)}75%{transform:translate(-7vw,5vh)}100%{transform:translate(9vw,-6vh)}}
-#stars{z-index:0} .wall-on #stars{z-index:51;opacity:.9}
-.wall > *{position:relative;z-index:52}
-.wall-price{font:700 clamp(4rem,18vw,11rem)/1 var(--f-mono);font-variant-numeric:tabular-nums;transition:color .6s,text-shadow .6s}
-.wall-sub{font:500 clamp(.9rem,2.4vw,1.3rem)/1.4 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
-.wall-row{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.wall-row .chip .v{font-size:clamp(1.1rem,3vw,1.7rem)}
-
 @media (max-width:480px){.tabs button{padding:10px 7px;letter-spacing:.03em;font-size:11px}}
-.wall .btn{font-size:clamp(12px,1.6vw,18px);padding:clamp(10px,1.4vw,16px) clamp(14px,2vw,24px)}
-.wall .btn:focus,.wall .btn:focus-visible{outline:3px solid var(--elec);outline-offset:4px;box-shadow:0 0 24px -4px var(--elec)}
-.wall-actions{display:flex;gap:10px}
 footer{font:11.5px/1.55 var(--f-mono);color:var(--muted);display:grid;gap:6px;max-width:84ch}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -224,7 +208,7 @@ footer{font:11.5px/1.55 var(--f-mono);color:var(--muted);display:grid;gap:6px;ma
     </div>
     <div class="actions">
       <span id="status" class="pill demo">Example data</span>
-      <button class="btn" id="wallBtn" type="button">Wall display</button>
+      <a class="btn" id="wallBtn" href="display.html#energy">Wall display</a>
       <button class="btn" id="refreshBtn" type="button">Refresh</button>
       <button class="btn primary" id="settingsBtn" type="button">Connect account</button>
     </div>
@@ -473,7 +457,7 @@ footer{font:11.5px/1.55 var(--f-mono);color:var(--muted);display:grid;gap:6px;ma
       <div class="actions"><button class="btn small" id="csvBtn" type="button">Download readings (CSV)</button></div>
       <div class="prose small muted">
         <p><b>Put it on your phone.</b> Open the page from your home server, then use Share → Add to Home Screen on iPhone, or the menu → Install app / Add to home screen in Chrome on Android.</p>
-        <p><b>Wall display.</b> The Wall display button gives a full-screen view for an old tablet or a spare screen. It refreshes itself every minute.</p>
+        <p><b>Wall display.</b> The Wall display button opens the household display: energy, home, travel, a screensaver and a night clock, made for a wall tablet or the TV. Each mode has its own link, such as <span class="mono">display.html#home</span>, so each screen can open its favourite.</p>
       </div>
     </section>
   </section>
@@ -482,16 +466,6 @@ footer{font:11.5px/1.55 var(--f-mono);color:var(--muted);display:grid;gap:6px;ma
     <p>All prices include VAT. Gas in cubic metres is converted to kWh with a volume correction of 1.02264 and a calorific value of 39.5 MJ/m³, so gas figures are close estimates. Smart meter readings arrive a day behind, so charts cover full days up to yesterday.</p>
     <p>Simulations, projections and savings are estimates to help you decide what to look into. They aren't financial advice or quotes.</p>
   </footer>
-</div>
-
-<div class="wall" id="wall" hidden>
-  <div class="wall-top"><span class="eyebrow">Harold Street · live</span><span class="wall-clock" id="wallClock">--:--</span><div class="wall-actions"><button class="btn" id="wallFs" type="button">Full screen</button><button class="btn" id="wallClose" type="button">Close</button></div></div>
-  <div class="wall-main">
-    <span class="wall-sub" id="wallLabel">Agile price now</span>
-    <span class="wall-price" id="wallPrice">--</span>
-    <span class="wall-sub" id="wallNext"></span>
-  </div>
-  <div class="wall-row" id="wallRow"></div>
 </div>
 <script>
 (() => {
@@ -533,15 +507,28 @@ const pct = v => `${Math.round(v*100)}%`;
 const fmtTick = v => { const r = Math.round(v*100)/100; return Math.abs(r) >= 10 ? String(Math.round(r)) : String(r); };
 const sum = a => a.reduce((x, y) => x + y, 0);
 const median = a => { if (!a.length) return 0; const s = a.slice().sort((x,y)=>x-y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1]+s[m])/2; };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// Nullish default, written out: shared code also runs on TV browsers older than Chromium 80.
+const nz = (v, d) => v == null ? d : v;
+
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+/* Per-device storage. The dashboard and the display share it, so a key entered on one works on the other. */
+const store = {
+  get(k){ try { return localStorage.getItem('hse.' + k); } catch(e){ return null; } },
+  set(k, v){ try { localStorage.setItem('hse.' + k, v); } catch(e){} },
+  del(k){ try { localStorage.removeItem('hse.' + k); } catch(e){} },
+  getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
+};
 
 function niceStep(x){ if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x/p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
 function niceScale(min, max, n = 4){ if (!(max > min)) max = min + 1; const step = niceStep((max-min)/n); return { lo: Math.floor(min/step)*step, hi: Math.ceil(max/step)*step, step }; }
 
 /* ---------- network ---------- */
 class ApiError extends Error { constructor(code, msg){ super(msg || code); this.code = code; } }
-const NET = { proxy: false, creds: null, token: null, tokenAt: 0 };
+const NET = { proxy: false, creds: null, token: null, tokenAt: 0, keys: {} };
 const OCTO = 'https://api.octopus.energy';
 
 async function request(url, opts = {}){
@@ -572,6 +559,10 @@ async function detectProxy(){
   if (location.protocol === 'file:') return false;
   try { const r = await fetch('./proxy/ping', { cache: 'no-store' }); NET.proxy = r.ok && (await r.text()).trim() === 'ok'; }
   catch(e){ NET.proxy = false; }
+  if (NET.proxy){
+    // Which service keys the helper holds (trains, trams). Older helpers don't answer this.
+    try { const r = await fetch('./proxy/status', { cache: 'no-store' }); if (r.ok) NET.keys = (await r.json()).keys || {}; } catch(e){}
+  }
   return NET.proxy;
 }
 
@@ -707,11 +698,15 @@ async function loadExportRates(region){
 }
 
 /* ---------- account ---------- */
-async function loadAccount({ gasUnit, pay, fallbackRegion }){
+async function loadProperty(){
   const acc = await octoGet(`/v1/accounts/${encodeURIComponent(NET.creds.account)}/`, true);
   const props = acc.properties || [];
   const prop = props.find(p => !p.moved_out_at) || props[props.length-1];
   if (!prop) throw new ApiError('NOPROP', 'No property is listed on this account yet.');
+  return prop;
+}
+async function loadAccount({ gasUnit, pay, fallbackRegion }){
+  const prop = await loadProperty();
   const pts = (list, idKey) => (list || []).map(m => ({
     id: m[idKey], serials: (m.meters || []).map(x => x.serial_number).filter(Boolean),
     agreements: m.agreements || [], agreement: pickAgreement(m.agreements)
@@ -724,8 +719,16 @@ async function loadAccount({ gasUnit, pay, fallbackRegion }){
   const elec = elecPts.length ? await loadConsumption('electricity', elecPts, from, end) : [];
   let gas = gasPts.length ? await loadConsumption('gas', gasPts, from, end) : [];
   if (gasUnit === 'm3') gas = gas.map(r => ({ t: r.t, v: r.v * GAS_M3_TO_KWH }));
-  const region = regionOf(elecPts[0]?.agreement?.tariff_code) || fallbackRegion;
+  const region = regionOf(elecPts[0] && elecPts[0].agreement && elecPts[0].agreement.tariff_code) || fallbackRegion;
   return { demo: false, region: REGIONS[region] ? region : fallbackRegion, elecPts, gasPts, eSets, gSets, elec, gas };
+}
+/** Today's electricity tariff only, without readings: what the display needs to price the Home Mini's figures. */
+async function loadTodayTariff(pay){
+  const prop = await loadProperty();
+  const pt = (prop.electricity_meter_points || []).filter(m => !m.is_export)[0];
+  if (!pt) return { region: null, eSets: [] };
+  const a = pickAgreement(pt.agreements);
+  return { region: regionOf(a && a.tariff_code), eSets: await loadTariffSets('electricity', pt.agreements, startOfDay(new Date()), pay) };
 }
 
 /* ---------- Octopus GraphQL (Home Mini, Saving Sessions, Octoplus) ---------- */
@@ -744,21 +747,23 @@ async function krakenToken(){
 }
 async function findHomeMini(){
   const d = await gql(`query($a:String!){account(accountNumber:$a){electricityAgreements(active:true){meterPoint{meters(includeInactive:false){serialNumber smartImportElectricityMeter{deviceId}}}}}}`, { a: NET.creds.account });
-  for (const ag of d.account?.electricityAgreements || [])
-    for (const m of ag.meterPoint?.meters || []) if (m.smartImportElectricityMeter?.deviceId) return m.smartImportElectricityMeter.deviceId;
+  for (const ag of (d.account && d.account.electricityAgreements) || [])
+    for (const m of (ag.meterPoint && ag.meterPoint.meters) || []) if (m.smartImportElectricityMeter && m.smartImportElectricityMeter.deviceId) return m.smartImportElectricityMeter.deviceId;
   return null;
 }
-async function liveReading(deviceId){
+/** Live draw from the Home Mini. withToday adds the day's half hours: a second GraphQL call, so the display asks for it less often. */
+async function liveReading(deviceId, withToday = true){
   const now = new Date(), q = `query($d:String!,$s:DateTime!,$e:DateTime!,$g:TelemetryGrouping){smartMeterTelemetry(deviceId:$d,grouping:$g,start:$s,end:$e){readAt consumptionDelta demand}}`;
   const recent = await gql(q, { d: deviceId, s: new Date(now - 10*60e3).toISOString(), e: now.toISOString(), g: 'TEN_SECONDS' });
-  const rows = (recent.smartMeterTelemetry || []).filter(r => r.demand != null);
-  const last = rows[rows.length-1] || null;
-  let today = null;
-  try {
+  const tens = (recent.smartMeterTelemetry || []).filter(r => r.demand != null);
+  const last = tens[tens.length-1] || null;
+  let today = null, halfHours = null;
+  if (withToday) try {
     const hh = await gql(q, { d: deviceId, s: startOfDay(now).toISOString(), e: now.toISOString(), g: 'HALF_HOURLY' });
-    today = sum((hh.smartMeterTelemetry || []).map(r => +r.consumptionDelta || 0)) / 1000;
+    halfHours = (hh.smartMeterTelemetry || []).map(r => ({ t: +new Date(r.readAt), v: (+r.consumptionDelta || 0) / 1000 }));
+    today = sum(halfHours.map(r => r.v));
   } catch(e){}
-  return { demand: last ? +last.demand : null, at: last ? +new Date(last.readAt) : null, today };
+  return { demand: last ? +last.demand : null, at: last ? +new Date(last.readAt) : null, today, rows: halfHours };
 }
 async function loadRewards(){
   const out = { sessions: null, points: null };
@@ -782,8 +787,8 @@ async function loadCarbonForecast(regionId){
 }
 function parseCarbon(j){
   const d = j && j.data;
-  const arr = Array.isArray(d) ? d.flatMap(x => x.data || [x]) : (d && d.data) || [];
-  return arr.filter(x => x.intensity).map(x => ({ from: +new Date(x.from), to: +new Date(x.to), v: x.intensity.forecast ?? x.intensity.actual, index: x.intensity.index }))
+  const arr = Array.isArray(d) ? d.reduce((a, x) => a.concat(x.data || [x]), []) : (d && d.data) || [];
+  return arr.filter(x => x.intensity).map(x => ({ from: +new Date(x.from), to: +new Date(x.to), v: nz(x.intensity.forecast, x.intensity.actual), index: x.intensity.index }))
             .filter(x => x.v != null).sort((a, b) => a.from - b.from);
 }
 async function loadCarbonHistory(regionId, from, to){
@@ -798,13 +803,13 @@ async function loadCarbonHistory(regionId, from, to){
 async function loadWeather(){
   const j = await request(`https://api.open-meteo.com/v1/forecast?latitude=${HOME.lat}&longitude=${HOME.lon}&daily=temperature_2m_mean&past_days=92&forecast_days=7&timezone=Europe%2FLondon`);
   const map = new Map(), today = dayKey(Date.now());
-  (j.daily?.time || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
+  ((j.daily && j.daily.time) || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
   return map;
 }
 async function loadPVGIS(kwp, aspect, angle){
   if (!NET.proxy) throw new ApiError('NOPROXY');
   const j = await request(`./proxy/pvgis/v5_3/PVcalc?lat=${HOME.lat}&lon=${HOME.lon}&peakpower=${kwp}&loss=14&angle=${angle}&aspect=${aspect}&outputformat=json`);
-  const m = j.outputs?.monthly?.fixed;
+  const m = j.outputs && j.outputs.monthly && j.outputs.monthly.fixed;
   if (!m || m.length !== 12) throw new ApiError('HTTP', 'PVGIS returned an unexpected answer.');
   return m.map(x => x.E_m / kwp);
 }
@@ -929,7 +934,7 @@ function buildModel(raw, days){
   if (ah && ah.unit && ehh.length){
     let aP = 0, yP = 0; const cov = new Set();
     for (const x of ehh){ const a = lookup(ah.unit, x.t), y = unitPriceAt(raw.eSets, x.t); if (a == null || y == null) continue; aP += x.v*a; yP += x.v*y; cov.add(dayKey(x.t)); }
-    for (const k of cov){ const mid = +keyDate(k) + 12*3600e3; aP += lookup(ah.sc, mid) ?? 0; yP += standingAt(raw.eSets, mid) ?? 0; }
+    for (const k of cov){ const mid = +keyDate(k) + 12*3600e3; aP += nz(lookup(ah.sc, mid), 0); yP += nz(standingAt(raw.eSets, mid), 0); }
     if (cov.size) agileCmp = { agile: aP, yours: yP, days: cov.size };
   }
 
@@ -1020,15 +1025,15 @@ function buildModelRange(raw, from, to){
   const s = +from, e = +to; let ec = 0, gc = 0; const ed = new Set(), gd = new Set();
   for (const x of raw.elec) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; ed.add(dayKey(x.t)); }
   for (const x of raw.gas) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; gd.add(dayKey(x.t)); }
-  for (const k of ed) ec += standingAt(raw.eSets, +keyDate(k) + 432e5) ?? 0;
-  for (const k of gd) gc += standingAt(raw.gSets, +keyDate(k) + 432e5) ?? 0;
+  for (const k of ed) ec += nz(standingAt(raw.eSets, +keyDate(k) + 432e5), 0);
+  for (const k of gd) gc += nz(standingAt(raw.gSets, +keyDate(k) + 432e5), 0);
   return { ec, gc, nE: ed.size, nG: gd.size };
 }
 function annualProjection(raw, reg){
   const now = Date.now(), end = startOfDay(new Date());
   const r30 = buildModelRange(raw, addDays(end, -30), end);
   const eRate = unitPriceAt(raw.eSets, now), gRate = unitPriceAt(raw.gSets, now);
-  const eSc = standingAt(raw.eSets, now) ?? 0, gSc = standingAt(raw.gSets, now) ?? 0;
+  const eSc = nz(standingAt(raw.eSets, now), 0), gSc = nz(standingAt(raw.gSets, now), 0);
   if (!r30.nE && !r30.nG) return null;
   const eUse = r30.nE ? sum(raw.elec.filter(x => x.t >= +addDays(end,-30) && x.t < +end).map(x=>x.v)) / r30.nE * 365 : 0;
   const elecP = r30.nE ? (eRate != null ? eUse*eRate : r30.ec/r30.nE*365) + eSc*365 : 0;
@@ -1067,11 +1072,11 @@ function compareTariffs(raw, options, days = 90){
       m.set(k, cur);
     });
   }
-  const keys = [...per[0].keys()].filter(k => per.every(m => m.get(k)?.ok));
+  const keys = [...per[0].keys()].filter(k => per.every(m => m.get(k) && m.get(k).ok));
   if (!keys.length) return null;
   const res = plans.map((p, i) => {
     let tot = 0;
-    for (const k of keys){ tot += per[i].get(k).p + (p.sc(+keyDate(k) + 432e5) ?? 0); }
+    for (const k of keys){ tot += per[i].get(k).p + nz(p.sc(+keyDate(k) + 432e5), 0); }
     return { id: p.id, label: p.label, note: p.note, product: p.product, total: tot, year: tot / keys.length * 365 };
   });
   return { days: keys.length, rows: res.sort((a, b) => a.total - b.total) };
@@ -1142,7 +1147,7 @@ function cheapestWindow(rates, slots, now = Date.now()){
   for (let i = 0; i + slots - 1 < fut.length; i++){
     const w = fut.slice(i, i + slots);
     if (w.some((r, j) => j && r.from !== w[j-1].to)) continue;
-    const avg = sum(w.map(r => r.p ?? r.v)) / slots;
+    const avg = sum(w.map(r => nz(r.p, r.v))) / slots;
     if (!best || avg < best.avg) best = { avg, from: w[0].from, to: w[slots-1].to };
   }
   return best;
@@ -1157,8 +1162,8 @@ function weekLog(raw){
     let ec = 0, gc = 0;
     for (const x of raw.elec) if (x.t >= s && x.t < e){ dayE.set(dayKey(x.t), (dayE.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; }
     for (const x of raw.gas) if (x.t >= s && x.t < e){ dayG.set(dayKey(x.t), (dayG.get(dayKey(x.t))||0) + x.v); const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; }
-    for (const k of dayE.keys()) ec += standingAt(raw.eSets, +keyDate(k)+432e5) ?? 0;
-    for (const k of dayG.keys()) gc += standingAt(raw.gSets, +keyDate(k)+432e5) ?? 0;
+    for (const k of dayE.keys()) ec += nz(standingAt(raw.eSets, +keyDate(k)+432e5), 0);
+    for (const k of dayG.keys()) gc += nz(standingAt(raw.gSets, +keyDate(k)+432e5), 0);
     const tot = new Map([...dayE.keys(), ...dayG.keys()].map(k => [k, 0]));
     for (const [k, v] of dayE) tot.set(k, tot.get(k) + v);
     for (const [k, v] of dayG) tot.set(k, tot.get(k) + v);
@@ -1193,21 +1198,11 @@ function toCSV(raw){
   const lines = ['interval_start,electricity_kwh,electricity_p_per_kwh,gas_kwh,gas_p_per_kwh'];
   for (const t of times){
     const ep = unitPriceAt(raw.eSets, t), gp = unitPriceAt(raw.gSets, t);
-    lines.push([new Date(t).toISOString(), e.get(t) ?? '', ep ?? '', g.has(t) ? g.get(t).toFixed(4) : '', gp ?? ''].join(','));
+    lines.push([new Date(t).toISOString(), nz(e.get(t), ''), nz(ep, ''), g.has(t) ? g.get(t).toFixed(4) : '', nz(gp, '')].join(','));
   }
   return lines.join('\n');
 }
 /* ===================== interface ===================== */
-const $ = s => document.querySelector(s);
-const $$ = s => [...document.querySelectorAll(s)];
-const store = {
-  get(k){ try { return localStorage.getItem('hse.' + k); } catch(e){ return null; } },
-  set(k, v){ try { localStorage.setItem('hse.' + k, v); } catch(e){} },
-  del(k){ try { localStorage.removeItem('hse.' + k); } catch(e){} },
-  getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
-  setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
-};
-
 const state = {
   gasUnit: store.get('gasUnit') || 'm3', pay: store.get('pay') || 'DIRECT_DEBIT',
   days: 30, unit: 'gbp', region: store.get('region') || 'G', tab: 'overview',
@@ -1314,7 +1309,6 @@ function renderAll(){
   state.model = buildModel(state.raw, state.days);
   state.reg = gasRegression(state.raw);
   renderTab(state.tab);
-  renderWall();
 }
 
 /* ---------- overview ---------- */
@@ -1665,10 +1659,9 @@ async function startLive(){
   if (state.live.deviceId && !liveTimer){ pollLive(); liveTimer = setInterval(pollLive, 60e3); }
 }
 async function pollLive(){
-  const wallOpen = !$('#wall').hidden;
-  if (document.hidden || (state.tab !== 'prices' && !wallOpen)){ clearInterval(liveTimer); liveTimer = null; return; }
+  if (document.hidden || state.tab !== 'prices'){ clearInterval(liveTimer); liveTimer = null; return; }
   try { state.live.data = await liveReading(state.live.deviceId); state.live.err = null; } catch(e){ state.live.err = e; }
-  renderLive(); renderWall();
+  renderLive();
 }
 function renderLive(){
   const out = $('#liveOut'), L = state.live;
@@ -1682,7 +1675,7 @@ function renderLive(){
       <div class="chip"><span class="big elec">${d.demand != null ? Math.round(d.demand).toLocaleString('en-GB') + ' W' : '—'}</span><span class="k">Drawing now${d.at ? ' · ' + hhmm(d.at) : ''}</span></div>
       <div class="chip"><span class="v">${d.today != null ? kwh(d.today) : '—'}</span><span class="k">Electricity used today</span></div>
       <div class="chip"><span class="v">${d.today != null && er != null ? gbp(d.today*er) : '—'}</span><span class="k">Today so far, before standing charge</span></div>
-    </div><p class="muted small">Updates every minute while this tab or the wall display is open.</p>`;
+    </div><p class="muted small">Updates every minute while this tab is open.</p>`;
 }
 
 /* ---------- compare ---------- */
@@ -1858,52 +1851,6 @@ function renderServer(){
     : `<p><b>Home server helper.</b> Some services, PVGIS solar data and the EPC register, don't let a browser page call them directly. Copy this file and <span class="mono">server.py</span> to your home server, run <span class="mono">python3 server.py</span>, then open <span class="mono">http://&lt;server address&gt;:8787</span> on any device at home. It also lets you add the app to your phone's home screen.</p>`;
 }
 
-/* ---------- wall display ---------- */
-let wallClock = null;
-function toggleFullscreen(){
-  try {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-    else if (document.documentElement.webkitRequestFullscreen) document.documentElement.webkitRequestFullscreen();
-  } catch(e){}
-}
-function syncFsButton(){ const b = $('#wallFs'); if (b) b.textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen'; }
-function openWall(){
-  $('#wall').hidden = false; document.body.classList.add('wall-on');
-  if (!document.fullscreenElement) toggleFullscreen();
-  try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => {}); } catch(e){}
-  const tick = () => { $('#wallClock').textContent = hhmm(Date.now()); };
-  tick(); wallClock = setInterval(() => { tick(); if (new Date().getSeconds() === 0) renderWall(); }, 1000);
-  renderWall(); startLive();
-  syncFsButton(); $('#wallFs').focus();
-}
-function closeWall(){
-  $('#wall').hidden = true; document.body.classList.remove('wall-on'); clearInterval(wallClock);
-  try { document.fullscreenElement && document.exitFullscreen(); } catch(e){}
-  $('#wallBtn').focus();
-}
-function renderWall(){
-  if ($('#wall').hidden) return;
-  const ag = state.agileToday?.unit?.filter(r => isFinite(r.to)) || [], now = Date.now();
-  const cur = ag.find(r => r.from <= now && now < r.to);
-  const el = $('#wallPrice');
-  if (cur){
-    const col = cur.p < 0 ? 'var(--neg)' : cur.p < 15 ? 'var(--good)' : cur.p < 25 ? 'var(--warn)' : 'var(--bad)';
-    el.textContent = pence(cur.p); el.style.color = col; el.style.textShadow = `0 0 40px ${col}`;
-    $('#wallLabel').textContent = cur.p < 0 ? 'Agile now · you\'re paid to use power' : cur.p < 15 ? 'Agile now · power is cheap' : 'Agile price now, per kWh';
-    const best = cheapestWindow(ag, 4);
-    $('#wallNext').textContent = best ? `Cheapest 2 hours ${dayKey(best.from) === dayKey(now) ? '' : DOW[new Date(best.from).getDay()] + ' '}${hhmm(best.from)}–${hhmm(best.to)} · ${pence(best.avg)}` : '';
-  } else { el.textContent = '--'; el.style.color = ''; el.style.textShadow = ''; $('#wallLabel').textContent = state.agileErr ? 'No signal from Octopus' : 'Waiting for Agile prices'; $('#wallNext').textContent = ''; }
-  const ci = state.carbonFc?.find(r => r.from <= now && now < r.to);
-  const L = state.live.data, er = eRateNow();
-  $('#wallRow').innerHTML = [
-    L && L.demand != null ? `<div class="chip"><span class="v elec">${Math.round(L.demand).toLocaleString('en-GB')} W</span><span class="k">Drawing now</span></div>` : '',
-    L && L.today != null ? `<div class="chip"><span class="v">${kwh(L.today)}</span><span class="k">Used today</span></div>` : '',
-    ci ? `<div class="chip"><span class="v">${ci.v} g</span><span class="k">Grid carbon · ${ci.index}</span></div>` : '',
-    er != null ? `<div class="chip"><span class="v">${pence(er)}</span><span class="k">Your tariff, per kWh</span></div>` : ''
-  ].join('');
-}
-
 /* ---------- loading ---------- */
 async function loadPrices(){
   const today = startOfDay(new Date());
@@ -1913,7 +1860,6 @@ async function loadPrices(){
   catch(e){ state.carbonFc = null; state.carbonErr = e; }
   if (state.tab === 'prices'){ renderAgile(); renderCarbon(); renderBest(); renderActivities(); }
   else if (state.agileToday) updateAlert(state.agileToday.unit.filter(r => isFinite(r.to) && r.to > Date.now() && r.p < 0));
-  renderWall();
 }
 async function loadExtras(){
   const raw = state.raw;
@@ -1948,7 +1894,7 @@ async function refresh(){
   } else { state.raw = makeDemo(); setStatus('demo'); }
   regionOptions();
   renderAll();
-  if (state.tab === 'prices' || !$('#wall').hidden) startLive();
+  if (state.tab === 'prices') startLive();
   loadPrices();
   loadExtras();
   loadSolarInputs();
@@ -2040,21 +1986,7 @@ $('#csvBtn').addEventListener('click', () => {
   a.download = `harold-street-energy-${dayKey(Date.now())}${isDemo() ? '-example' : ''}.csv`;
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 });
-$('#wallBtn').addEventListener('click', openWall);
-$('#wallClose').addEventListener('click', closeWall);
-// TV remotes send arrow keys, Enter and a Back key (Backspace, GoBack or BrowserBack depending on the TV).
-document.addEventListener('keydown', e => {
-  if ($('#wall').hidden) return;
-  if (['Escape', 'Backspace', 'GoBack', 'BrowserBack', 'XF86Back'].includes(e.key) || e.keyCode === 10009 || e.keyCode === 461){ e.preventDefault(); closeWall(); return; }
-  if (e.key === 'f' || e.key === 'F'){ toggleFullscreen(); return; }
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown'){
-    const btns = [$('#wallFs'), $('#wallClose')], i = btns.indexOf(document.activeElement);
-    e.preventDefault(); btns[(i + 1) % btns.length].focus();
-  }
-});
-document.addEventListener('fullscreenchange', syncFsButton);
-$('#wallFs').addEventListener('click', toggleFullscreen);
-document.addEventListener('visibilitychange', () => { if (!document.hidden && (state.tab === 'prices' || !$('#wall').hidden)) startLive(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.tab === 'prices') startLive(); });
 let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => renderTab(state.tab), 150); });
 setInterval(() => { if (!document.hidden) loadPrices(); }, 30*60e3);
 

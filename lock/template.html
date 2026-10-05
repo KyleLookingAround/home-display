@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en-GB" class="staticrypt-html">
+<head>
+<meta charset="utf-8">
+<title>/*[|template_title|]*/0</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#04050d">
+<meta name="robots" content="noindex">
+<meta http-equiv="cache-control" content="max-age=0">
+<meta http-equiv="cache-control" content="no-cache">
+<meta http-equiv="expires" content="0">
+<meta http-equiv="pragma" content="no-cache">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304050d'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='%234fd6ff' stroke-width='3'/%3E%3Cpath d='M35 14 24 35h9l-4 15 12-22h-9z' fill='%23ffb547'/%3E%3C/svg%3E">
+<style>
+/* The lock screen for the published site (StatiCrypt). Same look as the display, and usable with a TV remote:
+   arrows move round the keypad, Enter presses, and "Remember this screen" is ticked so a TV only asks once. */
+:root{--void:#04050d;--ink:#e9ecff;--muted:#9aa2c9;--line:rgba(134,152,255,.45);--gas:#4fd6ff;--elec:#ffb547;--bad:#ff6b7d;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;--f-body:"Exo 2",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box}
+html{font-size:16px}
+@media (min-width:1144px){html{font-size:1.4vw;font-size:min(1.4vw,2.5vh)}}
+body{margin:0;min-height:100vh;color:var(--ink);font:1rem/1.4 var(--f-body);background:radial-gradient(60vw 45vw at 88% -8%,rgba(143,107,255,.22),transparent 70%),radial-gradient(50vw 40vw at -10% 35%,rgba(79,214,255,.12),transparent 70%),var(--void)}
+.hidden{display:none!important}
+.wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:4vh 4vw}
+.card{width:100%;max-width:24rem;text-align:center}
+.eyebrow{font:500 .9rem/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.14em;color:var(--gas);margin:0 0 .4rem}
+h1{font:700 1.5rem/1.2 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;margin:0 0 .4rem}
+.note{color:var(--muted);font-size:.95rem;margin:0 0 1.2rem}
+input[type=password],input[type=text]{width:100%;font:500 1.6rem/1.2 var(--f-mono);letter-spacing:.3em;text-align:center;color:var(--ink);background:rgba(4,5,13,.7);border:2px solid var(--line);border-radius:4px;padding:.5em}
+.keys{display:grid;grid-template-columns:repeat(3,1fr);grid-gap:.6rem;gap:.6rem;margin:1rem 0}
+.key,.go{font:500 1.5rem/1 var(--f-mono);color:var(--ink);background:rgba(14,18,40,.8);border:2px solid var(--line);border-radius:4px;padding:.7em 0;cursor:pointer}
+.go{display:block;width:100%;background:var(--gas);border-color:var(--gas);color:#05060f;font-size:1.1rem;text-transform:uppercase;letter-spacing:.1em;padding:.9em 0}
+.key:focus,.go:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
+label.remember{display:flex;align-items:center;justify-content:center;margin:.2rem 0 1rem;font-size:1rem;color:var(--muted)}
+label.remember input{width:1.4rem;height:1.4rem;margin-right:.6rem;accent-color:var(--gas)}
+.err{color:var(--bad);min-height:1.4em;margin:.4rem 0 0;font:500 1rem/1.4 var(--f-mono)}
+.spin{min-height:100vh;display:flex;align-items:center;justify-content:center;font:500 1rem var(--f-mono);color:var(--muted)}
+</style>
+</head>
+<body class="staticrypt-body">
+<div id="staticrypt_loading" class="spin">Opening…</div>
+<div id="staticrypt_content" class="wrap hidden">
+  <div class="card">
+    <p class="eyebrow">Harold Street</p>
+    <h1>/*[|template_title|]*/0</h1>
+    <p class="note">/*[|template_instructions|]*/0</p>
+    <form id="staticrypt-form" action="#" method="post" autocomplete="off">
+      <input id="staticrypt-password" type="password" name="password" placeholder="/*[|template_placeholder|]*/0" aria-label="/*[|template_placeholder|]*/0" autofocus>
+      <div class="keys" id="keys" role="group" aria-label="Keypad">
+        <button class="key" type="button" data-k="1">1</button><button class="key" type="button" data-k="2">2</button><button class="key" type="button" data-k="3">3</button>
+        <button class="key" type="button" data-k="4">4</button><button class="key" type="button" data-k="5">5</button><button class="key" type="button" data-k="6">6</button>
+        <button class="key" type="button" data-k="7">7</button><button class="key" type="button" data-k="8">8</button><button class="key" type="button" data-k="9">9</button>
+        <button class="key" type="button" data-k="del" aria-label="Delete">&#9003;</button><button class="key" type="button" data-k="0">0</button><button class="key" type="button" data-k="clr" aria-label="Clear">C</button>
+      </div>
+      <label id="staticrypt-remember-label" class="remember hidden"><input id="staticrypt-remember" type="checkbox" name="remember" checked> /*[|template_remember|]*/0</label>
+      <button class="go" type="submit">/*[|template_button|]*/0</button>
+      <p class="err" id="err" role="alert"></p>
+    </form>
+  </div>
+</div>
+<script>
+  // Filled in by StatiCrypt when the site is published; the format is '/*[|variable_name|]*/0'.
+  const staticryptInitiator = /*[|js_staticrypt|]*/ 0;
+  const templateError = "/*[|template_error|]*/0",
+    isRememberEnabled = /*[|is_remember_enabled|]*/ 0,
+    staticryptConfig = /*[|staticrypt_config|]*/ 0;
+  const templateConfig = { rememberExpirationKey: "staticrypt_expiration", rememberPassphraseKey: "staticrypt_passphrase", replaceHtmlCallback: null, clearLocalStorageCallback: null };
+  const staticrypt = staticryptInitiator.init(staticryptConfig, templateConfig);
+
+  window.onload = async function () {
+    const { isSuccessful } = await staticrypt.handleDecryptOnLoad();
+    if (!isSuccessful) {
+      document.getElementById("staticrypt_loading").classList.add("hidden");
+      document.getElementById("staticrypt_content").classList.remove("hidden");
+      if (isRememberEnabled) document.getElementById("staticrypt-remember-label").classList.remove("hidden");
+      document.getElementById("staticrypt-password").focus();
+    }
+  };
+
+  const pw = document.getElementById("staticrypt-password"), form = document.getElementById("staticrypt-form");
+  document.getElementById("keys").addEventListener("click", function (e) {
+    const b = e.target.closest && e.target.closest("[data-k]"); if (!b) return;
+    const k = b.getAttribute("data-k");
+    pw.value = k === "del" ? pw.value.slice(0, -1) : k === "clr" ? "" : pw.value + k;
+  });
+  // Remote control: arrows move to the nearest control in that direction; Back clears.
+  document.addEventListener("keydown", function (e) {
+    const t = e.target;
+    if ((e.key === "Backspace" && t !== pw) || e.keyCode === 10009 || e.keyCode === 461) { e.preventDefault(); pw.value = pw.value.slice(0, -1); return; }
+    if (!/^Arrow/.test(e.key)) return;
+    if (t === pw && (e.key === "ArrowLeft" || e.key === "ArrowRight")) return;
+    const all = [].slice.call(form.querySelectorAll("input, button")).filter(function (el) { return el.offsetWidth || el.offsetHeight; });
+    const r = t.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let best = null, score = Infinity;
+    all.forEach(function (el) {
+      if (el === t) return;
+      const b = el.getBoundingClientRect(), dx = b.left + b.width / 2 - cx, dy = b.top + b.height / 2 - cy;
+      const along = e.key === "ArrowRight" ? dx : e.key === "ArrowLeft" ? -dx : e.key === "ArrowDown" ? dy : -dy;
+      const across = e.key === "ArrowRight" || e.key === "ArrowLeft" ? Math.abs(dy) : Math.abs(dx);
+      if (along < 2) return;
+      const s = along + across * 2.5; if (s < score) { score = s; best = el; }
+    });
+    if (best) { e.preventDefault(); best.focus(); }
+  });
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const remember = document.getElementById("staticrypt-remember").checked;
+    const { isSuccessful } = await staticrypt.handleDecryptionOfPage(pw.value, remember);
+    if (!isSuccessful) { document.getElementById("err").textContent = templateError; pw.value = ""; pw.focus(); }
+  });
+</script>
+</body>
+</html>
