@@ -16,8 +16,12 @@
 | How strong a theme? | **Calmer** | Same colours, fonts and starfield; more space, one card style, glow only on what's live or what matters now. |
 | What are pages called? | **Plain** | Now, Money, Usage, Home, Settings. |
 | Who uses the phone pages? | **Just Kyle** | Pages can lead with energy and money detail. They don't need simplifying for anyone else. |
+| Now's twelve-hour strip | **Energy, plus markers** | The price curve and carbon, with small markers for rain, the next event and the next train. |
+| Card corners | **Show both** | The mock-ups show sharp (3–4px) and rounded (14px) side by side; Kyle picks. |
+| Appliances first in "Run it now or later?" | **No preference** | Default: washing machine, dishwasher, tumble dryer (the long, movable loads). Changeable in Settings › Appliances. |
+| The TV | **Working; leave it for now** | The display stays as it is while the phone pages are redesigned. Rebuilding its modes waits until it's wanted. |
 
-Still open: see [Questions](#questions-still-open) at the end.
+Still open: see [the question](#questions-still-open) at the end.
 
 ## Where things stand
 
@@ -132,7 +136,7 @@ Each page opens on its answer; everything below it scrolls. Sections marked *(fo
    - plunge pricing;
    - a Saving Session you could join;
    - tomorrow's prices arriving ("Tomorrow's prices are in: cheapest 02:00").
-6. **Run it now or later?:** your three most used appliances with the cost now, the cheapest start and its cost. *(folded)* All appliances.
+6. **Run it now or later?:** the washing machine, dishwasher and tumble dryer by default (changeable in Settings), each with the cost now, the cheapest start and its cost. *(folded)* All appliances.
 7. **Example data** banner at the very top when no account is connected, with **Connect your account**.
 
 ### Money
@@ -256,9 +260,7 @@ Every chart reads the same way:
   - household (in `household.json`, published);
   - account (per device, never published);
   - screen (per device).
-- **The TV:** before the display's modes are rebuilt, a small Svelte page built for the TV's browser is opened on the real TV.
-  - If it runs, the display's modes become Astro pages from the same parts.
-  - If not, the display keeps its own file but takes the shared tokens and wording.
+- **The TV is left as it is for now.** It works, so it waits until the phone is done and the redesign is wanted there. When that comes, a small Svelte page built for the TV's browser is tried first. That decides whether its modes become Astro pages too, or keep their own file with the shared look.
 - **Tests and screenshots:**
   - Every page at 390px (phone), 768px (tablet) and 1280px (laptop), connected and with example data, plus the TV at 1080p.
   - No sideways scroll, no errors, contrast checked.
@@ -268,25 +270,24 @@ Every chart reads the same way:
 
 Each step ships on its own, and the old page stays until its replacement is live. `npm run ci` is green at every push and the screenshots are looked at.
 
+The phone first:
+
 | Step | What | Size |
 |---|---|---|
-| 1 | **Mock-ups** of Now, Money and Usage at phone size, clickable between them, with real example figures. Your yes, or changes. | One session |
+| 1 | **Mock-ups** of Now, Money and Usage at phone size, clickable between them, with real example figures, sharp and rounded corners side by side. Your yes, or changes. | One session |
 | 2 | **The kit:** tokens, card and stat styles, the chart parts, and a hidden page showing every piece | One or two sessions |
 | 3 | **The shell:** bottom bar and rail, slim header, Settings (account moves there), the example banner, loading and error states | One session |
 | 4 | **Now**, which becomes the first page | One session |
 | 5 | **Money** | One session |
 | 6 | **Usage** | One session |
 | 7 | **Home:** household and upgrades | One or two sessions |
-| 8 | **The data service and settings model** shared with the display, and "Add a screen" | One session |
-| 9 | **The TV test** on the real TV, to choose how the display is rebuilt | Short |
-| 10 | **The display's modes:** Energy, Home, Travel, Night | Two sessions |
-| 11 | **The screensaver and the lock screen:** shared colours, strip and wording; the keypad restyled | One session |
-| 12 | **Tidy-up:** retire the old pages, update the brief, the log and a decision record | Short |
+| 8 | **Tidy-up:** retire the old pages, update the brief, the log and a decision record | Short |
+
+Later, when wanted:
+- **One data service and settings model** shared with the display, and "Add a screen".
+- **The display's modes** (Energy, Home, Travel, Night) on the same parts, after a test on the TV.
+- **The screensaver and the lock screen:** the shared colours, strip and wording; the keypad restyled.
 
 ## Questions still open
 
-1. **The TV:** if its browser can't run the shared parts, is it all right for it to keep its own file with the shared look? (Step 9 decides; this is just whether that outcome is acceptable.)
-2. **Anything to drop?** For example the EPC search, or a simulator you'd never use. Less to redesign means a sharper result.
-3. **Now's markers:** should the next train and your next event sit on the twelve-hour strip, or keep Now purely about energy?
-4. **Corners:** sharp, like the sci-fi panels now, or softly rounded (14px), as drafted? The mock-ups can show both.
-5. **Appliances:** which three do you run most (washing machine, dishwasher, tumble dryer, oven, an EV)? They lead "Run it now or later?".
+1. **Anything to drop?** For example the EPC search, or a simulator you'd never use. Less to redesign means a sharper result. If nothing, everything moves across as the table says.
