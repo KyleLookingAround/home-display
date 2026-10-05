@@ -8,7 +8,7 @@
    */
   import { onMount } from 'svelte';
   import { store } from '../../lib/browser.js';
-  import { leaveBy, catchable } from '../../lib/household.js';
+  import { ordinal, signExpected, signGo, signLine, signStatus, signTrains } from '../../lib/household.js';
   import { hhmm, pad2 } from '../../lib/format.js';
   let { trains, walk = 0 } = $props();
   const VIEWS = [{ id: 'platform', label: 'Platform sign' }, { id: 'board', label: 'Departures' }, { id: 'leave', label: 'When to leave' }];
@@ -22,26 +22,9 @@
   const next = () => { v = (v + 1) % VIEWS.length; store.set('boardView', VIEWS[v].id); };
   const key = ev => { if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); next(); } };
 
-  const live = $derived((trains && trains.list ? trains.list : []).filter(d => (d.exp || d.sched) > clock - 30e3));
-  const caught = $derived(catchable(live, walk, clock));
-  const first3 = $derived(caught.list.slice(0, 3));
-  // the departures board: from just above the first you can make
-  const board = $derived.by(() => { const i = live.indexOf(caught.list[0]); return live.slice(Math.max(0, (i < 0 ? live.length : i) - 1)).slice(0, 7); });
-  const ord = n => n + (n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th');
-  const status = d => d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? 'Exp ' + hhmm(d.exp) : 'On time';
-  const list = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0] || '';
-  const going = d => { const l = leaveBy(d.exp || d.sched, walk, clock); return d.cancelled ? 'Cancelled' : l.mins > 1 ? `Go in ${l.mins} min` : l.text === 'Leave now' ? 'Go now' : l.text === 'Run for it' ? 'Run for it' : 'Too late'; };
-  const scroller = $derived.by(() => {
-    const d = first3[0]; if (!d) return '';
-    const parts = [];
-    if (d.platform) parts.push(`Platform ${d.platform}.`);
-    if (d.calls && d.calls.length) parts.push(`Calling at: ${list(d.calls)}.`);
-    if (d.coaches) parts.push(`This train has ${d.coaches} coaches.`);
-    if (d.operator) parts.push(`A ${d.operator} service.`);
-    if (d.reason) parts.push(d.reason.replace(/\.?$/, '.'));
-    if (trains.messages && trains.messages.length) parts.push(trains.messages[0]);
-    return parts.join('  ');
-  });
+  const sign = $derived(signTrains(trains && trains.list, walk, clock, 7));
+  const first3 = $derived(sign.first3);
+  const scroller = $derived(signLine(first3[0], trains && trains.messages));
   const time = $derived.by(() => { const d = new Date(clock); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; });
 </script>
 
@@ -50,28 +33,28 @@
   {#if VIEWS[v].id === 'platform'}
     {#if first3.length}
       {#each first3 as d, i}
-        <div class="row" class:gap={i === 1}><span class="o">{ord(i + 1)}</span><span class="t">{hhmm(d.sched)}</span><span class="d">{d.dest}</span><span class="s">{status(d)}</span></div>
+        <div class="row" class:gap={i === 1}><span class="o">{ordinal(i + 1)}</span><span class="t">{hhmm(d.sched)}</span><span class="d">{d.dest}</span><span class="s">{signStatus(d)}</span></div>
         {#if i === 0 && scroller}
           <div class="row calls" aria-label={scroller}>{#if still}<span class="wrap">{scroller}</span>{:else}<span class="run" style="animation-duration:{Math.max(8, scroller.length * 0.16)}s">{scroller}</span>{/if}</div>
         {/if}
       {/each}
     {:else}
-      <div class="row centre">{caught.missed ? 'No more you can make' : 'No trains for now'}</div>
+      <div class="row centre">{sign.missed ? 'No more you can make' : 'No trains for now'}</div>
       <div class="row centre dim">Please check the timetable</div>
     {/if}
     <div class="clock"><span class="side">{@render pips()}</span><span>{time}</span><span class="side"></span></div>
   {:else if VIEWS[v].id === 'board'}
     <div class="row hdr"><span class="t">Time</span><span class="d">Destination</span><span class="p">Plat</span><span class="s">Expt</span></div>
-    {#each board as d}
-      <div class="row" class:dim={!d.cancelled && leaveBy(d.exp || d.sched, walk, clock).text === 'Too late'}><span class="t">{hhmm(d.sched)}</span><span class="d">{d.dest}</span><span class="p">{d.platform || '-'}</span><span class="s">{d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? hhmm(d.exp) : 'On time'}</span></div>
+    {#each sign.board as d}
+      <div class="row" class:dim={signGo(d, walk, clock).late}><span class="t">{hhmm(d.sched)}</span><span class="d">{d.dest}</span><span class="p">{d.platform || '-'}</span><span class="s">{signExpected(d)}</span></div>
     {:else}<div class="row centre">No departures listed</div>{/each}
     <div class="foot"><span>{trains.station || ''}</span>{@render pips()}<span>{time}</span></div>
   {:else}
     <div class="row hdr"><span class="t">Time</span><span class="d">To</span><span class="s">With your walk</span></div>
-    {#each caught.list.slice(0, 6) as d}
-      {@const g = going(d)}
-      <div class="row"><span class="t">{hhmm(d.exp || d.sched)}</span><span class="d">{d.dest}</span><span class="s" class:blink={g === 'Run for it' && !still}>{g}</span></div>
-    {:else}<div class="row centre">{caught.missed ? 'No more you can make' : 'No trains for now'}</div>{/each}
+    {#each sign.catchable.slice(0, 6) as d}
+      {@const g = signGo(d, walk, clock)}
+      <div class="row"><span class="t">{hhmm(d.exp || d.sched)}</span><span class="d">{d.dest}</span><span class="s" class:blink={g.run && !still}>{g.text}</span></div>
+    {:else}<div class="row centre">{sign.missed ? 'No more you can make' : 'No trains for now'}</div>{/each}
     <div class="foot"><span>{walk} min walk</span>{@render pips()}<span>{time}</span></div>
   {/if}
 </div>

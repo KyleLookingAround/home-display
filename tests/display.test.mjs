@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -338,6 +338,30 @@ test('trains you can still make with your walk come first; the rest are only cou
   assert.equal(c.missed, 3, 'the one that has already left isn\'t counted');
   assert.equal(A.leaveBy(c.list[0].sched, 25, now).text, 'Run for it');
   assert.equal(A.catchable(null, 10, now).list.length, 0);
+});
+
+test('the station sign words a train the same on the phone and the TV', () => {
+  const now = at('2026-10-05T20:31:00'), d = (h, m, extra = {}) => Object.assign({ sched: at(`2026-10-05T${h}:${m}:00`), exp: at(`2026-10-05T${h}:${m}:00`), dest: 'Crewe', platform: '3' }, extra);
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23].map(A.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd']);
+  const late = d('20', '40', { exp: at('2026-10-05T20:44:00') });
+  assert.equal(A.signStatus(late), 'Exp 20:44'); assert.equal(A.signExpected(late), '20:44');
+  assert.equal(A.signStatus(d('20', '40', { exp: at('2026-10-05T20:40:30') })), 'On time', 'under a minute late is on time, as the boards have it');
+  assert.equal(A.signExpected(d('20', '40', { cancelled: true })), 'Cancelled');
+  assert.equal(A.signStatus(d('20', '40', { exp: null, delayed: true })), 'Delayed');
+  // with a 10 minute walk at 20:31
+  assert.deepEqual({ ...A.signGo(d('21', '00'), 10, now) }, { text: 'Go in 19 min', run: false, late: false });
+  assert.equal(A.signGo(d('21', '00'), 10, now, true).text, '19 min');
+  assert.deepEqual({ ...A.signGo(d('20', '40'), 10, now, true) }, { text: 'Run', run: true, late: false });
+  assert.deepEqual({ ...A.signGo(d('20', '33'), 10, now) }, { text: 'Too late', run: false, late: true });
+  assert.deepEqual({ ...A.signGo(d('20', '33', { cancelled: true }), 10, now, true) }, { text: '-', run: false, late: false });
+  assert.equal(A.signLine(Object.assign(d('20', '40'), { calls: ['Stockport', 'Macclesfield', 'Crewe'], coaches: 4, operator: 'Avanti West Coast', reason: 'Delayed by a signalling fault' }), ['Lifts out of order']),
+    'Platform 3.  Calling at: Stockport, Macclesfield and Crewe.  This train has 4 coaches.  An Avanti West Coast service.  Delayed by a signalling fault.  Lifts out of order');
+  assert.equal(A.signLine(null), '');
+  // the board starts just above the first you can make; the platform sign at it
+  const s = A.signTrains([d('20', '20'), d('20', '33'), d('20', '45'), d('20', '50'), d('21', '00')], 10, now, 3);
+  assert.deepEqual(Array.from(s.board, x => new Date(x.sched).getMinutes()), [33, 45, 50], 'the one that has gone is left off; one too soon to make stays, dimmed');
+  assert.deepEqual(Array.from(s.first3, x => new Date(x.sched).getMinutes()), [45, 50, 0]);
+  assert.equal(s.missed, 1);
 });
 
 test('heads-ups: a train to leave for, bins tonight, rain on its way', () => {

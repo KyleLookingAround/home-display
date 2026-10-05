@@ -13,7 +13,7 @@
   - the next twelve hours as a price strip with the cheapest hours, rain, events and your train;
   - three cards: trains, today and tomorrow (bins, then the calendar), and right now (live draw, today's cost, grid carbon and its mix, air and UV).
 
-  Energy (today and tomorrow's prices, the greenest hours, run it now or later) and Travel (trains and trams) are the detail. Old `#home` links and settings open Today.
+  Energy (today and tomorrow's prices, the greenest hours, run it now or later) and Travel (trains and trams) are the detail. Travel's trains look like the station's own signs (added later, after the phone's Home card): the departures board and the platform sign together, since a TV remote has nothing to tap. Old `#home` links and settings open Today.
 - **One look.** The display uses the dashboard's colours, cards, labels, price tones, icons and corners setting, at ten-foot sizes. Its price strip is drawn as a string (`board.js`), since the TV can't run the dashboard's Svelte. The cockpit stays as the screensaver, unchanged; Night is restyled and names the next thing to act on.
 - **The phone's Screen page** shows each view live, in a frame scaled from 1920 by 1080 (`display.html#<view>&embed=1`). Settings moved to a gear in the header, so the phone keeps five tabs.
 - **The phone as a remote, through ntfy.sh.** A browser on the TV can't be reached from the phone directly, and there's no server.

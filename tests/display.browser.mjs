@@ -246,7 +246,7 @@ test('display: content on the TV is real data, labelled examples only where noth
   await page.waitForTimeout(300);
   const trains = await page.textContent('#tTrains');
   assert.match(trains, /Manchester Piccadilly/);
-  assert.match(trains, /Leave in \d+ min/);
+  assert.match(trains, /Leave\s*Time|\d+ min/);
   assert.match(trains, /Cancelled/);
   assert.match(await page.textContent('#tTramTitle'), /East Didsbury/);
   assert.doesNotMatch(await page.textContent('#screen'), /Example/);
@@ -264,6 +264,35 @@ test('display: content on the TV is real data, labelled examples only where noth
   await bare.ctx.close();
 });
 
+test('display: Travel shows the trains as the station sign does', async () => {
+  for (const tramStop of ['East Didsbury', '']) {
+    const { page, ctx, errors } = await open('/display.html#travel', { withHelper: false, settings: { ...SETTINGS, trainWalk: 25, tramStop } });
+    await page.waitForSelector('#tBoard .row:not(.hdr)'); await page.evaluate(() => document.fonts.ready);
+    const board = await page.textContent('#tBoard'), plat = await page.textContent('#tPlat');
+    assert.match(board, /Time\s*Destination\s*Plat\s*Expt\s*Leave/);
+    assert.equal(await page.locator('#tBoard .row.dim').count(), 1, 'the 14:19, too soon to make with a 25 minute walk');
+    assert.match(board, /14:27\s*London Euston\s*3\s*14:33/);
+    assert.match(plat, /1st\s*14:27\s*London Euston\s*Exp 14:33/);
+    assert.match(plat, /Calling at: Macclesfield, Stoke-on-Trent, Milton Keynes Central and London Euston\./);
+    assert.match(plat, /2nd\s*14:34\s*Buxton/);
+    assert.equal(await page.evaluate(() => document.querySelector('#tPlat .run').getAnimations()[0].playState), 'running', 'the calling points scroll');
+    const html = await page.innerHTML('#tPlat');
+    await page.waitForTimeout(1100);
+    assert.equal(await page.innerHTML('#tPlat').then(h => h.replace(/\d\d:\d\d:\d\d/, '')), html.replace(/\d\d:\d\d:\d\d/, ''), 'the sign isn\'t redrawn each second, so the line scrolls on');
+    const clock = await page.textContent('[data-clock-s]');
+    assert.match(clock, /^\d\d:\d\d:\d\d$/, 'a clock with seconds');
+    // lined up as on the real sign, and nothing runs off it
+    const plats = await page.locator('#tBoard .row:not(.hdr) .p').evaluateAll(ps => ps.map(p => Math.round(p.getBoundingClientRect().left)));
+    assert.equal(new Set(plats).size, 1, 'the platforms line up');
+    assert.ok(await page.evaluate(() => [...document.querySelectorAll('.dmx')].every(el => [...el.querySelectorAll('.s,.g')].every(s => s.getBoundingClientRect().right <= el.getBoundingClientRect().right - 8))), 'nothing runs off the sign');
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('tTrains').parentNode).gridColumnEnd === '-1'), !tramStop, 'with no trams, the sign takes the width');
+    await shot(page, tramStop ? 'tv-travel-sign' : 'tv-travel-solo');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), 'fits the screen');
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 test('display: trains still come when a departure board is down', async () => {
   // Huxley2's public board fails; the second service answers. Then both fail, and Huxley2's staff board answers.
   const staff = () => { const j = huxley(); j.trainServices = j.trainServices.map(s => Object.assign({}, s, { std: '2026-10-05T' + s.std + ':00', etd: /^\d/.test(s.etd) ? '2026-10-05T' + s.etd + ':30' : s.etd === 'On time' ? '2026-10-05T' + s.std + ':00' : null })); return j; };
@@ -275,7 +304,7 @@ test('display: trains still come when a departure board is down', async () => {
     await page.reload(); await page.waitForTimeout(1200);
     const trains = await page.textContent('#tTrains');
     assert.match(trains, /Manchester Piccadilly/, `trains with ${down.join(' and ')} down`);
-    assert.match(trains, /Leave in \d+ min/);
+    assert.match(trains, /\d+ min/);
     await ctx.close();
   }
 });

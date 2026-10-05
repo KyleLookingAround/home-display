@@ -354,6 +354,44 @@ export function catchable(list, walkMin, now){
   });
   return { list: out, missed };
 }
+/* ---------- the station sign: its words, the same on the phone and the TV ---------- */
+export const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+/** A train as the platform sign has it: "On time", "Exp 14:33", "Delayed" or "Cancelled". */
+export function signStatus(d){ return d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? 'Exp ' + hhmm(d.exp) : 'On time'; }
+/** The departures board's Expt column: "On time", "14:33", "Delayed" or "Cancelled". */
+export function signExpected(d){ return d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? hhmm(d.exp) : 'On time'; }
+/**
+ * When to leave for a train with your walk. Long: "Go in 12 min", "Go now", "Run for it", "Too late", "Cancelled".
+ * Short, for a column: "12 min", "Now", "Run", "Late", "-". `run` and `late` say which it is.
+ */
+export function signGo(d, walkMin, now, short){
+  const l = leaveBy(d.exp || d.sched, nz(walkMin, 0), now), run = l.text === 'Run for it', late = l.text === 'Too late';
+  const text = d.cancelled ? (short ? '-' : 'Cancelled') : l.mins > 1 ? (short ? l.mins + ' min' : 'Go in ' + l.mins + ' min')
+    : l.text === 'Leave now' ? (short ? 'Now' : 'Go now') : run ? (short ? 'Run' : 'Run for it') : (short ? 'Late' : 'Too late');
+  return { text: text, run: run && !d.cancelled, late: late && !d.cancelled };
+}
+const andList = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0] || '';
+/** The platform sign's scrolling line: the platform, where it calls, its coaches and operator, why it's late, and the station's notice. */
+export function signLine(d, messages){
+  if (!d) return '';
+  const parts = [];
+  if (d.platform) parts.push('Platform ' + d.platform + '.');
+  if (d.calls && d.calls.length) parts.push('Calling at: ' + andList(d.calls) + '.');
+  if (d.coaches) parts.push('This train has ' + d.coaches + ' coaches.');
+  if (d.operator) parts.push((/^[AEIOU]/i.test(d.operator) ? 'An ' : 'A ') + d.operator + ' service.');
+  if (d.reason) parts.push(d.reason.replace(/\.?$/, '.'));
+  if (messages && messages.length) parts.push(messages[0]);
+  return parts.join('  ');
+}
+/**
+ * What the sign shows: the departures still to go (`live`), from just above the first you can make (`board`),
+ * the first three you can make (`first3`) and how many sooner ones you can't (`missed`).
+ */
+export function signTrains(list, walkMin, now, rows){
+  const live = (list || []).filter(d => (d.exp || d.sched) > now - 30e3), caught = catchable(live, walkMin, now);
+  const i = live.indexOf(caught.list[0]);
+  return { live: live, board: live.slice(Math.max(0, (i < 0 ? live.length : i) - 1)).slice(0, rows || 7), first3: caught.list.slice(0, 3), catchable: caught.list, missed: caught.missed };
+}
 /* ---------- birthdays and countdowns ---------- */
 /**
  * Dates worth counting down to, soonest first: birthdays and anniversaries every year (dates: [{ name, date, kind }],

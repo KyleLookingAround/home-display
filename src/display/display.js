@@ -88,6 +88,7 @@ function tick(){
   const now = Date.now(), set = D.set;
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
+  tickSign(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
@@ -104,6 +105,15 @@ function tick(){
   Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
   if (++D.ticks % 30 === 0) render();
 }
+
+/** The station sign's clock, with seconds. */
+function tickSign(now){
+  const el = $('[data-clock-s]'); if (!el) return;
+  const d = new Date(now), t = hhmm(now) + ':' + pad2(d.getSeconds());
+  if (el.textContent !== t) el.textContent = t;
+}
+/** Only redraws when it changes, so animations inside run on. */
+function setHtml(el, html){ if (el && el.__html !== html){ el.innerHTML = html; el.__html = html; } }
 
 /** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
 const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
@@ -239,21 +249,18 @@ function renderTravel(){
   else html = '<p class="empty">Checking departures…</p>';
   const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
   $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
+  const box = $('#tTrains');
   if (list){
-    // the whole board, dimmed where it's too late to make it, starting just before the first you can
-    const all = list.filter(d => (d.exp || d.sched) > now - 30e3), first = all.indexOf(catchable(all, s.trainWalk, now).list[0]);
-    const rows = all.slice(Math.max(0, (first < 0 ? all.length : first) - 1)).slice(0, 7);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
-      const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Expected ${hhmm(d.exp)}</span>` : '<span class="muted">On time</span>';
-      return `<tr${lv.text === 'Too late' && !d.cancelled ? ' class="gone"' : ''}><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
-    }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
-    if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
-  }
-  $('#tTrains').innerHTML = html;
+    // the station's sign: the board, dimmed where it's too late to make it, and the platform sign for the next you can
+    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div>';
+    const sign = signHtml(T.data, s.trainWalk, now);
+    setHtml($('#tBoard'), sign.board); setHtml($('#tPlat'), sign.platform);
+    tickSign(now);
+  } else box.innerHTML = html;
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
   const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
   tramPanel.hidden = !s.tramStop;
+  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width
   if (s.tramStop){
     let tr = null; html = '';
     if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';

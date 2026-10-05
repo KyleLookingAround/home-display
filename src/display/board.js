@@ -76,3 +76,25 @@ function stripSvg(o){
   if (o.now >= o.from && o.now <= o.to) s += `<text class="lbl now" x="${Math.max(fs * 1.4, x(o.now)).toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Now</text>`;
   return s + '</svg>';
 }
+
+/**
+ * The trains as the station shows them, in orange dot-matrix: the departures board (time, destination, platform,
+ * expected, and when to leave with your walk; the ones it's too late for dimmed) and the platform sign (1st, 2nd, 3rd
+ * from the first you can make, a scrolling line with where it calls, and a clock with seconds, which tick() fills).
+ * Returned in two parts, so each is only redrawn when it changes and the scrolling line runs on undisturbed.
+ */
+function signHtml(trains, walk, now){
+  const S = signTrains(trains.list, walk, now, 7), cell = (cls, t) => `<span class="${cls}">${esc(t)}</span>`;
+  const board = `<div class="row hdr">${cell('t', 'Time')}${cell('d', 'Destination')}${cell('p', 'Plat')}${cell('s', 'Expt')}${cell('g', 'Leave')}</div>`
+    + (S.board.length ? S.board.map(d => { const g = signGo(d, walk, now, true);
+      return `<div class="row${g.late ? ' dim' : ''}">${cell('t', hhmm(d.sched))}${cell('d', d.dest)}${cell('p', d.platform || '-')}${cell('s', signExpected(d))}<span class="g${g.run ? ' blink' : ''}">${esc(g.text)}</span></div>`; }).join('')
+      : '<div class="row centre">No departures listed</div>');
+  const line = signLine(S.first3[0], trains.messages);
+  let plat = '';
+  S.first3.forEach((d, i) => {
+    plat += `<div class="row">${cell('o', ordinal(i + 1))}${cell('t', hhmm(d.sched))}${cell('d', d.dest)}${cell('s', signStatus(d))}</div>`;
+    if (i === 0 && line) plat += `<div class="row calls"><span class="run" style="animation-duration:${Math.max(10, Math.round(line.length * 0.18))}s">${esc(line)}</span></div>`;
+  });
+  if (!S.first3.length) plat = `<div class="row centre">${S.missed ? 'No more you can make' : 'No trains for now'}</div><div class="row centre dim">Please check the timetable</div>`;
+  return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
+}

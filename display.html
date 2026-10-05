@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Exo+2:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Exo+2:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Doto:wght@700;800&display=swap">
 <style>
 /* Household display, in the dashboard's look (src/styles/app.css) at ten-foot sizes. On a 1080p TV the root font is
    about 27px and nothing is smaller than 0.9rem (24px); focus rings are loud; every action works with arrows and Enter;
@@ -147,6 +147,31 @@ h1,h2,h3{margin:0;font-weight:600}
 .deps tr.gone td{opacity:.45}
 .deps .lv{text-align:right;white-space:nowrap;font-family:var(--f-mono);padding-right:0}
 @media (max-width:520px){.deps .opt{display:none}}
+/* the trains as the station shows them: orange dot-matrix on black (Doto; the mono font if it hasn't loaded). Doto is monospaced, so columns in ch line up */
+.dmx{position:relative;background:#050403;border:2px solid #1d1a16;border-radius:var(--radius-sm);padding:.45rem .8rem .55rem;margin-top:.5rem;overflow:hidden;
+  font:800 1.1rem/1.35 "Doto",var(--f-mono);color:#ffa31a;text-shadow:0 0 .35rem rgba(255,150,0,.55);box-shadow:inset 0 0 1.2rem rgba(0,0,0,.9)}
+.dmx:after{content:"";position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;background-image:radial-gradient(rgba(0,0,0,0) 55%,rgba(0,0,0,.35) 56%);background-size:3px 3px}
+body.lite .dmx{text-shadow:none}
+.dmx .row{display:grid;grid-column-gap:1ch;column-gap:1ch;align-items:baseline;white-space:nowrap;min-width:0}
+.deps-sign .row{grid-template-columns:5ch minmax(0,1fr) 4ch 9ch 8ch}
+.plat-sign .row{grid-template-columns:3ch 5ch minmax(0,1fr) auto}
+.dmx .d{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dmx .p{text-align:center}
+.dmx .s,.dmx .g{text-align:right}
+.dmx .hdr{opacity:.75}
+.dmx .dim{opacity:.4}
+.dmx .row.centre{display:block;text-align:center}
+.dmx .row.calls{display:block;overflow:hidden}
+.dmx .run{display:inline-block;padding-left:100%;animation:dmxrun linear infinite}
+@keyframes dmxrun{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+.dmx .blink{animation:dmxblink 1s steps(2,start) infinite}
+@keyframes dmxblink{to{visibility:hidden}}
+.dmx .clock-s{text-align:center;font-size:1.5rem;line-height:1.25;letter-spacing:.06em}
+@media (prefers-reduced-motion:reduce){.dmx .row.calls{white-space:normal}.dmx .run{display:inline;padding-left:0;animation:none}.dmx .blink{animation:none}}
+.travel .solo{grid-column:1/-1}
+@media (min-width:900px){ .travel .solo .dmx{font-size:1.3rem} .travel .solo .dmx .clock-s{font-size:2rem} }
+
+@media (max-width:520px){.dmx{font-size:.95rem}.deps-sign .row{grid-template-columns:5ch minmax(0,1fr) 3ch 9ch}.deps-sign .g{display:none}.travel .solo .dmx{font-size:.95rem}}
 
 /* toolbar: hidden until a key, tap or mouse move, then fades after a few seconds */
 .bar{position:fixed;z-index:20;top:0;left:0;right:0;padding:calc(var(--edge-y) * .6 + env(safe-area-inset-top,0px)) var(--edge-x) .7rem;background:rgba(4,5,13,.96);border-bottom:1px solid var(--line-hot);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;transform:translateY(-110%);opacity:0;transition:transform .3s,opacity .3s;visibility:hidden}
@@ -1733,6 +1758,44 @@ function catchable(list, walkMin, now){
     if (leaveBy(d.exp || d.sched, nz(walkMin, 0), now).text === 'Too late') missed++; else out.push(d);
   });
   return { list: out, missed };
+}
+/* ---------- the station sign: its words, the same on the phone and the TV ---------- */
+const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
+/** A train as the platform sign has it: "On time", "Exp 14:33", "Delayed" or "Cancelled". */
+function signStatus(d){ return d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? 'Exp ' + hhmm(d.exp) : 'On time'; }
+/** The departures board's Expt column: "On time", "14:33", "Delayed" or "Cancelled". */
+function signExpected(d){ return d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : d.exp && d.exp - d.sched >= 60e3 ? hhmm(d.exp) : 'On time'; }
+/**
+ * When to leave for a train with your walk. Long: "Go in 12 min", "Go now", "Run for it", "Too late", "Cancelled".
+ * Short, for a column: "12 min", "Now", "Run", "Late", "-". `run` and `late` say which it is.
+ */
+function signGo(d, walkMin, now, short){
+  const l = leaveBy(d.exp || d.sched, nz(walkMin, 0), now), run = l.text === 'Run for it', late = l.text === 'Too late';
+  const text = d.cancelled ? (short ? '-' : 'Cancelled') : l.mins > 1 ? (short ? l.mins + ' min' : 'Go in ' + l.mins + ' min')
+    : l.text === 'Leave now' ? (short ? 'Now' : 'Go now') : run ? (short ? 'Run' : 'Run for it') : (short ? 'Late' : 'Too late');
+  return { text: text, run: run && !d.cancelled, late: late && !d.cancelled };
+}
+const andList = a => a.length > 1 ? a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1] : a[0] || '';
+/** The platform sign's scrolling line: the platform, where it calls, its coaches and operator, why it's late, and the station's notice. */
+function signLine(d, messages){
+  if (!d) return '';
+  const parts = [];
+  if (d.platform) parts.push('Platform ' + d.platform + '.');
+  if (d.calls && d.calls.length) parts.push('Calling at: ' + andList(d.calls) + '.');
+  if (d.coaches) parts.push('This train has ' + d.coaches + ' coaches.');
+  if (d.operator) parts.push((/^[AEIOU]/i.test(d.operator) ? 'An ' : 'A ') + d.operator + ' service.');
+  if (d.reason) parts.push(d.reason.replace(/\.?$/, '.'));
+  if (messages && messages.length) parts.push(messages[0]);
+  return parts.join('  ');
+}
+/**
+ * What the sign shows: the departures still to go (`live`), from just above the first you can make (`board`),
+ * the first three you can make (`first3`) and how many sooner ones you can't (`missed`).
+ */
+function signTrains(list, walkMin, now, rows){
+  const live = (list || []).filter(d => (d.exp || d.sched) > now - 30e3), caught = catchable(live, walkMin, now);
+  const i = live.indexOf(caught.list[0]);
+  return { live: live, board: live.slice(Math.max(0, (i < 0 ? live.length : i) - 1)).slice(0, rows || 7), first3: caught.list.slice(0, 3), catchable: caught.list, missed: caught.missed };
 }
 /* ---------- birthdays and countdowns ---------- */
 /**
@@ -3729,6 +3792,28 @@ function stripSvg(o){
   if (o.now >= o.from && o.now <= o.to) s += `<text class="lbl now" x="${Math.max(fs * 1.4, x(o.now)).toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Now</text>`;
   return s + '</svg>';
 }
+
+/**
+ * The trains as the station shows them, in orange dot-matrix: the departures board (time, destination, platform,
+ * expected, and when to leave with your walk; the ones it's too late for dimmed) and the platform sign (1st, 2nd, 3rd
+ * from the first you can make, a scrolling line with where it calls, and a clock with seconds, which tick() fills).
+ * Returned in two parts, so each is only redrawn when it changes and the scrolling line runs on undisturbed.
+ */
+function signHtml(trains, walk, now){
+  const S = signTrains(trains.list, walk, now, 7), cell = (cls, t) => `<span class="${cls}">${esc(t)}</span>`;
+  const board = `<div class="row hdr">${cell('t', 'Time')}${cell('d', 'Destination')}${cell('p', 'Plat')}${cell('s', 'Expt')}${cell('g', 'Leave')}</div>`
+    + (S.board.length ? S.board.map(d => { const g = signGo(d, walk, now, true);
+      return `<div class="row${g.late ? ' dim' : ''}">${cell('t', hhmm(d.sched))}${cell('d', d.dest)}${cell('p', d.platform || '-')}${cell('s', signExpected(d))}<span class="g${g.run ? ' blink' : ''}">${esc(g.text)}</span></div>`; }).join('')
+      : '<div class="row centre">No departures listed</div>');
+  const line = signLine(S.first3[0], trains.messages);
+  let plat = '';
+  S.first3.forEach((d, i) => {
+    plat += `<div class="row">${cell('o', ordinal(i + 1))}${cell('t', hhmm(d.sched))}${cell('d', d.dest)}${cell('s', signStatus(d))}</div>`;
+    if (i === 0 && line) plat += `<div class="row calls"><span class="run" style="animation-duration:${Math.max(10, Math.round(line.length * 0.18))}s">${esc(line)}</span></div>`;
+  });
+  if (!S.first3.length) plat = `<div class="row centre">${S.missed ? 'No more you can make' : 'No trains for now'}</div><div class="row centre dim">Please check the timetable</div>`;
+  return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
+}
 /* ===================== display: modes, remote control, scheduling, rendering ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
@@ -3819,6 +3904,7 @@ function tick(){
   const now = Date.now(), set = D.set;
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
+  tickSign(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
@@ -3835,6 +3921,15 @@ function tick(){
   Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
   if (++D.ticks % 30 === 0) render();
 }
+
+/** The station sign's clock, with seconds. */
+function tickSign(now){
+  const el = $('[data-clock-s]'); if (!el) return;
+  const d = new Date(now), t = hhmm(now) + ':' + pad2(d.getSeconds());
+  if (el.textContent !== t) el.textContent = t;
+}
+/** Only redraws when it changes, so animations inside run on. */
+function setHtml(el, html){ if (el && el.__html !== html){ el.innerHTML = html; el.__html = html; } }
 
 /** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
 const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
@@ -3970,21 +4065,18 @@ function renderTravel(){
   else html = '<p class="empty">Checking departures…</p>';
   const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
   $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
+  const box = $('#tTrains');
   if (list){
-    // the whole board, dimmed where it's too late to make it, starting just before the first you can
-    const all = list.filter(d => (d.exp || d.sched) > now - 30e3), first = all.indexOf(catchable(all, s.trainWalk, now).list[0]);
-    const rows = all.slice(Math.max(0, (first < 0 ? all.length : first) - 1)).slice(0, 7);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
-      const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Expected ${hhmm(d.exp)}</span>` : '<span class="muted">On time</span>';
-      return `<tr${lv.text === 'Too late' && !d.cancelled ? ' class="gone"' : ''}><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
-    }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
-    if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
-  }
-  $('#tTrains').innerHTML = html;
+    // the station's sign: the board, dimmed where it's too late to make it, and the platform sign for the next you can
+    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div>';
+    const sign = signHtml(T.data, s.trainWalk, now);
+    setHtml($('#tBoard'), sign.board); setHtml($('#tPlat'), sign.platform);
+    tickSign(now);
+  } else box.innerHTML = html;
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
   const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
   tramPanel.hidden = !s.tramStop;
+  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width
   if (s.tramStop){
     let tr = null; html = '';
     if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';
