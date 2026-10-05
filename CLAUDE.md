@@ -24,7 +24,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `analysis.js`: pure functions with no DOM, shared by both pages. Example data, the period roll-up, spikes, weather regression, projections, tariff comparison, battery and solar simulators, and `cheapestWindow`.
   - `dom.js`: the dashboard's state, rendering, the generic SVG `barChart` and event wiring.
   - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
-  - `display/cockpit.js`: the screensaver, drawn on two canvases with DOM billboards between them.
+  - `display/cockpit.js`: the screensaver, a side window onto space, drawn on two canvases with DOM billboards between them. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`).
     - Outside: sky, galaxies, planet, nebulae, stars, traffic, debris, dust, lightning.
     - The glass: rain, snow, frost, fog.
     - The frame, the dashboard and the 3D billboards.
@@ -42,10 +42,11 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - It serves the folder (never dotfiles, `.py` or `.md`) and proxies a fixed allowlist of hosts under `/proxy/<name>/…`.
   - It holds the train and tram keys from `.env` or the environment: `RTT_TOKEN` or `RTT_REFRESH_TOKEN`, and `TFGM_KEY`. `GET /proxy/status` says which are set.
   - Pages detect it with `GET ./proxy/ping`, and from then on all Octopus calls go through it.
+- `scripts/bins.mjs`: fetches the next bin collections from Stockport Council for the UPRN in the `STOCKPORT_UPRN` secret, and writes `bins.json`. The workflow runs it every morning on a schedule (tests skipped) and publishes the result with the site. The display prefers it while it's under four days old ([decision 0006](docs/decisions/0006-council-bins.md)).
 - `household.json`: settings every screen shares (bins, station, default mode), editable on GitHub and published with the site. Nothing private goes in it. Each screen stores only its own changes on top.
 - `package.json`: `npm run ci` runs everything CI runs. Playwright is the only dependency, and it's for development only.
 - `lock/`: `template.html` is the StatiCrypt lock screen (PIN keypad, remote-friendly). `publish.sh` builds `_site/` for Pages and locks it when `SITE_PASSWORD` is set.
-- `.github/workflows/pages.yml`: checks every push, and publishes `main` to GitHub Pages.
+- `.github/workflows/pages.yml`: checks every push, and publishes `main` to GitHub Pages. It also runs every morning to refresh the bin dates.
 - `tests/`:
   - `*.test.mjs`: unit tests with no dependencies. `analysis.test.mjs` covers the maths. `display.test.mjs` covers the display's logic, the TV syntax check and "built pages match the source".
   - `display.browser.mjs`: Playwright, on fixed fake data with the clock held. Phone and 1080p layouts, 24px text, the remote, the idle screensaver, the night clock, setup links, and the dashboard at both sizes.

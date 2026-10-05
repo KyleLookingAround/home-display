@@ -4,6 +4,9 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Creation:** bin days from Stockport Council. A daily GitHub Action reads the council's page for the address in the `STOCKPORT_UPRN` secret and publishes `bins.json` ([0006](decisions/0006-council-bins.md)).
+- **Update:** the screensaver looks out of a side window. Everything slides past with parallax, near things faster than far ones; billboards drift by at readable and distant depths; rain is swept backwards on the glass ([0005](decisions/0005-cockpit.md), revised).
+- **Finding:** Stockport Council's bin page only allows browser calls from stockport.gov.uk, and turns away requests that don't look like a browser.
 - **Creation:** the cockpit screensaver. Billboards in 3D, traffic at different depths, and weather on the glass and in the sky; the power price sets the engines. New screens open on it ([0005](decisions/0005-cockpit.md)).
 - **Creation:** `household.json`, settings every screen shares, editable on GitHub. Screens store only their own changes.
 - **Update:** live trains come from Huxley2 in the browser; no home server is needed ([0004](decisions/0004-no-home-server.md)). Example data is gone from the display: anything not set up says how to set it up.

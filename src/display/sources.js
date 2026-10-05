@@ -52,13 +52,25 @@ const BIN_COLOURS = { black:'#2a2d3a', blue:'#2f7bff', brown:'#8a5a32', green:'#
 function nextCollections(bins, now = Date.now()){
   const today = +startOfDay(new Date(now));
   return bins.map(b => {
-    const every = Math.max(1, Math.round(+b.every || 1)) * 7;
+    // every: 0 is a single known date, as the council gives; it drops off once it has passed.
+    const every = +b.every === 0 ? 0 : Math.max(1, Math.round(+b.every || 1)) * 7;
     let d = keyDate(b.date);
     const gap = Math.round((today - +d) / 864e5);
-    if (gap > 0) d = addDays(d, Math.ceil(gap / every) * every);
-    return { name: b.name, colour: b.colour || 'grey', date: d, days: Math.round((+d - today) / 864e5) };
-  }).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
+    if (gap > 0){ if (!every) return null; d = addDays(d, Math.ceil(gap / every) * every); }
+    return { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
+  }).filter(Boolean).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
+/** The council's dates from bins.json (published each morning by a GitHub Action), if they're recent; else null. */
+function councilBins(j, now = Date.now()){
+  if (!j || !Array.isArray(j.bins) || !j.bins.length || !(now - +new Date(j.fetched) < 4 * 864e5)) return null;
+  const bins = j.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)).map(b => ({ name: b.name, colour: b.colour, what: b.what || '', date: b.date, every: 0 }));
+  return bins.length && nextCollections(bins, now).length ? bins : null;
+}
+async function loadCouncilBins(){
+  const r = await fetch('bins.json', { cache: 'no-cache' }).catch(() => null);
+  return r && r.ok ? r.json() : null;
+}
+
 /* ---------- weather (Open-Meteo, no key, allows browser calls) ---------- */
 const WMO = [
   [[0], 'Clear', '☀'], [[1], 'Mostly clear', '☀'], [[2], 'Partly cloudy', '⛅'], [[3], 'Overcast', '☁'],

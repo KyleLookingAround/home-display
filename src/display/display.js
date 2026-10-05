@@ -21,6 +21,7 @@ const SRC = {
   // Octopus allows about 100 GraphQL calls an hour, shared with its app: at most ~37 an hour from here.
   live:    { label: 'Home Mini', every: () => SRC.live.data && SRC.live.data.none ? 6*60*MIN : shown() === 'night' ? 30*MIN : (shown() === 'energy' || shown() === 'screensaver') ? 2*MIN : 10*MIN, need: () => !!NET.creds, run: pollMini },
   weather: { label: 'Weather', every: () => 15*MIN, need: () => true, run: loadDisplayWeather },
+  council: { label: 'Bins', every: () => 3*60*MIN, need: () => true, run: loadCouncilBins },
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
@@ -94,6 +95,9 @@ function tick(){
   Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
   if (++D.ticks % 30 === 0) render();
 }
+
+/** Bins from the council when the morning feed has them, otherwise the ones set by hand. */
+const binsNow = now => councilBins(SRC.council.data, now) || D.set.bins;
 
 /* ---------- rendering ---------- */
 function render(){
@@ -191,8 +195,8 @@ function renderHome(){
     $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
     $('#hHours').innerHTML = '';
   }
-  const bins = nextCollections(D.set.bins, now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins in settings, or for every screen in household.json.</p>' : `<ul class="list">${bins.map(b => {
+  const council = !!councilBins(SRC.council.data, now), bins = nextCollections(binsNow(now), now), hour = new Date(now).getHours();
+  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add the STOCKPORT_UPRN secret for the council\'s dates (see the README), or add your bins in settings.</p>' : `<ul class="list">${bins.map(b => {
     const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
     return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
   }).join('')}</ul>`;
@@ -203,7 +207,7 @@ function renderHome(){
   else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
   else note = 'Reading the calendar…';
   $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
-  $('#hFoot').innerHTML = '<span>Weather from Open-Meteo</span>' + foot(['weather', 'cal']);
+  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins from Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
 }
 
 function renderTravel(){
@@ -266,7 +270,7 @@ function cockpitInfo(now){
   const sky = skyFor(W, now, D.preview), known = !!W || !!D.preview.wx;
   return {
     sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null),
-    cards: buildBillboards({ agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins: D.set.bins,
+    cards: buildBillboards({ agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins: binsNow(now),
       events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, label: 'Harold Street · region ' + region() }, now),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };

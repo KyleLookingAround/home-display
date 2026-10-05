@@ -61,21 +61,16 @@
       <canvas id="cGlass" aria-hidden="true"></canvas>
       <svg id="cFrame" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <linearGradient id="gHull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2040"/><stop offset="1" stop-color="#080a17"/></linearGradient>
-          <linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
-          <linearGradient id="gSideR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
-          <linearGradient id="gDash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151a36"/><stop offset=".25" stop-color="#0b0e22"/><stop offset="1" stop-color="#04050d"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161b36"/><stop offset=".55" stop-color="#0d1126"/><stop offset="1" stop-color="#05060f"/></linearGradient>
+          <linearGradient id="gRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3158"/><stop offset="1" stop-color="#0c0f22"/></linearGradient>
         </defs>
-        <path d="M0 0H1600V96C1220 44 380 44 0 96Z" fill="url(#gHull)"/>
-        <path d="M0 96C380 44 1220 44 1600 96" fill="none" stroke="#4fd6ff" stroke-opacity=".4" stroke-width="2.5"/>
-        <path d="M0 64L158 78L76 696L0 716Z" fill="url(#gSide)"/>
-        <path d="M158 78L76 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
-        <path d="M1600 64L1442 78L1524 696L1600 716Z" fill="url(#gSideR)"/>
-        <path d="M1442 78L1524 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
-        <path d="M0 700C420 642 1180 642 1600 700V900H0Z" fill="url(#gDash)"/>
-        <path d="M0 700C420 642 1180 642 1600 700" fill="none" stroke="#ffb547" stroke-opacity=".5" stroke-width="2.5"/>
-        <path d="M90 760C500 720 1100 720 1510 760M60 850H1540M520 700V900M1080 700V900" fill="none" stroke="#8698ff" stroke-opacity=".1" stroke-width="2"/>
-        <path d="M600 30H1000M560 46H1040" stroke="#8698ff" stroke-opacity=".12" stroke-width="2"/>
+        <!-- the cabin wall, with a side window cut out of it -->
+        <path fill-rule="evenodd" fill="url(#gWall)" d="M0 0H1600V900H0ZM190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
+        <path fill="none" stroke="#8698ff" stroke-opacity=".1" stroke-width="2" d="M40 0V900M1560 0V900M0 760H1600M0 850H1600M520 760V900M1080 760V900"/>
+        <path fill="none" stroke="url(#gRim)" stroke-width="26" d="M190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
+        <path fill="none" stroke="#4fd6ff" stroke-opacity=".45" stroke-width="2.5" d="M190 77H1410A71 71 0 0 1 1481 148V606A71 71 0 0 1 1410 677H190A71 71 0 0 1 119 606V148A71 71 0 0 1 190 77Z"/>
+        <path fill="none" stroke="#ffb547" stroke-opacity=".35" stroke-width="2" d="M106 720H1494"/>
+        <g fill="#2a3158" stroke="#4fd6ff" stroke-opacity=".25" stroke-width="1.5"><circle cx="250" cy="36" r="5"/><circle cx="250" cy="718" r="5"/><circle cx="400" cy="36" r="5"/><circle cx="400" cy="718" r="5"/><circle cx="550" cy="36" r="5"/><circle cx="550" cy="718" r="5"/><circle cx="700" cy="36" r="5"/><circle cx="700" cy="718" r="5"/><circle cx="850" cy="36" r="5"/><circle cx="850" cy="718" r="5"/><circle cx="1000" cy="36" r="5"/><circle cx="1000" cy="718" r="5"/><circle cx="1150" cy="36" r="5"/><circle cx="1150" cy="718" r="5"/><circle cx="1300" cy="36" r="5"/><circle cx="1300" cy="718" r="5"/><circle cx="78" cy="170" r="5"/><circle cx="78" cy="280" r="5"/><circle cx="78" cy="390" r="5"/><circle cx="78" cy="500" r="5"/><circle cx="78" cy="610" r="5"/><circle cx="1522" cy="170" r="5"/><circle cx="1522" cy="280" r="5"/><circle cx="1522" cy="390" r="5"/><circle cx="1522" cy="500" r="5"/><circle cx="1522" cy="610" r="5"/></g>
       </svg>
       <div class="hud" id="cHud" data-engine="cruise">
         <div class="g"><span class="k">Power</span><span class="v" id="hPrice">--</span><span class="s" id="hEngine">Cruising</span></div>

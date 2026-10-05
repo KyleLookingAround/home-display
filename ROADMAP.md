@@ -33,6 +33,8 @@ Put the wall display on its own website on GitHub Pages. It should show househol
   - Weather on the glass and in the sky; the power price sets the engines. See [decision 0005](docs/decisions/0005-cockpit.md).
 - **No home server needed:** live trains come straight from the browser through Huxley2 ([decision 0004](docs/decisions/0004-no-home-server.md)).
 - **`household.json`:** settings every screen shares, editable on GitHub.
+- **Bin days from Stockport Council:** a GitHub Action reads the council's page for your address every morning and publishes the dates. The address is held as a secret ([decision 0006](docs/decisions/0006-council-bins.md)).
+- **The side window:** the screensaver became a view out of a side window, where everything slides past ([decision 0005](docs/decisions/0005-cockpit.md), revised).
 - **Older TV browsers:** the display's code avoids syntax newer than Chromium 63, and a test checks it.
 - **On GitHub Pages**, a workflow publishes `main`, checking the build, unit tests, layouts and the lock first.
 
@@ -42,7 +44,6 @@ Put the wall display on its own website on GitHub Pages. It should show househol
   - **A Cloudflare Worker** (item 3) holding the TfGM key and the iCal address as secrets. It's live, and free.
   - **A scheduled GitHub Action** fetching every few minutes and publishing to a data branch. It needs only GitHub secrets, but runs late at busy times, and anything private would need encrypting with the site PIN.
 - **Buses.** The Bus Open Data Service gives vehicle positions rather than stop departures, so it needs more work.
-- **Bin collections from the council.** These are entered by hand for now. UKBinCollectionData could fill them in, through the backend.
 - **More for the cockpit:** a billboard for Saving Sessions, a meteor shower when the bins are due, and the aurora when the grid is greenest.
 
 ### Password lock

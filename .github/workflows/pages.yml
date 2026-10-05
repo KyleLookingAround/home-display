@@ -6,6 +6,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  # Every morning: fetch the next bin collections from Stockport Council and republish (see scripts/bins.mjs).
+  schedule:
+    - cron: '17 4 * * *'
 
 permissions:
   contents: read
@@ -26,14 +29,20 @@ jobs:
       - name: Install (Playwright for the phone and TV checks)
         run: |
           npm ci --no-audit --no-fund
-          npx playwright install --with-deps chromium
+          if [ "${{ github.event_name }}" != "schedule" ]; then npx playwright install --with-deps chromium; fi
       - name: Everything a contributor runs (npm run ci)
+        if: github.event_name != 'schedule'
         run: npm run ci
       - name: Build the published folder
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         run: lock/publish.sh _site
+      - name: Next bin collections from Stockport Council
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          STOCKPORT_UPRN: ${{ secrets.STOCKPORT_UPRN }}
+        run: node scripts/bins.mjs _site/bins.json
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:

@@ -1,4 +1,4 @@
-# 0005: The cockpit is the screen's resting state
+# 0005: The view from the ship is the screen's resting state
 
 **Status:** accepted, October 2026
 
@@ -11,6 +11,12 @@
 - **Power:** the price sets the engines. Negative means warp speed; peak means power saving. High grid carbon hazes the view.
 
 The logic is pure, in `skyFor`, `engineFor`, `buildBillboards` and `billboardRotation` in `sources.js`, and tested. The drawing is in `cockpit.js`. Links such as `#screensaver&wx=rain&phase=night&price=-3` preview any combination.
+
+**Revision, 5 October 2026: a side window.** Kyle wanted to look out of a side window and watch it all go by, rather than out of the front. The view is now a cabin wall with a rounded window, and everything outside slides past from right to left with parallax:
+- Each thing has a depth, and its speed across the window is the ship's speed divided by that depth. Dust right by the glass (depth about 0.4) streaks past; the furthest stars (about 70) creep.
+- Billboards drift by in lanes at depth 1 (readable, about 16 seconds to cross) and depth 2.3 to 2.6 (small and hazy, for distance). Their speed is capped so warp doesn't make them unreadable.
+- Rain on the glass is swept backwards by the ship's motion.
+- The planet and moon drift by over many minutes.
 
 **Consequences.**
 - It's the heaviest part on old TVs. It halves its own detail when frames run slow, and draws a still frame every 20 seconds under reduced motion.

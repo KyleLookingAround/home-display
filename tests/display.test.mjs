@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = ['src/core.js', 'src/analysis.js', 'src/display/sources.js'].map(read).join('\n');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
+const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -179,6 +179,22 @@ test('weather: the next twelve hours from now', () => {
   assert.equal(w.days[0].rise, at('2026-10-05T07:12:00'));
   assert.equal(A.weatherText(61).text, 'Rain');
   assert.equal(A.weatherText(1234).text, '—');
+});
+
+test('bins from Stockport Council: the saved page parses, and old or missing feeds fall back', async () => {
+  const { parseStockportBins } = await import('../scripts/bins.mjs');
+  const bins = parseStockportBins(read('tests/fixtures/stockport-bins.html'));
+  assert.deepEqual(bins.map(b => [b.name, b.colour, b.date]), [['Blue bin', 'blue', '2026-10-08'], ['Brown bin', 'brown', '2026-10-08'], ['Green bin', 'green', '2026-10-08'], ['Black bin', 'black', '2026-10-15']]);
+  assert.equal(bins[0].what, 'Paper, cardboard and cartons');
+  assert.deepEqual(parseStockportBins('<html>nothing here</html>'), []);
+  const feed = { source: 'Stockport Council', fetched: '2026-10-05T04:17:00Z', bins };
+  const now = at('2026-10-05T09:00:00');
+  assert.equal(A.councilBins(feed, now).length, 4);
+  assert.deepEqual(plain(A.nextCollections(A.councilBins(feed, now), now)).map(b => [b.name, b.days]), [['Blue bin', 3], ['Brown bin', 3], ['Green bin', 3], ['Black bin', 10]]);
+  // A single date drops off once it has passed: Thursday's three go, leaving the black bin.
+  assert.deepEqual(plain(A.nextCollections(A.councilBins(feed, at('2026-10-09T03:00:00')), at('2026-10-09T03:00:00'))).map(b => b.name), ['Black bin']);
+  assert.equal(A.councilBins(feed, at('2026-10-12T09:00:00')), null, 'a feed more than four days old is ignored');
+  assert.equal(A.councilBins(null, now), null);
 });
 
 test('links can carry cockpit previews after the mode', () => {

@@ -1,16 +1,20 @@
-/* ===================== cockpit: the screensaver, looking out of a rocket ship's window ===================== */
-// Billboards carrying your live numbers fly past; the weather outside shows up on the glass and in the sky,
-// and the power price sets the engines. Written for older TV browsers too: no ?. or ?? here.
+/* ===================== cockpit: the screensaver, looking out of a side window of a ship in space ===================== */
+// Everything outside slides past from right to left: the nearer it is, the faster it goes. Billboards carrying your live
+// numbers drift by at different depths, the weather shows on the glass and in the sky, and the power price sets the
+// ship's speed. Written for older TV browsers too: no ?. or ?? here.
 const Cockpit = (() => {
   let on = false, raf = 0, last = 0, frame = 0, W = 0, H = 0, dpr = 1, quality = 1, slowFrames = 0, staticTimer = 0;
   let sctx = null, gctx = null, planetCache = null, planetKey = '', frostCache = null, frostKey = '';
   let stars = [], clouds = [], rocks = [], drops = [], flakes = [], motes = [], traffic = [], nextTraffic = 0, galaxies = [];
   let sky = skyFor(null), engine = engineFor(null), cards = [], rot = [], rotI = 0, boards = [], nextBoard = 0, laneI = 0;
-  let bolt = null, nextBolt = 0, vp = { x: 0, y: 0 };
+  let bolt = null, nextBolt = 0, planet = { x: 0 }, moon = { x: 0 }, view = { x: 0, y: 0 };
   const rnd = (a, b) => a + Math.random() * (b - a);
   const el = id => document.getElementById(id);
   const still = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const narrow = () => W / H < 1.1;
+  /** How fast something at a given depth crosses the window, in pixels a second. Depth 1 is a billboard close by. */
+  const speedAt = d => W / 13 * engine.speed / d;
+  const STAR_TINTS = ['233,236,255', '255,220,180', '180,210,255', '215,195,255'];
 
   /* ---------- sizes ---------- */
   function resize(){
@@ -19,18 +23,17 @@ const Cockpit = (() => {
     sctx = el('cSpace').getContext('2d'); gctx = el('cGlass').getContext('2d');
     sctx.setTransform(dpr, 0, 0, dpr, 0, 0); gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     planetKey = ''; frostKey = '';
-    const n = Math.round(W * H / 3400 * quality);
-    stars = []; for (let i = 0; i < n; i++) stars.push(newStar(true));
-    motes = []; for (let i = 0; i < Math.round(26 * quality); i++) motes.push(newMote(true));
-    galaxies = [{ x: .3, y: .3, r: .09, a: -.5, c: '190,170,255' }, { x: .66, y: .17, r: .05, a: .7, c: '150,210,255' }];
+    const n = Math.round(W * H / 3000 * quality);
+    stars = []; for (let i = 0; i < n; i++) stars.push(newStar(rnd(0, W)));
+    motes = []; for (let i = 0; i < Math.round(14 * quality); i++) motes.push(newMote(rnd(0, W)));
+    galaxies = [{ x: .3, y: .26, r: .09, a: -.5, c: '190,170,255' }, { x: .7, y: .16, r: .05, a: .7, c: '150,210,255' }];
+    planet.x = W * .74; moon.x = W * .82;
   }
-  function newMote(anywhere){ return { x: rnd(-1.6, 1.6), y: rnd(-1, .9), z: anywhere ? rnd(.02, .25) : .25 }; }
-  function newStar(anywhere){
-    return { x: rnd(-1.7, 1.7), y: rnd(-1.1, 1.1), z: anywhere ? rnd(.05, 1) : 1, c: ['233,236,255', '255,220,180', '180,210,255', '215,195,255'][(Math.random() * 4) | 0] };
-  }
+  // Depth runs from about 0.4 (dust right by the glass) to 70 (the furthest stars).
+  function newStar(x){ return { x, y: rnd(0, H), d: 4 + Math.pow(Math.random(), .6) * 66, c: STAR_TINTS[(Math.random() * 4) | 0] }; }
+  function newMote(x){ return { x, y: rnd(H * .05, H * .8), d: rnd(.35, .7) }; }
 
   /* ---------- outside: sky, planet, stars, nebulae, debris, lightning ---------- */
-  function project(x, y, z){ const f = W * .36; return { x: vp.x + x / z * f, y: vp.y + y / z * f }; }
   function drawSky(t){
     const c = sctx;
     c.fillStyle = sky.phase === 'day' ? '#050b24' : '#02030a'; c.fillRect(0, 0, W, H);
@@ -39,8 +42,8 @@ const Cockpit = (() => {
     if (sky.phase === 'dusk'){ glow(W, H, H * 1.1, '255,110,70', .3); glow(W * .8, H, H * .9, '170,80,255', .2); }
     if (sky.phase === 'day') glow(W * .18, H * .2, H * 1.3, '80,140,255', .22);
     glow(W * .85, H * .1, H * .9, '143,107,255', .12);
-    if (engine.mode === 'warp') glow(vp.x, vp.y, H * .9, '184,146,255', .18 + .06 * Math.sin(t / 300));
-    if (sky.phase === 'night' && sky.cloud < .8) drawMoon(W * .8, H * .24, H * .055);
+    if (engine.mode === 'warp') glow(W / 2, H * .42, H * .9, '184,146,255', .18 + .06 * Math.sin(t / 300));
+    if (sky.phase === 'night' && sky.cloud < .8) drawMoon(moon.x, H * .22, H * .055);
     if (sky.sun > 0) drawSun(W * .2, H * .22, sky.sun);
   }
   function drawMoon(x, y, r){
@@ -59,14 +62,14 @@ const Cockpit = (() => {
     c.fillStyle = g; c.fillRect(0, 0, W, H);
     // lens flare along the line through the middle of the view
     [[.35, .03, '255,200,120'], [.6, .018, '120,200,255'], [.95, .05, '184,146,255'], [1.25, .025, '70,230,161']].forEach(f => {
-      const fx = x + (vp.x - x) * f[0] * 2, fy = y + (vp.y - y) * f[0] * 2, r = H * f[1] * 2;
+      const fx = x + (W / 2 - x) * f[0] * 2, fy = y + (H * .42 - y) * f[0] * 2, r = H * f[1] * 2;
       g = c.createRadialGradient(fx, fy, 0, fx, fy, r); g.addColorStop(0, `rgba(${f[2]},${.16 * s})`); g.addColorStop(1, `rgba(${f[2]},0)`);
       c.fillStyle = g; c.beginPath(); c.arc(fx, fy, r, 0, 7); c.fill();
     });
   }
-  /** A gas giant low on the right, its colours from the temperature outside, lit by the sun when there is one. */
+  /** A gas giant drifting past far away, its colours from the temperature outside, lit by the sun when there is one. */
   function drawPlanet(t){
-    const r = H * .44, key = Math.round(sky.temp) + sky.phase + Math.round(t / 4000) + W + 'x' + H;
+    const r = H * .38, key = Math.round(sky.temp) + sky.phase + Math.round(t / 4000) + W + 'x' + H;
     if (key !== planetKey){
       planetKey = key;
       const cv = planetCache || document.createElement('canvas'); planetCache = cv;
@@ -88,14 +91,14 @@ const Cockpit = (() => {
       c.fillStyle = shade; c.fillRect(0, 0, s, s); c.restore();
       c.strokeStyle = 'rgba(160,200,255,.35)'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cx, r, 0, 7); c.stroke();
     }
-    const x = W * .86 + Math.sin(t / 60000) * W * .02 + (vp.x - W / 2) * .15, y = H * .9 + (vp.y - H * .42) * .15;
-    sctx.drawImage(planetCache, x - planetCache.width / 2, y - planetCache.height / 2);
+    sctx.drawImage(planetCache, planet.x - planetCache.width / 2 + view.x * .05, H * .66 - planetCache.height / 2 + view.y * .05);
   }
   /** Faint spiral galaxies, so far away they barely move. */
-  function drawGalaxies(){
+  function drawGalaxies(dt){
     const c = sctx;
     for (const g of galaxies){
-      const x = W * g.x + (vp.x - W / 2) * .04, y = H * g.y + (vp.y - H * .42) * .04, r = H * g.r;
+      g.x -= speedAt(900) * dt / 1000 / W; if (g.x < -.15) g.x = 1.15;
+      const r = H * g.r, x = g.x * W, y = H * g.y + view.y * .02;
       c.save(); c.translate(x, y); c.rotate(g.a); c.scale(1, .38);
       const gr = c.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, `rgba(${g.c},.32)`); gr.addColorStop(.25, `rgba(${g.c},.12)`); gr.addColorStop(1, `rgba(${g.c},0)`);
       c.fillStyle = gr; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill();
@@ -106,22 +109,21 @@ const Cockpit = (() => {
   }
   /** Things passing at their own distances: satellites, freighters, a ring station, tumbling asteroids. Far ones are small, dim and blue. */
   function drawTraffic(t, dt){
-    if (t > nextTraffic && traffic.length < 3){
-      const kinds = ['satellite', 'freighter', 'station', 'asteroid', 'satellite', 'freighter'];
-      const side = Math.random() < .5 ? -1 : 1;
-      traffic.push({ kind: kinds[(Math.random() * kinds.length) | 0], x: side * rnd(.35, 1.1), y: rnd(-.55, .25), z: 1, vx: rnd(-.04, .04), spin: rnd(-.6, .6), a: rnd(0, 6), born: t });
-      nextTraffic = t + rnd(9000, 22000) / Math.max(.6, engine.speed);
+    if (t > nextTraffic && traffic.length < 4){
+      const kinds = ['satellite', 'freighter', 'station', 'asteroid', 'satellite', 'freighter'], kind = kinds[(Math.random() * kinds.length) | 0];
+      const d = rnd(1.8, 9), own = kind === 'freighter' ? rnd(-.6, 1.8) : rnd(-.15, .15);   // some freighters overtake us
+      traffic.push({ kind, d, own, x: own > 1 ? -W * .1 : W * 1.1, y: rnd(H * .12, H * .62), spin: rnd(-.6, .6), a: rnd(0, 6) });
+      nextTraffic = t + rnd(7000, 16000) / Math.max(.6, engine.speed);
     }
-    traffic.sort((a, b) => b.z - a.z);
+    traffic.sort((a, b) => b.d - a.d);
     for (let i = traffic.length - 1; i >= 0; i--){
-      const o = traffic[i];
-      o.z -= .045 * engine.speed * dt / 1000; o.x += o.vx * dt / 1000; o.a += o.spin * dt / 1000;
-      const p = project(o.x, o.y, o.z), size = W * .016 / o.z;
-      if (o.z < .06 || p.x < -size * 4 || p.x > W + size * 4 || p.y > H + size * 4){ traffic.splice(i, 1); continue; }
-      const near = clamp(1 - o.z, 0, 1), fade = Math.min(1, (t - o.born) / 2500);
-      sctx.save(); sctx.globalAlpha = fade * (.35 + .65 * near); sctx.translate(p.x, p.y);
+      const o = traffic[i], size = W * .05 / o.d;
+      o.x += (o.own - 1) * speedAt(o.d) * dt / 1000; o.a += o.spin * dt / 1000;
+      if (o.x < -size * 5 || o.x > W + size * 6){ traffic.splice(i, 1); continue; }
+      const near = clamp(1 - (o.d - 1.8) / 7.2, 0, 1);
+      sctx.save(); sctx.globalAlpha = .35 + .65 * near; sctx.translate(o.x + view.x / o.d, o.y + view.y / o.d);
+      if (o.kind === 'freighter' && o.own < 1) sctx.scale(-1, 1);       // engines at the back, whichever way it's going
       shapes[o.kind](sctx, size, o.a, near, t);
-      // distance haze: far things take on the colour of space
       sctx.restore();
     }
   }
@@ -162,53 +164,63 @@ const Cockpit = (() => {
   };
   /** Dust right by the glass: big, soft and fast, the nearest layer of all. */
   function drawMotes(dt){
-    const c = sctx, dz = .05 * engine.speed * dt / 1000;
+    const c = sctx;
     for (const m of motes){
-      m.z -= dz;
-      const p = project(m.x, m.y, m.z);
-      if (m.z < .012 || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60){ Object.assign(m, newMote(false)); continue; }
-      const r = Math.min(9, .045 / m.z), a = Math.min(.35, (.25 - m.z) * 2);
-      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r); g.addColorStop(0, `rgba(220,230,255,${a})`); g.addColorStop(1, 'rgba(220,230,255,0)');
-      c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, r, 0, 7); c.fill();
+      const v = speedAt(m.d);
+      m.x -= v * dt / 1000;
+      if (m.x < -80) Object.assign(m, newMote(W + rnd(20, 300)));
+      const r = 5 / m.d, len = Math.max(r, v * .05);
+      const g = c.createLinearGradient(m.x, 0, m.x + len, 0); g.addColorStop(0, 'rgba(220,230,255,.22)'); g.addColorStop(1, 'rgba(220,230,255,0)');
+      c.strokeStyle = g; c.lineWidth = r; c.lineCap = 'round'; c.beginPath(); c.moveTo(m.x, m.y + view.y / m.d); c.lineTo(m.x + len, m.y + view.y / m.d); c.stroke();
     }
   }
+  /** Stars at every depth: near ones slide past quickly, far ones creep. At warp speed they streak. */
   function drawStars(dt){
-    const c = sctx, speed = .075 * engine.speed * (1 + sky.wind * .3), dz = speed * dt / 1000, trail = 4 + engine.speed * 7;
+    const c = sctx, trail = engine.mode === 'warp' ? .35 : engine.mode === 'fast' ? .08 : .03;
     c.lineCap = 'round';
     for (const s of stars){
-      s.z -= dz;
-      const p = project(s.x, s.y, s.z);
-      if (s.z < .03 || p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50){ Object.assign(s, newStar(false)); continue; }
-      const q = project(s.x, s.y, Math.min(1, s.z + dz * trail)), a = Math.min(1, (1 - s.z) * 1.3), w = Math.max(.6, 1.9 * (1 - s.z));
+      const v = speedAt(s.d);
+      s.x -= v * dt / 1000;
+      if (s.x < -30) Object.assign(s, newStar(W + rnd(5, 40)));
+      const x = s.x + view.x / s.d, y = s.y + view.y / s.d, a = Math.min(1, 2.6 / Math.sqrt(s.d)), w = Math.max(.6, 3.2 / Math.sqrt(s.d));
       c.strokeStyle = `rgba(${engine.mode === 'warp' ? '215,195,255' : s.c},${a})`; c.lineWidth = w;
-      c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(p.x + .01, p.y); c.stroke();
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.max(.01, v * trail), y); c.stroke();
     }
   }
   function drawClouds(dt){
-    const want = Math.round(sky.cloud * 7 + sky.fog * 3);
-    while (clouds.length < want) clouds.push({ x: rnd(-1.4, 1.4), y: rnd(-.8, .6), z: clouds.length ? 1 : rnd(.3, 1), r: rnd(.5, 1.1), h: (Math.random() * 3) | 0 });
+    const want = Math.round(sky.cloud * 6 + sky.fog * 3);
+    while (clouds.length < want) clouds.push({ x: clouds.length ? W + rnd(100, 600) : rnd(0, W), y: rnd(H * .1, H * .6), d: rnd(8, 22), r: rnd(.6, 1.2), h: (Math.random() * 3) | 0 });
     if (clouds.length > want) clouds.length = want;
     const c = sctx, stormy = sky.rain > 0 || sky.thunder, cols = stormy ? ['70,85,120', '55,60,105', '90,100,140'] : ['143,107,255', '255,95,174', '79,214,255'];
     for (const k of clouds){
-      k.z -= .02 * engine.speed * dt / 1000;
-      if (k.z < .12) Object.assign(k, { x: rnd(-1.4, 1.4), y: rnd(-.8, .6), z: 1 });
-      const p = project(k.x, k.y, k.z), R = k.r / k.z * W * .09, a = Math.min(.3, (1 - k.z) * .45) * (stormy ? 1.3 : 1);
-      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, R); g.addColorStop(0, `rgba(${cols[k.h]},${a})`); g.addColorStop(1, `rgba(${cols[k.h]},0)`);
-      c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, R, 0, 7); c.fill();
+      const R = k.r * H * 4 / Math.sqrt(k.d);
+      k.x -= speedAt(k.d) * dt / 1000;
+      if (k.x < -R) Object.assign(k, { x: W + R + rnd(0, 400), y: rnd(H * .1, H * .6), d: rnd(8, 22) });
+      const a = .22 * (stormy ? 1.3 : 1), g = c.createRadialGradient(k.x, k.y, 0, k.x, k.y, R);
+      g.addColorStop(0, `rgba(${cols[k.h]},${a})`); g.addColorStop(1, `rgba(${cols[k.h]},0)`);
+      c.fillStyle = g; c.beginPath(); c.arc(k.x, k.y, R, 0, 7); c.fill();
     }
   }
+  /** On windy days, rocks and debris tumble past close by. */
   function drawRocks(dt){
     const want = Math.round(sky.wind * 9);
-    while (rocks.length < want) rocks.push({ x: -40 - Math.random() * W * .5, y: rnd(H * .12, H * .68), v: rnd(60, 180), r: rnd(4, 15), a: rnd(0, 6), va: rnd(-2, 2) });
+    while (rocks.length < want) rocks.push({ x: W + rnd(20, W * .6), y: rnd(H * .1, H * .7), d: rnd(1.1, 2.6), r: rnd(5, 16), a: rnd(0, 6), va: rnd(-2, 2) });
     if (rocks.length > want) rocks.length = want;
     const c = sctx;
     for (const k of rocks){
-      k.x += k.v * (dt / 1000) * (1 + sky.wind); k.a += k.va * dt / 1000;
-      if (k.x > W + 40) Object.assign(k, { x: -40, y: rnd(H * .12, H * .68) });
+      k.x -= speedAt(k.d) * (1 + sky.wind) * dt / 1000; k.a += k.va * dt / 1000;
+      if (k.x < -40) Object.assign(k, { x: W + rnd(20, 300), y: rnd(H * .1, H * .7) });
+      const r = k.r / k.d * 1.6;
       c.save(); c.translate(k.x, k.y); c.rotate(k.a); c.fillStyle = '#4a4560'; c.strokeStyle = 'rgba(200,190,255,.35)';
-      c.beginPath(); for (let i = 0; i < 7; i++){ const an = i / 7 * 6.283, rr = k.r * (.7 + .3 * Math.sin(i * 2.7 + k.r)); c[i ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); }
+      c.beginPath(); for (let i = 0; i < 7; i++){ const an = i / 7 * 6.283, rr = r * (.7 + .3 * Math.sin(i * 2.7 + k.r)); c[i ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); }
       c.closePath(); c.fill(); c.stroke(); c.restore();
     }
+  }
+  /** The planet and moon go by too, slowly enough that you'd only notice over minutes. */
+  function driftBodies(dt){
+    const r = H * .38;
+    planet.x -= speedAt(160) * dt / 1000; if (planet.x < -r * 1.1) planet.x = W + r * 2.5;
+    moon.x -= speedAt(400) * dt / 1000; if (moon.x < -H * .2) moon.x = W + H * .3;
   }
   function drawLightning(t){
     if (!sky.thunder) return;
@@ -244,14 +256,15 @@ const Cockpit = (() => {
     const sec = dt / 1000;
     // rain: drops land, sit, and now and then one runs down the glass
     if (sky.rain > 0 && drops.length < 170 * sky.rain && Math.random() < sky.rain * 9 * sec) drops.push({ x: rnd(0, W), y: rnd(0, H * .82), r: rnd(1.5, 4.5) * (W > 1400 ? 1.4 : 1), life: rnd(15e3, 45e3), age: 0, vy: 0 });
-    if (sky.rain > 0 && Math.random() < sky.rain * .7 * sec){ const d = drops[(Math.random() * drops.length) | 0]; if (d && d.r > 3 && !d.vy) d.vy = rnd(30, 90); }
+    // The ship is moving, so running drops are swept backwards along the glass as well as down.
+    if (sky.rain > 0 && Math.random() < sky.rain * .9 * sec){ const d = drops[(Math.random() * drops.length) | 0]; if (d && d.r > 3 && !d.vy){ d.vy = rnd(15, 45); d.vx = -rnd(50, 140) * Math.min(2, engine.speed); } }
     for (let i = drops.length - 1; i >= 0; i--){
       const d = drops[i]; d.age += dt;
-      if (d.vy){ d.y += d.vy * sec; d.vy = Math.min(220, d.vy + 40 * sec); if (Math.random() < 3 * sec) drops.push({ x: d.x + rnd(-1, 1), y: d.y - d.r * 2, r: d.r * .4, life: rnd(4e3, 9e3), age: 0, vy: 0 }); }
-      if (d.age > d.life || d.y > H){ drops.splice(i, 1); continue; }
+      if (d.vy){ d.y += d.vy * sec; d.x += d.vx * sec; if (Math.random() < 4 * sec) drops.push({ x: d.x + d.r * 2, y: d.y - d.r * .5, r: d.r * .4, life: rnd(4e3, 9e3), age: 0, vy: 0 }); }
+      if (d.age > d.life || d.y > H || d.x < -10){ drops.splice(i, 1); continue; }
       const a = Math.min(1, (d.life - d.age) / 2500);
       c.fillStyle = `rgba(170,200,255,${.13 * a})`; c.strokeStyle = `rgba(230,240,255,${.32 * a})`; c.lineWidth = .8;
-      c.beginPath(); if (d.vy) c.ellipse(d.x, d.y, d.r * .85, d.r * 1.25, 0, 0, 7); else c.arc(d.x, d.y, d.r, 0, 7); c.fill(); c.stroke();
+      c.beginPath(); if (d.vy) c.ellipse(d.x, d.y, d.r * 1.35, d.r * .8, Math.atan2(d.vy, d.vx), 0, 7); else c.arc(d.x, d.y, d.r, 0, 7); c.fill(); c.stroke();
       c.fillStyle = `rgba(255,255,255,${.55 * a})`; c.beginPath(); c.arc(d.x - d.r * .35, d.y - d.r * .35, d.r * .28, 0, 7); c.fill();
     }
     // snow: flakes stick to the glass and slowly melt
@@ -292,12 +305,13 @@ const Cockpit = (() => {
   }
 
   /* ---------- billboards ---------- */
-  const LANES = [{ x: -.27, y: -.06, cls: '' }, { x: .27, y: -.02, cls: '' }, { x: 0, y: -.27, cls: 'wide' }];
-  const NARROW_LANES = [{ x: 0, y: -.17, cls: 'wide' }, { x: 0, y: .05, cls: 'wide' }];
+  // Each lane is a height in the window and a depth. Depth 1 is close and readable; the far lane is small and hazy.
+  const LANES = [{ y: .27, d: 1 }, { y: .2, d: 2.3 }, { y: .53, d: 1.05 }, { y: .4, d: 2.6 }];
+  const NARROW_LANES = [{ y: .24, d: 1 }, { y: .5, d: 1.05 }];
   function boardHtml(card){
     return `<span class="bh">${esc(card.head)}</span><span class="bb">${esc(card.big)}</span>${card.sub ? `<span class="bs">${esc(card.sub)}</span>` : ''}`;
   }
-  function spawn(t){
+  function spawn(t, x){
     if (!rot.length) return;
     // Never the same billboard twice on screen at once.
     let card = rot[rotI++ % rot.length];
@@ -305,40 +319,36 @@ const Cockpit = (() => {
     if (boards.some(b => b.id === card.id)) return;
     const lanes = narrow() ? NARROW_LANES : LANES, lane = lanes[laneI++ % lanes.length];
     const b = document.createElement('div');
-    b.className = `board tone-${card.tone} ${lane.cls}${String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id); b.innerHTML = boardHtml(card);
+    b.className = `board tone-${card.tone}${String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id); b.innerHTML = boardHtml(card);
     el('cBoards').appendChild(b);
-    boards.push({ el: b, id: card.id, lane, born: t, life: still() ? 20000 : 15000, w: b.offsetWidth, h: b.offsetHeight, seed: Math.random() * 6 });
+    const w = b.offsetWidth, h = b.offsetHeight, s = 1 / lane.d;
+    boards.push({ el: b, id: card.id, lane, w, h, x: x != null ? x : W + w * s / 2 + 30, seed: Math.random() * 6 });
   }
-  function scaleAt(p){
-    if (p < .3){ const q = p / .3; return .04 + .81 * Math.pow(q, 2.2); }
-    if (p < .8) return .85 + .2 * (p - .3) / .5;
-    const q = (p - .8) / .2; return 1.05 + 2.6 * q * q;
-  }
-  function placeBoards(t){
+  function placeBoards(t, dt){
+    // Near billboards take about 16 seconds to cross the window, slow enough to read whatever the engines are doing.
+    const base = (W + 640) / 16 * Math.min(1.4, Math.max(.7, engine.speed));
     for (let i = boards.length - 1; i >= 0; i--){
-      const b = boards[i], p = (t - b.born) / b.life;
-      if (p >= 1){ b.el.parentNode && b.el.parentNode.removeChild(b.el); boards.splice(i, 1); continue; }
-      const s = still() ? 1 : scaleAt(p), bob = Math.sin(t / 1700 + b.seed) * 5 * s;
-      const x = vp.x + b.lane.x * W * s, y = vp.y + b.lane.y * H * s + bob;
-      const a = still() ? 1 : p < .08 ? p / .08 : p > .86 ? Math.max(0, 1 - (p - .86) / .14) : 1;
-      // Side billboards turn to face you as they pass; the overhead one tips down. Far away they're soft, dim and blue.
-      const turn = still() ? 0 : Math.min(1, s), ry = b.lane.x < 0 ? 18 * turn : b.lane.x > 0 ? -18 * turn : 0, rx = b.lane.x === 0 ? (b.lane.y < 0 ? -12 : 10) * turn : 0;
-      b.el.style.transform = `translate(${(x - b.w / 2).toFixed(1)}px,${(y - b.h / 2).toFixed(1)}px) scale(${s.toFixed(3)}) rotateY(${ry.toFixed(2)}deg) rotateX(${rx.toFixed(2)}deg)`;
-      b.el.style.opacity = a.toFixed(3);
-      const far = clamp((.6 - s) / .56, 0, 1);
-      b.el.style.filter = far > 0 ? `${quality === 1 ? `blur(${(far * 3).toFixed(2)}px) ` : ''}brightness(${(1 - far * .45).toFixed(2)}) saturate(${(1 - far * .5).toFixed(2)})` : '';
-      b.el.style.zIndex = String(Math.round(s * 100));
+      const b = boards[i], d = b.lane.d, s = 1 / d;
+      if (!still()) b.x -= base / d * dt / 1000;
+      if (b.x < -b.w * s / 2 - 40){ b.el.parentNode && b.el.parentNode.removeChild(b.el); boards.splice(i, 1); continue; }
+      const y = H * b.lane.y + Math.sin(t / 1900 + b.seed) * 6 * s + view.y / d;
+      // A slight turn as it goes by gives it depth; far ones are soft, dim and blue.
+      const ry = still() ? 0 : clamp((b.x - W / 2) / (W / 2), -1, 1) * -16 * s;
+      b.el.style.transform = `translate(${(b.x - b.w / 2).toFixed(1)}px,${(y - b.h / 2).toFixed(1)}px) scale(${s.toFixed(3)}) rotateY(${ry.toFixed(2)}deg)`;
+      const far = clamp((d - 1.2) / 1.4, 0, 1);
+      b.el.style.filter = far > 0 ? `${quality === 1 ? `blur(${(far * 2.2).toFixed(2)}px) ` : ''}brightness(${(1 - far * .4).toFixed(2)}) saturate(${(1 - far * .45).toFixed(2)})` : '';
+      b.el.style.opacity = far > 0 ? (1 - far * .25).toFixed(2) : '1';
+      b.el.style.zIndex = String(Math.round(100 / d));
     }
-    if (t >= nextBoard){ spawn(t); nextBoard = t + (still() ? 10000 : narrow() ? 7600 : 5600); }
+    if (!still() && t >= nextBoard){ spawn(t); nextBoard = t + (narrow() ? 9000 : 5200); }
   }
 
   /* ---------- the ship ---------- */
   function sway(t){
-    el('cBoards').style.perspectiveOrigin = `${vp.x.toFixed(0)}px ${vp.y.toFixed(0)}px`;
-    const k = 1 + sky.wind * 2.5, sx = Math.sin(t / 6300) * 6 * k + Math.sin(t / 23000) * 10, sy = Math.sin(t / 8100) * 4 * k + Math.sin(t / 31000) * 7;
-    const r = Math.sin(t / 9700) * .22 * k;
+    const k = 1 + sky.wind * 2.5, sy = Math.sin(t / 7300) * 5 * k + Math.sin(t / 29000) * 8, sx = Math.sin(t / 19000) * 6;
+    const r = Math.sin(t / 11000) * .18 * k;
     el('cShip').style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px) rotate(${r.toFixed(3)}deg)`;
-    vp.x = W / 2 - sx * 1.6; vp.y = H * (narrow() ? .36 : .42) - sy * 1.6;
+    view.x = -sx * 1.5; view.y = -sy * 1.5;   // looking through a moving window shifts the view the other way
   }
 
   function loop(t){
@@ -346,23 +356,23 @@ const Cockpit = (() => {
     const dt = Math.min(80, t - (last || t)); last = t; frame++;
     if (dt > 34) slowFrames++; else if (slowFrames > 0) slowFrames -= .25;
     if (slowFrames > 90 && quality > .5){ quality = .5; slowFrames = 0; resize(); }
-    sway(t); drawSky(t); drawGalaxies(); drawPlanet(t); drawClouds(dt); drawStars(dt); drawTraffic(t, dt); drawRocks(dt); drawMotes(dt); drawLightning(t); drawHaze();
+    sway(t); driftBodies(dt); drawSky(t); drawGalaxies(dt); drawPlanet(t); drawClouds(dt); drawStars(dt); drawTraffic(t, dt); drawRocks(dt); drawMotes(dt); drawLightning(t); drawHaze();
     if (quality === 1 || frame % 2 === 0) drawGlass(quality === 1 ? dt : dt * 2);
-    placeBoards(t);
+    placeBoards(t, dt);
     raf = requestAnimationFrame(loop);
   }
   /** Reduced motion: one still frame, refreshed every 20 seconds with the next billboards. */
   function drawStill(){
     const t = performance.now();
-    sway(0); drawSky(t); drawGalaxies(); drawPlanet(t); drawClouds(0); drawStars(0); drawHaze(); drawGlass(400);
-    boards.forEach(b => b.el.parentNode && b.el.parentNode.removeChild(b.el)); boards = [];
-    LANES.slice(0, narrow() ? 1 : 2).forEach(() => spawn(t)); placeBoards(t + 1);
+    sway(0); drawSky(t); drawGalaxies(0); drawPlanet(t); drawClouds(0); drawStars(0); drawHaze(); drawGlass(400);
+    boards.forEach(b => b.el.parentNode && b.el.parentNode.removeChild(b.el)); boards = []; laneI = 0;
+    (narrow() ? [W / 2, W / 2] : [W * .3, W * .7]).forEach(x => { spawn(t, x); if (!narrow()) laneI++; }); placeBoards(t, 0);
   }
 
   return {
     start(){
       if (on) return; on = true; document.body.classList.add('cockpit');
-      resize(); last = 0; nextBoard = 0; nextBolt = performance.now() + 2500;
+      resize(); last = 0; nextBoard = 0; laneI = 0; nextBolt = performance.now() + 2500;
       if (still()){ drawStill(); staticTimer = setInterval(drawStill, 20000); }
       else raf = requestAnimationFrame(loop);
     },

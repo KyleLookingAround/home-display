@@ -4,12 +4,16 @@ A home energy dashboard for your Octopus account, and a household display for th
 
 - **Dashboard** (`index.html`): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
 - **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
-  - **Screensaver: the cockpit.** You're in a rocket ship looking out, and it's what a screen shows when nobody's using it.
-    - Holographic billboards carrying your live numbers fly out of the distance and turn towards you as they pass: the price, the cheapest hours, bins, the next train, the weather, what's coming up.
-    - Satellites, freighters, a ring station and asteroids pass at their own distances.
-    - The real weather shows on the glass and in the sky: rain beads and runs, snow sticks, frost creeps in when it's cold, fog mists the window, thunder flashes, wind rocks the ship.
-    - The sun, moon, dawn and dusk follow Stockport's sunrise and sunset.
-    - The power price sets the engines: warp speed when you're paid to use power, power saving at peak price. High grid carbon hazes the view.
+  - **Screensaver: the side window.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
+    - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, dust and traffic give it depth.
+    - **Billboards:** holographic signs carrying your live numbers drift by at different distances: the price, the cheapest hours, bins, the next train, the weather, what's coming up. Near ones take about 16 seconds to cross, slow enough to read; far ones are small and hazy.
+    - **Traffic:** satellites, freighters (some overtake you), a ring station and asteroids pass at their own depths. A gas giant and the moon drift by over many minutes.
+    - **Weather:**
+      - Rain beads on the glass and is swept backwards as you move.
+      - Snow sticks, and frost creeps in when it's cold.
+      - Fog mists the window, thunder flashes, and wind rocks the cabin and sends debris tumbling past.
+      - The sun, moon, dawn and dusk follow Stockport's sunrise and sunset.
+    - **Power price:** it sets the ship's speed. Warp when you're paid to use power, and the stars streak; slow at peak price. High grid carbon hazes the view.
   - **Energy:** Agile price now, the next day's prices, the cheapest two hours, grid carbon, Home Mini live draw and today's cost.
   - **Home:** clock, date, weather now and for the next 12 hours, sunrise and sunset, bin day and your calendar.
   - **Travel:** live trains from your station, with "leave in 6 min" countdowns that allow for the walk.
@@ -34,7 +38,24 @@ To see the cockpit in any weather, add it to the link. For example, `display.htm
 
 On a phone or tablet, swipe left or right to change mode and tap to show the toolbar.
 
-**Settings every screen shares** live in [`household.json`](household.json): your bins, station, walk time and the mode screens open on.
+### Bins
+
+Bin days come from Stockport Council automatically, once you've told GitHub your address's property number.
+
+1. On Stockport Council's website, look up your bin collection day.
+2. When it shows your bins, the page address ends in a long number, for example `myaccount.stockport.gov.uk/bin-collections/show/100011234567`. That number is your property reference (UPRN).
+3. In this repository on GitHub, go to Settings → Secrets and variables → Actions → New repository secret. Name it `STOCKPORT_UPRN` and paste the number.
+4. Run the "Check and publish" workflow once from the Actions tab, or wait for the next morning.
+
+How it works:
+- A GitHub Action reads your bin page every morning at about 05:17 and publishes the dates as `bins.json` with the site.
+- Your address stays a secret: only the dates are published.
+- The display shows the council's dates, colours and what goes in each bin, including bank holiday changes.
+- If the feed stops (GitHub pauses scheduled jobs in a repository with no commits for 60 days), screens fall back to any bins set by hand.
+
+### Settings
+
+**Settings every screen shares** live in [`household.json`](household.json): your station, walk time, the mode screens open on, and bins by hand if you'd rather not use the council feed.
 - Edit it on GitHub (open the file, press the pencil, commit). Screens pick it up at their next fresh start.
 - It's published with the site, so keep anything private out of it.
 
@@ -42,7 +63,7 @@ On a phone or tablet, swipe left or right to change mode and tap to show the too
 - choose the mode the screen opens on;
 - rotate between energy, home and travel;
 - set when the screensaver and night clock start;
-- add your bins (one known collection date and how often each comes);
+- add bins by hand (one known collection date and how often each comes), if you're not using the council feed;
 - add your calendar's secret iCal address;
 - pick your station and tram stop, and how long the walk is.
 

@@ -91,6 +91,17 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
   - Typical bill: £1,723 a year.
 - Regional figures are in Ofgem's downloadable tables. The app shows the account's actual rates instead.
 
+## Stockport Council bin collections (display: bins, daily in GitHub Actions)
+
+- **No API.** The page is `https://myaccount.stockport.gov.uk/bin-collections/show/{UPRN}` (HTML).
+- **Browser calls:** refused. `Access-Control-Allow-Origin` lists only stockport.gov.uk, so it's fetched by `scripts/bins.mjs` in GitHub Actions.
+- **Firewall:** CloudFront answers 403 unless the request has a browser-like `User-Agent`.
+- **Layout (checked 5 October 2026):**
+  - One `<div class="service-item service-item-{colour}">` per bin.
+  - Each holds `<h3>` (for example "Blue bin"), `<p class="sub-title">` (what goes in it) and a `<p>` with the date as "Thursday, 8 October 2026".
+  - The parser is the same approach as the community project UKBinCollectionData.
+- **Finding your UPRN:** it's the number at the end of the page address once you've looked up your bins.
+
 ## Huxley2 (display: trains, no server)
 
 - **What it is:** a community JSON front end to National Rail's Darwin (OpenLDBWS) at `https://huxley2.azurewebsites.net`. No key needed, and it allows browser calls (`Access-Control-Allow-Origin: *`; checked 5 October 2026).
