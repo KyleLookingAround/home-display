@@ -22,6 +22,8 @@ const SRC = {
   live:    { label: 'Home Mini', every: () => SRC.live.data && SRC.live.data.none ? 6*60*MIN : shown() === 'night' ? 30*MIN : (shown() === 'energy' || shown() === 'screensaver') ? 2*MIN : 10*MIN, need: () => !!NET.creds, run: pollMini },
   weather: { label: 'Weather', every: () => 15*MIN, need: () => true, run: loadDisplayWeather },
   council: { label: 'Bins', every: () => 3*60*MIN, need: () => true, run: loadCouncilBins },
+  // The real ISS: watched closely only while the window is showing, so it can be spotted when it's overhead.
+  iss:     { label: 'ISS', every: () => shown() === 'screensaver' ? MIN : 10*MIN, need: () => true, run: loadISS },
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
@@ -267,11 +269,15 @@ function cockpitInfo(now){
   const cur = ag ? ag.filter(r => r.from <= now && now < r.to)[0] : null;
   const ci = SRC.carbon.data ? SRC.carbon.data.filter(r => r.from <= now && now < r.to)[0] : null;
   const L = SRC.live.data && !SRC.live.data.none ? SRC.live.data : null, T = SRC.tariff.data, W = SRC.weather.data;
-  const sky = skyFor(W, now, D.preview), known = !!W || !!D.preview.wx;
+  const sky = skyFor(W, now, D.preview), known = !!W || !!D.preview.wx, bins = binsNow(now);
+  // A preview can put the real ISS overhead: #screensaver&show=iss
+  const issRaw = /iss/.test(String(D.preview.show || '')) ? { latitude: HOME.lat + 2, longitude: HOME.lon, altitude: 421, velocity: 27580 } : SRC.iss.data;
+  const iss = issPass(issRaw, HOME);
+  const x = { agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins,
+              events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, iss, sky, label: 'Harold Street · region ' + region() };
   return {
-    sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null),
-    cards: buildBillboards({ agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins: binsNow(now),
-      events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, label: 'Harold Street · region ' + region() }, now),
+    sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null), world: Object.assign(worldFor(x, now), { iss }), preview: D.preview,
+    cards: buildBillboards(x, now),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };
 }

@@ -18,6 +18,17 @@ The logic is pure, in `skyFor`, `engineFor`, `buildBillboards` and `billboardRot
 - Rain on the glass is swept backwards by the ship's motion.
 - The planet and moon drift by over many minutes.
 
+**Revision, 5 October 2026: the voyage.** Kyle asked for a full redesign to make it gorgeous to watch, and asked whether something other than billboards would be better. He chose all four ideas offered, keeping billboards but using them less:
+- **The view:** nebulae are painted from noise (warped fractal noise, gradient-mapped to the time of day and the mood) and grown a few rows a frame. Planets are lit spheres with an atmosphere, some with rings, one passing every few minutes. The frame's rim takes the colour of the light outside.
+- **Billboards are for what you need to catch:** the price when it matters, bins, the next train, rain on the way and the ISS (`boardCards`). Everything else rides the train.
+- **The space train:** the Harold Street Express passes every few minutes on a guide rail, with one fact on each carriage, slowly enough to read. A card is never on a billboard and the train at once.
+- **Your house on an asteroid:** a red-brick terrace drifts by every few minutes. Its windows glow with the Home Mini's live draw, the chimney smokes when it's cold, the porch lantern takes the price's colour, and the bins are out the evening before collection.
+- **Nature tells the story** (`worldFor`): the aurora when grid carbon is low or power is free; a comet with a tail in the colours of tomorrow's bins on bin night; the moon in its real phase (`moonPhase`); and the real International Space Station passing when it's within 1,500 km of Stockport (`issPass`, from wheretheiss.at).
+- **Space wildlife:** whales, jellyfish and birds of light pass now and then, for no reason at all.
+- **Previews:** `show=` adds any of `train`, `house`, `whales`, `jellies`, `birds`, `iss`, `comet`, `aurora`, `moon`, `traffic`, `flyby`, `rock`, `truss` or `cruiser` mid-screen, such as `#screensaver&phase=night&show=train,aurora`.
+
+The drawing of each thing lives in `scenery.js`; `cockpit.js` decides when and where.
+
 **Consequences.**
 - It's the heaviest part on old TVs. It halves its own detail when frames run slow, and draws a still frame every 20 seconds under reduced motion.
 - The energy, home and travel modes stay for reading details.

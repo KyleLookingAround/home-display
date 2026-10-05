@@ -391,3 +391,23 @@ test('cockpit: every kind of weather and power price draws without errors', asyn
     await ctx.close();
   }
 });
+
+// GALLERY=1 SHOTS=1: one screenshot per scene, for looking at the window by eye (skipped otherwise).
+test('cockpit gallery', { skip: !process.env.GALLERY }, async () => {
+  const looks = (process.env.GALLERY_LOOKS || [
+    'phase=night&show=train', 'wx=clear&phase=day&show=house', 'phase=dusk&show=whales', 'wx=rain&phase=night&show=jellies',
+    'wx=snow&show=birds', 'price=-3&phase=night&show=aurora,comet', 'wx=thunder&phase=night&show=iss,moon', 'wx=fog&show=flyby', 'phase=dawn&wx=cold&show=house'
+  ].join('|')).split('|');
+  for (const [width, height] of [[1920, 1080], [390, 844]]) {
+    if (width < 1000 && !process.env.GALLERY_PHONE) continue;
+    for (const look of looks) {
+      const { page, ctx, errors } = await open('/display.html#screensaver&' + look, { width, height });
+      await page.clock.runFor(1500);
+      await page.evaluate(() => document.body.classList.remove('chrome-on'));
+      await page.waitForTimeout(400);
+      await shot(page, `gallery-${width}-${look.replace(/[&=,]/g, '-')}`);
+      assert.deepEqual(errors, [], look);
+      await ctx.close();
+    }
+  }
+});

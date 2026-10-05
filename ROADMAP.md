@@ -35,6 +35,12 @@ Put the wall display on its own website on GitHub Pages. It should show househol
 - **`household.json`:** settings every screen shares, editable on GitHub.
 - **Bin days:** the repeats from the council's calendar are in `household.json`, and a weekly GitHub Action checks them against Stockport Council's page for your address, which is held as a secret ([decision 0006](docs/decisions/0006-council-bins.md)).
 - **The side window:** the screensaver became a view out of a side window, where everything slides past ([decision 0005](docs/decisions/0005-cockpit.md), revised).
+- **The voyage** (the screensaver redrawn, [decision 0005](docs/decisions/0005-cockpit.md), second revision):
+  - painted nebulae and lit planets, some with rings;
+  - the Harold Street Express, a space train with one fact on each carriage;
+  - the house on its own asteroid, lit by your live power use;
+  - nature telling the story: the aurora when the grid is clean, a comet in your bins' colours on bin night, the real moon phase, and the real ISS when it's overhead;
+  - whales, jellyfish and birds of light.
 - **Older TV browsers:** the display's code avoids syntax newer than Chromium 63, and a test checks it.
 - **On GitHub Pages**, a workflow publishes `main`, checking the build, unit tests, layouts and the lock first.
 
@@ -44,7 +50,7 @@ Put the wall display on its own website on GitHub Pages. It should show househol
   - **A Cloudflare Worker** (item 3) holding the TfGM key and the iCal address as secrets. It's live, and free.
   - **A scheduled GitHub Action** fetching every few minutes and publishing to a data branch. It needs only GitHub secrets, but runs late at busy times, and anything private would need encrypting with the site PIN.
 - **Buses.** The Bus Open Data Service gives vehicle positions rather than stop departures, so it needs more work.
-- **More for the cockpit:** a billboard for Saving Sessions, a meteor shower when the bins are due, and the aurora when the grid is greenest.
+- **More for the cockpit:** a billboard and a carriage for Saving Sessions, and a birthday or holiday visitor from the calendar.
 
 ### Password lock
 

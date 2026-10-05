@@ -4,6 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Update:** the screensaver redrawn as a voyage: painted nebulae, lit planets with rings, the Harold Street Express (a space train with one fact on each carriage), the house on an asteroid lit by live power use, the aurora when the grid is clean, a comet in the bins' colours on bin night, the real moon phase and the real ISS overhead, and space wildlife. Billboards now carry only what you need to catch ([0005](decisions/0005-cockpit.md), second revision).
+- **Creation:** the ISS's position from wheretheiss.at, once a minute while the screensaver shows and every ten minutes otherwise.
 - **Creation:** bin days. The repeats from the council's printed calendar are in `household.json`. A weekly GitHub Action (Saturdays) reads the council's page for the address in the `STOCKPORT_UPRN` secret, publishes `bins.json`, and the display restarts each repeat from the council's latest date ([0006](decisions/0006-council-bins.md)).
 - **Update:** the screensaver looks out of a side window. Everything slides past with parallax, near things faster than far ones; billboards drift by at readable and distant depths; rain is swept backwards on the glass ([0005](decisions/0005-cockpit.md), revised).
 - **Finding:** Stockport Council's bin page only allows browser calls from stockport.gov.uk, and turns away requests that don't look like a browser.

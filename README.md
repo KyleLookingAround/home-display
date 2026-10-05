@@ -4,10 +4,17 @@ A home energy dashboard for your Octopus account, and a household display for th
 
 - **Dashboard** (`index.html`): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
 - **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
-  - **Screensaver: the side window.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
-    - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, dust and traffic give it depth.
-    - **Billboards:** holographic signs carrying your live numbers drift by at different distances: the price, the cheapest hours, bins, the next train, the weather, what's coming up. Near ones take about 16 seconds to cross, slow enough to read; far ones are small and hazy.
-    - **Traffic:** satellites, freighters (some overtake you), a ring station and asteroids pass at their own depths. A gas giant and the moon drift by over many minutes.
+  - **Screensaver: the voyage.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
+    - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, nebulae, planets and traffic give it depth.
+    - **The Harold Street Express:** every few minutes a space train passes with one fact on each carriage: the price, the cheapest hours, grid carbon, the weather, sunset, what's coming up.
+    - **Billboards:** holographic beacons for what you need to catch: bins, the next train, rain on the way, a price worth knowing about.
+    - **Your house on an asteroid:** it drifts by now and then. The windows glow brighter the more power you're using, the chimney smokes when it's cold, the porch lantern shows the price, and the bins are out the evening before collection.
+    - **Nature tells the story:**
+      - the aurora when the grid is clean;
+      - a comet with a tail in the colours of the bins going out, on bin night;
+      - the moon in its real phase;
+      - the real International Space Station when it's passing over Stockport.
+    - **Wildlife and traffic:** whales, jellyfish and birds of light; satellites, freighters, stations and asteroids; now and then something huge sweeps right past the glass.
     - **Weather:**
       - Rain beads on the glass and is swept backwards as you move.
       - Snow sticks, and frost creeps in when it's cold.
@@ -26,7 +33,8 @@ Open https://kylelookingaround.github.io/home-display/display.html, or use the W
 To see the cockpit in any weather, add it to the link. For example, `display.html#screensaver&wx=thunder&phase=night` or `#screensaver&price=-3`:
 - `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;
 - `phase`: dawn, day, dusk or night;
-- `price`: any Agile price in pence.
+- `price`: any Agile price in pence;
+- `show`: bring things into view straight away, such as `show=train,house,aurora,comet`. Also `whales`, `jellies`, `birds`, `iss`, `moon`, `traffic` and `flyby`.
 
 | On a TV remote or keyboard | What it does |
 |---|---|
@@ -84,6 +92,7 @@ Everything below works from the published site, in the browser, with no server:
 - **National Grid:** the carbon forecast.
 - **Open-Meteo:** the weather.
 - **National Rail:** live trains, through [Huxley2](https://huxley2.azurewebsites.net), a free community service.
+- **Where the ISS is:** [wheretheiss.at](https://wheretheiss.at).
 
 A few things can't be fetched by a web page:
 - **Metrolink times:** TfGM refuses browser calls.

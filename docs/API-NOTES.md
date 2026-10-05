@@ -117,6 +117,12 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
 - **Times:** local, with no date. `boardTime()` puts them on the right day around midnight.
 - **Caution:** it's a free community service with no guarantee, and the mirror `national-rail-api.davwheat.dev` answers the same way. The display asks once a minute only while departures are on screen. If Huxley2 fails and a home server holds a Realtime Trains token, it uses that.
 
+## Where the ISS is (display: screensaver, no server)
+
+- **What it is:** `https://api.wheretheiss.at/v1/satellites/25544` gives the International Space Station's `latitude`, `longitude`, `altitude` (km), `velocity` (km/h) and `visibility` (`daylight` or `eclipsed`). No key; it allows browser calls (`Access-Control-Allow-Origin: *`).
+- **Limit:** about one call a second. The display asks once a minute while the screensaver shows, and every ten minutes otherwise.
+- **Use:** `issPass()` works out the distance from Stockport along the ground. Under 1,500 km counts as overhead, and the station passes the window with a billboard saying how far up it is.
+
 ## Realtime Trains (display: travel, through a server only)
 
 - **The old API is gone.** `api.rtt.io` stopped on 30 September 2026 and now answers 418 with a pointer to the new one. `secure.realtimetrains.co.uk` follows on 31 March 2027.

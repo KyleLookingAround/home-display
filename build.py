@@ -19,7 +19,7 @@ def page(head, body, scripts):
 PAGES = {
     'index.html': page('head.html', 'body.html', ('core.js', 'analysis.js', 'dom.js')),
     'display.html': page('display/head.html', 'display/body.html',
-                         ('core.js', 'analysis.js', 'display/sources.js', 'display/cockpit.js', 'display/display.js')),
+                         ('core.js', 'analysis.js', 'display/sources.js', 'display/scenery.js', 'display/cockpit.js', 'display/display.js')),
 }
 
 if __name__ == '__main__':

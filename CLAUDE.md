@@ -24,13 +24,15 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `analysis.js`: pure functions with no DOM, shared by both pages. Example data, the period roll-up, spikes, weather regression, projections, tariff comparison, battery and solar simulators, and `cheapestWindow`.
   - `dom.js`: the dashboard's state, rendering, the generic SVG `barChart` and event wiring.
   - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
-  - `display/cockpit.js`: the screensaver, a side window onto space, drawn on two canvases with DOM billboards between them. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`).
-    - Outside: sky, galaxies, planet, nebulae, stars, traffic, debris, dust, lightning.
-    - The glass: rain, snow, frost, fog.
-    - The frame, the dashboard and the 3D billboards.
-    - It slows itself down on weak hardware.
+  - `display/cockpit.js`: the screensaver, a side window onto space. It decides when and where things appear. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`; `readableAt` caps it for text). Layers, back to front:
+    - `cSpace` canvas: sky, painted nebulae (grown a few rows a frame), stars, sun, comets, moon, aurora, planets, traffic, the house, wildlife, the ISS, the train's rail.
+    - `cBoards`: DOM billboards and the space train, in 3D.
+    - `cNear` canvas: huge things sweeping past, dust, warp streaks, debris, rain outside.
+    - `cShip`: the glass (rain, snow, frost, fog), the frame and the dashboard.
+    - It slows itself down on weak hardware, and shows a still frame under reduced motion.
+  - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
   - `display/sources.js`: the display's household data, mostly pure.
-    - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`.
+    - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), and `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`.
     - Huxley2 trains, and household settings merging.
     - Modes, night window and settings defaults.
     - Bins, weather, and the iCal parser and `RRULE` expansion.
@@ -54,7 +56,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
 
 ## Display modes
 
-Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Night. The mode comes from the link (`display.html#home`) or the screen's own setting. Extras after the mode preview the cockpit: `#screensaver&wx=rain&phase=night&price=-3`. `wx` is clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold; `phase` is dawn, day, dusk or night. The screensaver and night clock also take over automatically as overrides that don't change the link. Settings live in `localStorage` under `hse.display` on each device, and a setup link (`#setup=<base64 JSON>`) copies them between devices.
+Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Night. The mode comes from the link (`display.html#home`) or the screen's own setting. Extras after the mode preview the cockpit: `#screensaver&wx=rain&phase=night&price=-3&show=train,house`. `wx` is clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold; `phase` is dawn, day, dusk or night. The screensaver and night clock also take over automatically as overrides that don't change the link. Settings live in `localStorage` under `hse.display` on each device, and a setup link (`#setup=<base64 JSON>`) copies them between devices.
 
 ## Dashboard tabs
 
@@ -94,5 +96,5 @@ Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Nigh
    - the remote control and the cockpit in every weather;
    - the Home Mini's rate budget;
    - the lock.
-4. `npm run shots` also saves screenshots to `tests/screens/`. Look at them.
+4. `npm run shots` also saves screenshots to `tests/screens/`. Look at them. For the screensaver, `GALLERY=1 SHOTS=1 node --test --test-name-pattern=gallery tests/display.browser.mjs` saves one per scene (`GALLERY_LOOKS='phase=night&show=train|wx=snow'` to choose, `GALLERY_PHONE=1` for the phone too).
 5. `npm run ci` runs all of it, as CI does.

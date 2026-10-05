@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = ['src/core.js', 'src/analysis.js', 'src/display/sources.js'].map(read).join('\n');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
+const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -304,5 +304,44 @@ test('the display\'s script runs on older TV browsers', () => {
 test('built pages match the source', () => {
   const page = (head, body, scripts) => read(`src/${head}`) + read(`src/${body}`) + '<script>\n(() => {\n"use strict";\n' + scripts.map(f => read(`src/${f}`)).join('') + '\n})();\n</script>\n<script>\n' + read('src/starfield.js') + '</script>\n</body>\n</html>\n';
   assert.equal(read('index.html'), page('head.html', 'body.html', ['core.js', 'analysis.js', 'dom.js']), 'run python3 build.py');
-  assert.equal(read('display.html'), page('display/head.html', 'display/body.html', ['core.js', 'analysis.js', 'display/sources.js', 'display/cockpit.js', 'display/display.js']), 'run python3 build.py');
+  assert.equal(read('display.html'), page('display/head.html', 'display/body.html', ['core.js', 'analysis.js', 'display/sources.js', 'display/scenery.js', 'display/cockpit.js', 'display/display.js']), 'run python3 build.py');
 });
+
+test('the moon is in its real phase', () => {
+  const near = (a, b) => Math.min(Math.abs(a - b), 1 - Math.abs(a - b)) < .02;
+  assert.ok(near(A.moonPhase(Date.UTC(2024, 0, 11, 11, 57)).f, 0), 'new moon 11 Jan 2024');
+  assert.ok(near(A.moonPhase(Date.UTC(2024, 0, 25, 17, 54)).f, .5), 'full moon 25 Jan 2024');
+  assert.equal(A.moonPhase(Date.UTC(2024, 0, 25, 17, 54)).name, 'Full moon');
+  assert.ok(A.moonPhase(Date.UTC(2024, 0, 25, 17, 54)).illum > .99);
+  assert.equal(A.moonPhase(Date.UTC(2024, 0, 18, 3, 52)).name, 'First quarter');
+});
+
+test('the real ISS counts as overhead within 1,500 km of home', () => {
+  assert.ok(Math.abs(A.kmBetween(53.41, -2.16, 51.5, -.12) - 249) < 10, 'Stockport to London');
+  assert.equal(A.issPass({ latitude: 54.5, longitude: 0, altitude: 421, velocity: 27560 }, { lat: 53.41, lon: -2.16 }).near, true);
+  assert.equal(A.issPass({ latitude: -10, longitude: 7, altitude: 421 }, { lat: 53.41, lon: -2.16 }).near, false);
+  assert.equal(A.issPass(null, { lat: 53, lon: -2 }), null);
+});
+
+test('the world outside follows the grid, the bins, the weather and your power draw', () => {
+  const now = at('2026-10-08T19:00:00'), slot = { from: now - 600e3, to: now + 1200e3 };
+  const w = A.worldFor({ carbon: [Object.assign({ v: 40, index: 'very low' }, slot)], agile: [Object.assign({ p: 12 }, slot)],
+    bins: [{ name: 'Green bin', colour: 'green', date: '2026-10-09', every: 1 }, { name: 'Black bin', colour: 'black', date: '2026-10-16', every: 2 }],
+    weather: { now: { temp: 4, code: 0, wind: 5 }, days: [], hours: [] }, live: { demand: 1500 } }, now);
+  assert.equal(w.aurora, 1);
+  assert.deepEqual(plain(w.comet), ['green'], 'a comet on bin night, in the colour of the bin');
+  assert.deepEqual(plain(w.house.bins), ['green']);
+  assert.ok(Math.abs(w.house.glow - (.12 + .44)) < 1e-9, 'windows glow with the live draw');
+  assert.ok(w.house.smoke > .5, 'the chimney smokes when it\'s cold');
+  assert.equal(w.house.lantern, 'good');
+  const noon = at('2026-10-05T12:00:00'), day = A.worldFor({ agile: [{ from: noon - 600e3, to: noon + 1200e3, p: -2 }] }, noon);
+  assert.equal(day.aurora, .9, 'paid to use power lights the aurora');
+  assert.deepEqual(plain(day.comet), []);
+  assert.equal(day.house.smoke, 0);
+});
+
+test('billboards keep to what you need to catch; the rest rides the train', () => {
+  const cards = [{ id: 'price', weight: 1 }, { id: 'wx', weight: 1 }, { id: 'bins', weight: 3 }, { id: 'date', weight: 1 }, { id: 'event0', weight: 1 }];
+  assert.deepEqual(plain(A.boardCards(cards)).map(c => c.id), ['price', 'bins']);
+});
+

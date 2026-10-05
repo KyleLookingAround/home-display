@@ -53,24 +53,33 @@
     <p class="mode-foot" id="tFoot"></p>
   </section>
 
-  <!-- ================= SCREENSAVER: the cockpit ================= -->
-  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver: the view from the cockpit" hidden>
+  <!-- ================= SCREENSAVER: a side window onto space ================= -->
+  <section class="mode mode-saver" id="cSec" data-mode="screensaver" aria-label="Screensaver: the view from a side window of a ship in space" hidden>
     <canvas id="cSpace" aria-hidden="true"></canvas>
     <div id="cBoards"></div>
+    <canvas id="cNear" aria-hidden="true"></canvas>
     <div id="cShip">
       <canvas id="cGlass" aria-hidden="true"></canvas>
       <svg id="cFrame" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
         <defs>
-          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#161b36"/><stop offset=".55" stop-color="#0d1126"/><stop offset="1" stop-color="#05060f"/></linearGradient>
-          <linearGradient id="gRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3158"/><stop offset="1" stop-color="#0c0f22"/></linearGradient>
+          <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#141a35"/><stop offset=".5" stop-color="#0c1027"/><stop offset=".78" stop-color="#080a1b"/><stop offset="1" stop-color="#04050d"/></linearGradient>
+          <linearGradient id="gBevel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4374"/><stop offset=".5" stop-color="#1a1f40"/><stop offset="1" stop-color="#2c3462"/></linearGradient>
+          <linearGradient id="gStrip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb547" stop-opacity=".28"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></linearGradient>
+          <radialGradient id="gSpill" cx=".5" cy="0" r=".7"><stop offset="0" stop-color="#ffb547" stop-opacity=".07"/><stop offset="1" stop-color="#ffb547" stop-opacity="0"/></radialGradient>
         </defs>
         <!-- the cabin wall, with a side window cut out of it -->
         <path fill-rule="evenodd" fill="url(#gWall)" d="M0 0H1600V900H0ZM190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
-        <path fill="none" stroke="#8698ff" stroke-opacity=".1" stroke-width="2" d="M40 0V900M1560 0V900M0 760H1600M0 850H1600M520 760V900M1080 760V900"/>
-        <path fill="none" stroke="url(#gRim)" stroke-width="26" d="M190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
-        <path fill="none" stroke="#4fd6ff" stroke-opacity=".45" stroke-width="2.5" d="M190 77H1410A71 71 0 0 1 1481 148V606A71 71 0 0 1 1410 677H190A71 71 0 0 1 119 606V148A71 71 0 0 1 190 77Z"/>
-        <path fill="none" stroke="#ffb547" stroke-opacity=".35" stroke-width="2" d="M106 720H1494"/>
-        <g fill="#2a3158" stroke="#4fd6ff" stroke-opacity=".25" stroke-width="1.5"><circle cx="250" cy="36" r="5"/><circle cx="250" cy="718" r="5"/><circle cx="400" cy="36" r="5"/><circle cx="400" cy="718" r="5"/><circle cx="550" cy="36" r="5"/><circle cx="550" cy="718" r="5"/><circle cx="700" cy="36" r="5"/><circle cx="700" cy="718" r="5"/><circle cx="850" cy="36" r="5"/><circle cx="850" cy="718" r="5"/><circle cx="1000" cy="36" r="5"/><circle cx="1000" cy="718" r="5"/><circle cx="1150" cy="36" r="5"/><circle cx="1150" cy="718" r="5"/><circle cx="1300" cy="36" r="5"/><circle cx="1300" cy="718" r="5"/><circle cx="78" cy="170" r="5"/><circle cx="78" cy="280" r="5"/><circle cx="78" cy="390" r="5"/><circle cx="78" cy="500" r="5"/><circle cx="78" cy="610" r="5"/><circle cx="1522" cy="170" r="5"/><circle cx="1522" cy="280" r="5"/><circle cx="1522" cy="390" r="5"/><circle cx="1522" cy="500" r="5"/><circle cx="1522" cy="610" r="5"/></g>
+        <path fill="none" stroke="#8698ff" stroke-opacity=".08" stroke-width="2" d="M36 0V900M1564 0V900M0 772H1600M0 862H1600M530 772V900M1070 772V900"/>
+        <!-- the frame: a deep bevel, lit along its inner edge by whatever is outside -->
+        <path fill="none" stroke="#05060f" stroke-width="40" d="M190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
+        <path fill="none" stroke="url(#gBevel)" stroke-width="26" d="M190 64H1410A84 84 0 0 1 1494 148V606A84 84 0 0 1 1410 690H190A84 84 0 0 1 106 606V148A84 84 0 0 1 190 64Z"/>
+        <path class="rim" fill="none" stroke-width="3" d="M190 80H1410A68 68 0 0 1 1478 148V606A68 68 0 0 1 1410 674H190A68 68 0 0 1 122 606V148A68 68 0 0 1 190 80Z"/>
+        <path fill="none" stroke="#ffffff" stroke-opacity=".08" stroke-width="2" d="M190 51H1410A97 97 0 0 1 1507 148"/>
+        <g class="bolts" fill="#262d55" stroke-width="1.5"><circle cx="260" cy="34" r="4"/><circle cx="260" cy="720" r="4"/><circle cx="415" cy="34" r="4"/><circle cx="415" cy="720" r="4"/><circle cx="570" cy="34" r="4"/><circle cx="570" cy="720" r="4"/><circle cx="725" cy="34" r="4"/><circle cx="725" cy="720" r="4"/><circle cx="880" cy="34" r="4"/><circle cx="880" cy="720" r="4"/><circle cx="1035" cy="34" r="4"/><circle cx="1035" cy="720" r="4"/><circle cx="1190" cy="34" r="4"/><circle cx="1190" cy="720" r="4"/><circle cx="1345" cy="34" r="4"/><circle cx="1345" cy="720" r="4"/><circle cx="76" cy="180" r="4"/><circle cx="76" cy="290" r="4"/><circle cx="76" cy="400" r="4"/><circle cx="76" cy="510" r="4"/><circle cx="1524" cy="180" r="4"/><circle cx="1524" cy="290" r="4"/><circle cx="1524" cy="400" r="4"/><circle cx="1524" cy="510" r="4"/></g>
+        <!-- the light strip under the sill, spilling warm light down the wall -->
+        <rect x="140" y="727" width="1320" height="3" rx="1.5" fill="#ffb547" fill-opacity=".7"/>
+        <rect x="140" y="731" width="1320" height="40" fill="url(#gStrip)"/>
+        <rect x="0" y="731" width="1600" height="169" fill="url(#gSpill)"/>
       </svg>
       <div class="hud" id="cHud" data-engine="cruise">
         <div class="g"><span class="k">Power</span><span class="v" id="hPrice">--</span><span class="s" id="hEngine">Cruising</span></div>

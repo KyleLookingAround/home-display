@@ -442,6 +442,9 @@ function buildBillboards(x, now = Date.now()){
     const lv = leaveBy(t.exp || t.sched, x.walk, now);
     add('train', 'travel', lv.cls === 'good' ? 'cyan' : lv.cls, `${hhmm(t.sched)} to ${t.dest}`, lv.text, `${t.platform ? 'Platform ' + t.platform + ' · ' : ''}${t.delayed ? 'Delayed' : t.exp && t.exp - t.sched >= 60e3 ? 'Expected ' + hhmm(t.exp) : 'On time'}`, lv.mins <= 10 ? 3 : 1);
   }
+  if (x.iss && x.iss.near) add('iss', 'space', 'cyan', 'The real ISS is over you', `${x.iss.alt} km up`, `${x.iss.km.toLocaleString('en-GB')} km away · ${x.iss.speed.toLocaleString('en-GB')} km/h`, 3);
+  const moon = moonPhase(now);
+  if (W){ const today = W.days.filter(d => d.k === dayKey(now))[0]; if (today && (now > today.set - 3600e3 || now < today.rise)) add('moon', 'space', 'violet', 'The moon tonight', moon.name, `${Math.round(moon.illum * 100)}% lit`); }
   add('date', 'home', 'muted', 'Stardate', longDay(new Date(now)), x.label || '');
   return out;
 }
@@ -452,3 +455,53 @@ function billboardRotation(cards){
   for (let i = 1; i < out.length; i++) if (out[i].id === out[i - 1].id){ const j = out.findIndex((c, k) => k > i && c.id !== out[i].id); if (j > 0){ const tmp = out[i]; out[i] = out[j]; out[j] = tmp; } }
   return out;
 }
+
+/* ---------- the world outside the window: what the data does to the scenery ---------- */
+/** The moon's real phase. f runs 0 (new) to 0.5 (full) to 1; illum is the lit fraction of the disc. */
+function moonPhase(now = Date.now()){
+  const syn = 29.530588853, ref = Date.UTC(2000, 0, 6, 18, 14);   // a known new moon
+  const age = (((now - ref) / 864e5) % syn + syn) % syn, f = age / syn;
+  const names = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+  return { age, f, illum: (1 - Math.cos(f * 2 * Math.PI)) / 2, waxing: f < .5, name: names[Math.round(f * 8) % 8] };
+}
+function kmBetween(lat1, lon1, lat2, lon2){
+  const r = Math.PI / 180, a = Math.pow(Math.sin((lat2 - lat1) * r / 2), 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.pow(Math.sin((lon2 - lon1) * r / 2), 2);
+  return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+/** Where the real International Space Station is, from wheretheiss.at; near means high enough in our sky to wave at. */
+function issPass(iss, home){
+  if (!iss || iss.latitude == null || iss.longitude == null) return null;
+  const km = kmBetween(home.lat, home.lon, +iss.latitude, +iss.longitude);
+  return { km: Math.round(km), near: km < 1500, alt: Math.round(+iss.altitude || 420), speed: Math.round(+iss.velocity || 27600), lit: iss.visibility || '' };
+}
+async function loadISS(){ return request('https://api.wheretheiss.at/v1/satellites/25544', { headers: { Accept: 'application/json' } }); }
+/**
+ * What the scenery shows:
+ * - aurora: 0 to 1, when the grid is clean or you're paid to use power;
+ * - comet: bin colours on bin night (the evening before, and the morning of);
+ * - moon: its real phase;
+ * - house: your house on its asteroid. Its windows glow with your live draw, its chimney smokes when it's cold,
+ *   its bins are out when they're due, and its lantern shows the power price;
+ * - iss: whether the real ISS is overhead.
+ */
+function worldFor(x, now = Date.now()){
+  const at = list => list ? list.filter(r => r.from <= now && now < r.to)[0] : null;
+  const ci = at(x.carbon), ag = at(x.agile), hour = new Date(now).getHours();
+  let aurora = ci ? ({ 'very low': 1, low: .6 })[ci.index] || 0 : 0;
+  if (ag && ag.p < 0) aurora = Math.max(aurora, .9);
+  const bins = x.bins && x.bins.length ? nextCollections(x.bins, now) : [];
+  const uniq = a => a.filter((c, i) => a.indexOf(c) === i);
+  const comet = uniq(bins.filter(b => (b.days === 1 && hour >= 16) || (b.days === 0 && hour < 10)).map(b => b.colour));
+  const out = uniq(bins.filter(b => b.days === 0 || (b.days === 1 && hour >= 16)).map(b => b.colour));
+  const W = x.weather, temp = W ? W.now.temp : 12, sky = x.sky || skyFor(W, now), dark = sky.phase !== 'day';
+  const demand = x.live && x.live.demand != null ? x.live.demand : null;
+  return {
+    aurora, comet, moon: moonPhase(now), iss: issPass(x.iss, HOME),
+    house: { glow: demand != null ? clamp(.12 + demand / 3000 * .88, .12, 1) : dark ? .6 : .18, demand, dark,
+             smoke: temp < 12 ? clamp((14 - temp) / 16, .2, 1) : 0, bins: out,
+             lantern: ag ? (ag.p < 0 ? 'neg' : ag.p < 15 ? 'good' : ag.p < 25 ? 'warn' : 'bad') : 'warn' }
+  };
+}
+/** Billboards are for what you need to catch; everything else rides on the space train. */
+const URGENT = ['price', 'plunge', 'bins', 'train', 'rainsoon', 'iss'];
+function boardCards(cards){ return cards.filter(c => c.weight >= 2 || URGENT.indexOf(c.id) >= 0); }
