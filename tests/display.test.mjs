@@ -306,6 +306,17 @@ test('trains from Huxley2: board times, delays, cancellations, just after midnig
   assert.deepEqual(plain(A.parseHuxley({})).list, []);
 });
 
+test('trains: where each one calls, from either board, and how long it is', () => {
+  const now = at('2026-10-05T20:30:00');
+  const r = plain(A.parseHuxley({ trainServices: [
+    { std: '20:36', etd: 'On time', length: 4, destination: [{ locationName: 'Manchester Piccadilly' }], subsequentCallingPoints: [{ callingPoint: [{ locationName: 'Heaton Chapel' }, { locationName: 'Levenshulme' }, { locationName: 'Manchester Piccadilly' }] }] },
+    { std: '2026-10-05T20:40:00', etd: null, destination: [{ locationName: 'Manchester Piccadilly' }], subsequentLocations: [{ locationName: 'HTNOJN', crs: null, isPass: true }, { locationName: 'Heaton Chapel', crs: 'HTC', isPass: true }, { locationName: 'Manchester Piccadilly', crs: 'MAN', isPass: false, isOperational: false }] } ] }, now));
+  assert.deepEqual(r.list[0].calls, ['Heaton Chapel', 'Levenshulme', 'Manchester Piccadilly']);
+  assert.equal(r.list[0].coaches, 4);
+  assert.deepEqual(r.list[1].calls, ['Manchester Piccadilly'], 'junctions and stations it runs through are left out');
+  assert.equal(r.list[1].coaches, null);
+});
+
 test('trains from the staff board: full date-times, and seconds on the estimate', () => {
   const now = at('2026-10-05T23:50:00');
   assert.equal(A.boardTime('2026-10-06T00:10:00', now), at('2026-10-06T00:10:00'));

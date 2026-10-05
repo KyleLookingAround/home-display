@@ -79,7 +79,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 
 function huxley(){
   const hm = m => { const d = new Date(+NOW + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
-  const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, destination: [{ locationName: dest, via: null }] }, extra || {});
+  const calls = { 'Manchester Piccadilly': ['Heaton Chapel', 'Levenshulme', 'Manchester Piccadilly'], 'London Euston': ['Macclesfield', 'Stoke-on-Trent', 'Milton Keynes Central', 'London Euston'], Buxton: ['Davenport', 'Hazel Grove', 'Disley', 'Buxton'] };
+  const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, length: 4, destination: [{ locationName: dest, via: null }],
+    subsequentCallingPoints: [{ callingPoint: (calls[dest] || [dest]).map(n => ({ locationName: n })) }] }, extra || {});
   return { locationName: 'Stockport', crs: 'SPT', nrccMessages: null, trainServices: [
     svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', hm(23)), svc(24, 'Buxton', '4'),
     svc(31, 'Hazel Grove', '2', 'Cancelled', { isCancelled: true }), svc(38, 'Sheffield', '3', 'Delayed'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4') ] };
@@ -617,14 +619,38 @@ test('dashboard: the pages open with no signal, once seen', async () => {
   await ctx.close();
 });
 
-test('dashboard: Home lists the trains you can still make with your walk', async () => {
-  const { page, ctx, errors } = await open('/home.html', { settings: { ...SETTINGS, trainWalk: 25 }, withHelper: false });
-  const card = page.locator('.card', { hasText: 'Trains from' });
-  await card.locator('.rows li').first().waitFor();
-  const text = await card.textContent();
-  assert.doesNotMatch(text, /Too late/, 'only trains you can make');
-  assert.match(text, /14:27 London Euston/, 'the 14:19 has gone; the next you can make leads');
-  assert.match(text, /1 sooner one leaves too soon to make/);
+test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {
+  const { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, settings: { ...SETTINGS, trainWalk: 25 }, withHelper: false });
+  const sign = page.locator('.dmx');
+  await sign.waitFor(); await ready(page);
+  await page.evaluate(() => localStorage.removeItem('hse.boardView'));
+  // the platform sign: from the first you can make with a 25 minute walk, where it calls, and the clock
+  let text = await sign.textContent();
+  assert.match(text, /1st\s*14:27\s*London Euston\s*Exp 14:33/, 'the 14:19 has gone; the next you can make leads');
+  assert.match(text, /Calling at: Macclesfield, Stoke-on-Trent, Milton Keynes Central and London Euston\./);
+  assert.match(text, /2nd\s*14:34\s*Buxton/);
+  assert.match(text, /\d\d:\d\d:\d\d/, 'a clock with seconds');
+  assert.match(await page.locator('.card', { hasText: 'Trains from' }).textContent(), /1 sooner one leaves too soon to make/);
+  await sign.scrollIntoViewIfNeeded();
+  await shot(page, 'home-board-platform');
+  // tap: the departures board, the one you can't make dimmed
+  await sign.click();
+  text = await sign.textContent();
+  assert.match(text, /Time\s*Destination\s*Plat\s*Expt/);
+  assert.equal(await sign.locator('.row.dim').count(), 1, 'the 14:19, too soon to make');
+  const tops = await sign.locator('.row').evaluateAll(rs => rs.map(r => r.getBoundingClientRect()).map(b => [b.top, b.height]));
+  assert.ok(tops.every(([t, h], i) => !i || Math.abs(t - tops[i - 1][0] - tops[i - 1][1]) < 4), 'no gaps between the lines');
+  const plats = await sign.locator('.row:not(.hdr) .p').evaluateAll(ps => ps.map(p => Math.round(p.getBoundingClientRect().left)));
+  assert.equal(new Set(plats).size, 1, 'the platforms line up');
+  assert.ok(await sign.evaluate(el => [...el.querySelectorAll('.s')].every(s => s.getBoundingClientRect().right <= el.getBoundingClientRect().right - 8)), 'nothing runs off the sign');
+  await shot(page, 'home-board-departures');
+  // tap: when to leave
+  await sign.click();
+  assert.match(await sign.textContent(), /Go in \d+ min|Run for it|Go now/);
+  await shot(page, 'home-board-leave');
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.boardView')), 'leave', 'remembered for next time');
+  await sign.click();
+  assert.match(await sign.textContent(), /1st/, 'and round again');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

@@ -469,13 +469,18 @@ export function parseHuxley(j, now = Date.now()){
     const sched = boardTime(s.std, now); if (sched == null) return null;
     const etd = String(s.etd || '').trim(), cancelled = !!s.isCancelled || /cancel/i.test(etd);
     const exp = etd === 'On time' ? sched : boardTime(etd, now, sched);
+    // where it calls after here: the public board's calling points, or the staff board's stops (not junctions or stations it passes)
+    const calls = [], cp = s.subsequentCallingPoints && s.subsequentCallingPoints[0] && s.subsequentCallingPoints[0].callingPoint;
+    if (cp) cp.forEach(c => { if (c && c.locationName) calls.push(c.locationName); });
+    else (s.subsequentLocations || []).forEach(l => { if (l && l.crs && !l.isPass && !l.isOperational && l.locationName) calls.push(l.locationName); });
     return { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
-             platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || '') };
+             platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || ''),
+             calls, coaches: +s.length > 0 ? +s.length : null };
   }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
   return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
 }
 export async function loadTrainsLive(from, to){
-  const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/20`;   // about an hour at Stockport, room for a long walk
+  const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/20?expand=true`;   // about an hour at Stockport, with where each train calls
   let err = null;
   for (let i = 0; i < TRAIN_BOARDS.length; i++){
     const k = (trainBoard + i) % TRAIN_BOARDS.length;

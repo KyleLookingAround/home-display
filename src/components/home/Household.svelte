@@ -6,6 +6,7 @@
   import { BIN_COLOURS, relDay, weatherText, leaveBy, catchable } from '../../lib/household.js';
   import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
   import Radar from '../charts/Radar.svelte';
+  import DepartureBoard from './DepartureBoard.svelte';
   import { qrSvg, wifiCode } from '../../lib/qr.js';
   import { cleanCode, sendRemote } from '../../lib/remote.js';
   import { store } from '../../lib/browser.js';
@@ -98,17 +99,10 @@
 
   <section class="card">
     <h2 class="label">Trains{app.trains && app.trains.station ? ' from ' + app.trains.station : ''}</h2>
-    {#if trains && trains.length}
-      <ul class="rows">
-        {#each trains as t}
-          {@const l = leaveBy(t.exp || t.sched, walk, app.now)}
-          <li><span class="main-t"><span><b class="mono">{hhmm(t.sched)}</b> {t.dest}</span>
-            <span class="sub">{t.cancelled ? 'Cancelled' : t.exp && t.exp !== t.sched ? 'Expected ' + hhmm(t.exp) : t.delayed ? 'Delayed' : 'On time'}{t.platform ? ' · platform ' + t.platform : ''}</span></span>
-            <span class="side {t.cancelled ? 'bad' : l.cls}">{t.cancelled ? '—' : l.text}</span></li>
-        {/each}
-      </ul>
-      <p class="note">With a {walk} minute walk to the station{caught.missed ? `. ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
-    {:else if trains}<p class="note">{caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>
+    {#if app.trains && app.trains.list && app.trains.list.length}
+      <DepartureBoard trains={app.trains} {walk} />
+      <p class="note">Tap the board for the departures and when to leave. With a {walk} minute walk{caught.missed ? `, ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
+    {:else if trains}<p class="note">No trains in the next couple of hours.</p>
     {:else if app.trainsErr}<p class="note">Departures didn't load: {errorText(app.trainsErr)[0]}</p>
     {:else if app.house && !app.house.trainFrom}<p class="note">Choose your station <a href="./settings.html#household">in Settings</a>.</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
