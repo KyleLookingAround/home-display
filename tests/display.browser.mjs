@@ -510,6 +510,20 @@ test('cockpit frame budget', { skip: !process.env.BENCH }, async () => {
   await ctx.close();
 });
 
+// PAGES=index,money (with SHOTS=1): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
+test('page shots', { skip: !process.env.PAGES }, async () => {
+  for (const [width, height] of [[390, 844], [1280, 900]]) {
+    const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, account: !!process.env.ACCOUNT });
+    for (const id of process.env.PAGES.split(',')) {
+      await page.goto(`${base}/${id}.html`);
+      await page.waitForTimeout(1200);
+      if (SHOTS) await page.screenshot({ path: join(SHOTS, `page-${id}-${width}${process.env.ACCOUNT ? '-account' : ''}.png`), fullPage: true });
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
 // GALLERY=1 SHOTS=1: one screenshot per scene, for looking at the window by eye (skipped otherwise).
 test('cockpit gallery', { skip: !process.env.GALLERY }, async () => {
   const looks = (process.env.GALLERY_LOOKS || [

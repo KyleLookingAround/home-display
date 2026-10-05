@@ -1,0 +1,52 @@
+<script>
+  // The header on every page: its title, how fresh the data is, and Refresh. Also sends the negative price
+  // notification when it's switched on, from whichever page is open.
+  import { onMount } from 'svelte';
+  import { app } from '../state/app.svelte.js';
+  import { boot, refresh, loadPrices } from '../state/session.js';
+  import { store } from '../lib/browser.js';
+  import { hhmm, dayKey, pence } from '../lib/format.js';
+  let { title } = $props();
+  let online = $state(true), busy = $state(false);
+  onMount(() => {
+    boot();
+    online = navigator.onLine;
+    const on = () => { online = true; }, off = () => { online = false; };
+    addEventListener('online', on); addEventListener('offline', off);
+    return () => { removeEventListener('online', on); removeEventListener('offline', off); };
+  });
+  const kind = $derived(!online ? 'offline' : busy || app.status === 'loading' ? 'loading' : app.status);
+  const text = $derived(
+    kind === 'offline' ? (app.checkedAt ? `Offline · ${hhmm(app.checkedAt)}` : 'Offline')
+    : kind === 'loading' ? 'Updating…'
+    : kind === 'demo' ? 'Example data'
+    : kind === 'err' ? 'No signal'
+    : `Updated ${hhmm(app.checkedAt || app.now)}`);
+  async function again(){
+    if (busy) return;
+    busy = true;
+    try { await Promise.all([refresh(), loadPrices(true)]); } finally { busy = false; }
+  }
+  // negative prices coming up: a notification, once per run of them, if switched on in Settings
+  $effect(() => {
+    const neg = app.agileToday && app.agileToday.unit ? app.agileToday.unit.filter(r => isFinite(r.to) && r.to > app.now && r.p < 0) : [];
+    if (!neg.length) return;
+    try {
+      if (store.get('notify') === 'on' && 'Notification' in window && Notification.permission === 'granted'){
+        const first = neg[0], key = 'neg-' + first.from;
+        if (store.get('lastNotified') !== key){
+          new Notification('Agile prices go negative', { body: `From ${hhmm(first.from)} ${dayKey(first.from) === dayKey(Date.now()) ? 'today' : 'tomorrow'}, as low as ${pence(Math.min(...neg.map(r => r.p)))}.` });
+          store.set('lastNotified', key);
+        }
+      }
+    } catch {}
+  });
+</script>
+
+<header class="head">
+  <h1>{title}</h1>
+  <span class="status {kind}" id="status" role="status"><i></i>{text}</span>
+  <button class="icon-btn" class:spin={busy} type="button" aria-label="Refresh" onclick={again}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+  </button>
+</header>

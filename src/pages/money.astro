@@ -1,0 +1,17 @@
+---
+import App from '../layouts/App.astro';
+import Notices from '../components/Notices.svelte';
+import ThisMonth from '../components/money/ThisMonth.svelte';
+import YearAhead from '../components/money/YearAhead.svelte';
+import YourTariff from '../components/money/YourTariff.svelte';
+import Rewards from '../components/money/Rewards.svelte';
+import ThisWeek from '../components/money/ThisWeek.svelte';
+---
+<App page="money" title="Money">
+  <Notices client:load />
+  <ThisMonth client:load />
+  <div class="cols">
+    <YearAhead client:load />
+    <div class="page"><YourTariff client:load /><ThisWeek client:load /><Rewards client:load /></div>
+  </div>
+</App>

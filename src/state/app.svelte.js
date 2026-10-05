@@ -6,6 +6,7 @@
 import { buildModel, gasRegression } from '../lib/analysis.js';
 import { store } from '../lib/browser.js';
 import { unitPriceAt } from '../lib/octopus.js';
+import { mergeBins, councilBins } from '../lib/household.js';
 
 class App {
   raw = $state.raw(null);                     // account data, or example data when no account is connected
@@ -26,6 +27,13 @@ class App {
   rewards = $state.raw(null);
   now = $state(Date.now());                   // ticks each minute, so "now" moves on a page left open
 
+  house = $state.raw(null);                   // household settings: household.json, with this device's changes on top
+  weather = $state.raw(null); weatherErr = $state.raw(null);
+  trains = $state.raw(null); trainsErr = $state.raw(null);
+  events = $state.raw(null); eventsErr = $state.raw(null);
+  council = $state.raw(null);                 // the council's bin dates, when the weekly check has published them
+  live = $state.raw(null); liveErr = $state.raw(null); liveState = $state('');   // the Home Mini: '' | looking | none | on
+
   compare = $state.raw(null);                 // the tariff comparison, once run
   compareOpts = $state.raw(null);             // the tariffs it priced, which the battery simulator offers too
 
@@ -38,6 +46,7 @@ class App {
   reg = $derived(this.raw ? gasRegression(this.raw) : null);
 
   get demo(){ return !this.raw || !!this.raw.demo; }
+  get bins(){ return this.house ? mergeBins(this.house.bins, councilBins(this.council, this.now)) : []; }
   get eRateNow(){ return this.raw ? unitPriceAt(this.raw.eSets, Date.now()) : null; }
   get gRateNow(){ return this.raw ? unitPriceAt(this.raw.gSets, Date.now()) : null; }
 }

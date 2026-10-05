@@ -54,8 +54,8 @@ export function makeDemo(){
 }
 
 /* ---------- main roll-up for the selected period ---------- */
-export function buildModel(raw, days){
-  const end = startOfDay(new Date()), start = addDays(end, -days);
+export function buildModel(raw, days, endDay){
+  const end = endDay ? startOfDay(endDay) : startOfDay(new Date()), start = addDays(end, -days);   // endDay: the period before, for comparing
   const s = +start, e = +end;
   const list = [], idx = new Map();
   for (let d = new Date(start); d < end; d = addDays(d, 1)){

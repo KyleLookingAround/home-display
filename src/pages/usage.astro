@@ -1,0 +1,24 @@
+---
+import App from '../layouts/App.astro';
+import Notices from '../components/Notices.svelte';
+import Period from '../components/usage/Period.svelte';
+import Headline from '../components/usage/Headline.svelte';
+import EveryDay from '../components/usage/EveryDay.svelte';
+import YearMap from '../components/usage/YearMap.svelte';
+import YourDay from '../components/usage/YourDay.svelte';
+import Heating from '../components/usage/Heating.svelte';
+import Unusual from '../components/usage/Unusual.svelte';
+import Carbon from '../components/usage/Carbon.svelte';
+---
+<App page="usage" title="Usage">
+  <Notices client:load />
+  <Period client:load />
+  <Headline client:load />
+  <div class="cols">
+    <div class="span"><EveryDay client:load /></div>
+    <YourDay client:load />
+    <div class="page"><YearMap client:load /><Unusual client:load /></div>
+    <Heating client:load />
+    <Carbon client:load />
+  </div>
+</App>

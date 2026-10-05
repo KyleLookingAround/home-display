@@ -19,6 +19,13 @@ test('roll-up covers the requested days and prices every reading', () => {
   }
 });
 
+test('the roll-up can end on any day, for the period before', () => {
+  const now = A.buildModel(raw, 7), before = A.buildModel(raw, 7, now.start);
+  assert.equal(+before.end, +now.start);
+  assert.equal(before.days.length, 7);
+  assert.ok(before.tot.nE > 0);
+});
+
 test('lookup finds the rate covering a time', () => {
   const list = [{ from: 0, to: 100, p: 1 }, { from: 100, to: 200, p: 2 }, { from: 200, to: Infinity, p: 3 }];
   assert.equal(A.lookup(list, 50), 1);

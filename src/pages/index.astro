@@ -1,25 +1,18 @@
 ---
-import Dashboard from '../layouts/Dashboard.astro';
-import Tariffs from '../components/Tariffs.svelte';
-import Period from '../components/Period.svelte';
-import Totals from '../components/Totals.svelte';
-import DailyUse from '../components/DailyUse.svelte';
-import BillTracker from '../components/BillTracker.svelte';
-import PriceCap from '../components/PriceCap.svelte';
-import Rewards from '../components/Rewards.svelte';
-import MissionLog from '../components/MissionLog.svelte';
+import App from '../layouts/App.astro';
+import Notices from '../components/Notices.svelte';
+import Verdict from '../components/now/Verdict.svelte';
+import Ahead from '../components/now/Ahead.svelte';
+import RightNow from '../components/now/RightNow.svelte';
+import ComingUp from '../components/now/ComingUp.svelte';
+import RunIt from '../components/now/RunIt.svelte';
 ---
-<Dashboard page="index" title="Overview">
-  <Tariffs client:load />
-  <Period client:load />
-  <Totals client:load />
-  <DailyUse client:load />
-  <div class="grid2">
-    <BillTracker client:load />
-    <PriceCap client:load />
+<App page="index" title="Now">
+  <Notices client:load example />
+  <Verdict client:load />
+  <div class="cols">
+    <div class="page span"><Ahead client:load /></div>
+    <RightNow client:load />
+    <div class="page"><ComingUp client:load /><RunIt client:load /></div>
   </div>
-  <div class="grid2">
-    <Rewards client:load />
-    <MissionLog client:load />
-  </div>
-</Dashboard>
+</App>
