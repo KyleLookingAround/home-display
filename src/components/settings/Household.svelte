@@ -8,8 +8,14 @@
   import { houseSettings, saveHouse } from '../../state/house.js';
   import { BIN_COLOURS } from '../../lib/household.js';
   let f = $state(null), saved = $state('');
-  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'tramStop', 'tramWalk', 'ical'];
-  const fill = s => { const o = {}; KEYS.forEach(k => { o[k] = k === 'bins' ? s.bins.map(b => ({ name: b.name, what: b.what || '', colour: b.colour || 'grey', date: b.date, every: +b.every || 1 })) : s[k]; }); return o; };
+  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
+  const fill = s => {
+    const o = {};
+    KEYS.forEach(k => { o[k] = k === 'bins' ? s.bins.map(b => ({ name: b.name, what: b.what || '', colour: b.colour || 'grey', date: b.date, every: +b.every || 1 })) : s[k]; });
+    o.wifi = s.wifi ? { ...s.wifi } : { ssid: '', password: '', security: 'WPA', hidden: false };
+    o.dates = (s.dates || []).map(d => ({ ...d }));
+    return o;
+  };
   onMount(async () => { f = fill(await houseSettings()); });
   async function save(ev){
     ev.preventDefault();
@@ -17,6 +23,8 @@
     form.trainFrom = String(form.trainFrom || '').trim().toUpperCase(); form.trainTo = String(form.trainTo || '').trim().toUpperCase();
     form.trainWalk = +form.trainWalk || 0; form.tramWalk = +form.tramWalk || 0; form.ical = String(form.ical || '').trim();
     form.bins = form.bins.filter(b => b.name && b.date).map(b => ({ ...b, every: Math.max(1, Math.round(+b.every || 1)) }));
+    form.wifi = form.wifi && String(form.wifi.ssid || '').trim() ? { ssid: form.wifi.ssid.trim(), password: form.wifi.password || '', security: form.wifi.security || 'WPA', hidden: !!form.wifi.hidden } : null;
+    form.dates = form.dates.filter(d => String(d.name || '').trim() && d.date).map(d => ({ name: d.name.trim(), date: d.date, kind: d.kind || 'birthday' }));
     await saveHouse(form);
     f = fill(app.house); saved = 'Saved on this device.';
   }
@@ -64,6 +72,29 @@
         <div class="field"><label for="hIcal">Secret iCal address</label><input id="hIcal" type="url" inputmode="url" spellcheck="false" bind:value={f.ical} placeholder="https://calendar.google.com/calendar/ical/…/basic.ics">
           <span class="help">In Google Calendar: Settings → your calendar → Secret address in iCal format. It stays on this device. Google's address needs the home server.</span></div>
       </fieldset>
+      <fieldset>
+        <legend>Guest Wi-Fi</legend>
+        <div class="inline-fields">
+          <div class="field"><label for="wSsid">Network name</label><input id="wSsid" autocomplete="off" bind:value={f.wifi.ssid} placeholder="Your guest network"></div>
+          <div class="field"><label for="wPass">Password</label><input id="wPass" autocomplete="off" spellcheck="false" bind:value={f.wifi.password}></div>
+          <div class="field"><label for="wSec">Security</label><select id="wSec" bind:value={f.wifi.security}><option value="WPA">WPA2 or WPA3</option><option value="WEP">WEP</option><option value="nopass">None</option></select></div>
+        </div>
+        <label class="check" for="wHidden"><input id="wHidden" type="checkbox" bind:checked={f.wifi.hidden}> The network is hidden</label>
+      </fieldset>
+      <fieldset>
+        <legend>Birthdays and dates</legend>
+        {#each f.dates as d, i}
+          <div class="inline-fields date-row">
+            <div class="field"><label for="dn{i}">Who or what</label><input id="dn{i}" bind:value={d.name} placeholder="Sam"></div>
+            <div class="field"><label for="dd{i}">Date</label><input id="dd{i}" type="date" bind:value={d.date}></div>
+            <div class="field"><label for="dk{i}">Kind</label><select id="dk{i}" bind:value={d.kind}><option value="birthday">Birthday</option><option value="anniversary">Anniversary</option><option value="once">Just once</option></select></div>
+            <button class="btn small" type="button" aria-label="Remove {d.name || 'this date'}" onclick={() => f.dates.splice(i, 1)}>Remove</button>
+          </div>
+        {/each}
+        <button class="btn small add" type="button" onclick={() => f.dates.push({ name: '', date: '', kind: 'birthday' })}>Add a date</button>
+        <p class="note">With the year of birth, a birthday says how old. Christmas and the next bank holiday count down by themselves.</p>
+      </fieldset>
+      <p class="note">Guest Wi-Fi, dates and the calendar stay on this phone. To put them on the TV, use Send to the TV on <a href="./screen.html">Screen</a>.</p>
       <div class="actions"><button class="btn primary" type="submit">Save</button>{#if saved}<span class="note" role="status">{saved}</span>{/if}</div>
       <p class="note">These start from <code>household.json</code>, which every screen shares. Changes here stay on this device.</p>
     </form>
@@ -81,6 +112,8 @@
   .bin summary i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25);flex:none}
   .bin summary .muted{margin-left:auto;font-size:13px}
   .bin .btn{justify-self:start}
+  .date-row{align-items:end}
+  .add{justify-self:start}
   .mono{font-family:var(--f-mono);text-transform:uppercase}
   code{font-family:var(--f-mono);font-size:.9em}
 </style>

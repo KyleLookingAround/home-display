@@ -48,13 +48,15 @@ export function inWindow(now, from, to){
 
 export const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
-  bins: [], ical: '',
+  bins: [], ical: '', wifi: null, dates: [],
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
 };
 export function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
   s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
   if (MODE_ALIASES[s.mode]) s.mode = MODE_ALIASES[s.mode];
+  s.dates = Array.isArray(s.dates) ? s.dates.filter(d => d && d.name && /^\d{4}-\d\d-\d\d$/.test(d.date)) : [];
+  s.wifi = s.wifi && s.wifi.ssid ? { ssid: String(s.wifi.ssid), password: String(s.wifi.password || ''), security: s.wifi.security === 'WEP' || s.wifi.security === 'nopass' ? s.wifi.security : 'WPA', hidden: !!s.wifi.hidden } : null;
   return s;
 }
 
@@ -339,6 +341,39 @@ export function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
+/* ---------- birthdays and countdowns ---------- */
+/**
+ * Dates worth counting down to, soonest first: birthdays and anniversaries every year (dates: [{ name, date, kind }],
+ * kind birthday, anniversary or once), Christmas, the next bank holiday, and all-day calendar events that are
+ * birthdays or anniversaries. A birthday with a year of birth says how old. Within `within` days (default 120).
+ */
+export function countdowns(o, now){
+  const today = startOfDay(new Date(now)), out = [], within = nz(o.within, 120);
+  const next = (m, d) => { let w = new Date(today.getFullYear(), m, d); if (+w < +today) w = new Date(today.getFullYear() + 1, m, d); return w; };
+  const add = (title, when, kind, extra) => {
+    const days = Math.round((+startOfDay(when) - +today) / 864e5);
+    if (days < 0 || days > within || out.some(x => x.title === title && x.days === days)) return;
+    out.push(Object.assign({ title, date: startOfDay(when), days, kind, when: days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days < 7 ? DAY_NAMES[when.getDay()] : 'In ' + days + ' days' }, extra || {}));
+  };
+  (o.dates || []).forEach(d => {
+    const base = keyDate(d.date);
+    if (d.kind === 'once'){ add(d.name, base, 'once'); return; }
+    const w = next(base.getMonth(), base.getDate()), years = w.getFullYear() - base.getFullYear();
+    if (d.kind === 'anniversary') add(d.name, w, 'anniversary', years > 0 && base.getFullYear() > 1900 ? { years } : null);
+    else add(/birthday/i.test(d.name) ? d.name : d.name + '\u2019s birthday', w, 'birthday', years > 0 && base.getFullYear() > 1900 ? { age: years } : null);
+  });
+  add('Christmas', next(11, 25), 'holiday');
+  const hol = (o.holidays || []).filter(h => +keyDate(h.date) >= +today && !/christmas/i.test(h.title))[0];
+  if (hol) add(hol.title, keyDate(hol.date), 'holiday');
+  (o.events || []).forEach(e => { if (e.allDay && /birthday|anniversary/i.test(e.title)) add(e.title, new Date(e.start), /anniversary/i.test(e.title) ? 'anniversary' : 'birthday'); });
+  return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
+}
+
+/** "Christmas in 81 days", "Sam’s birthday tomorrow". */
+export function countdownText(c){
+  return c.title + (c.days === 0 ? ' today' : c.days === 1 ? ' tomorrow' : c.days < 7 ? ' on ' + c.when : ' in ' + c.days + ' days');
+}
+
 /* ---------- heads-ups: what to act on soon ---------- */
 /**
  * The few things worth saying before anything else: a train to leave for, bins to put out, rain on its way.
@@ -361,6 +396,9 @@ export function headsUp(o, now){
     if (first.days === 1 && hour >= 15) out.push({ kind: 'bins', tone: 'warn', title: 'Bins out tonight', sub: names + note, colours: same.map(b => b.colour) });
     else if (first.days === 0 && hour < 10) out.push({ kind: 'bins', tone: 'warn', title: 'Bins go this morning', sub: names + note, colours: same.map(b => b.colour) });
   }
+  (o.countdowns || []).filter(c => c.days <= 1 && (c.kind === 'birthday' || c.kind === 'anniversary')).slice(0, 2).forEach(c => {
+    out.push({ kind: 'cake', tone: 'neg', title: c.title + (c.days === 0 ? ' today' : ' tomorrow'), sub: c.age ? (c.days === 0 ? 'Turns ' : 'Turning ') + c.age : c.years ? c.years + ' years' : c.days === 0 ? 'Say happy birthday' : 'Tomorrow' });
+  });
   const floods = o.floods || [];
   for (let i = 0; i < floods.length && i < 2; i++) out.push({ kind: 'flood', tone: floods[i].level <= 2 ? 'bad' : 'warn', title: floods[i].title, sub: floods[i].area });
   const soon = o.nowcast ? rainSoon(o.nowcast, now) : null;
@@ -442,7 +480,7 @@ export async function loadTrainsLive(from, to){
 /* ---------- household settings shared by every screen (household.json, editable on GitHub) ---------- */
 /** Defaults, then the household file, then this device's own changes. */
 export function mergeSettings(household, device){
-  const h = Object.assign({}, household || {}); delete h.ical;   // a secret address never comes from a public file
+  const h = Object.assign({}, household || {}); delete h.ical; delete h.wifi; delete h.dates;   // secrets and family dates never come from a public file
   const s = displaySettings(Object.assign({}, h, device || {}));
   if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
   return s;

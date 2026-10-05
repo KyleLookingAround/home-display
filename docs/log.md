@@ -4,6 +4,9 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Creation** (redesign): guest Wi-Fi. Set the network in Settings, Household; Home shows a code a visitor's phone camera reads to join, and the TV shows it big (Guest Wi-Fi on its toolbar, the W key, or Show it on the TV from the phone). The codes are made here (`src/lib/qr.js`) and checked in the tests with a QR reader.
+- **Creation** (redesign): birthdays and countdowns. Birthdays, anniversaries and one-off dates in Settings, with Christmas, the next bank holiday and calendar birthdays: Coming up on Home, a heads-up the day before and on the day ("Sam’s birthday tomorrow, turning 7"), and the nearest on the TV's Today beside the date.
+- **Update** (redesign): Send to the TV now carries guest Wi-Fi, dates and the calendar address with the account, all sealed with the site PIN. They stay out of `household.json`, which is public.
 - **Creation** (redesign): send your Octopus account from the phone's Screen tab to the paired TV, sealed (AES-GCM) with a key made from the site's PIN as the lock keeps it on each device, so the key is never typed with a remote. The relay sees only the sealed box; a screen unlocked with another PIN can't open it.
 - **Creation** (redesign): the phone pages open at once and with no signal once seen (`public/sw.js`): pages from the network when it answers, the kept copy when it doesn't; prices fall back to the last ones kept.
 - **Update** (redesign): gas in the tariff comparison: a usual year of your gas (winter included) at each Octopus gas tariff's rates today (Flexible, the 12 and 18 month fixes, and Tracker when it's listed).

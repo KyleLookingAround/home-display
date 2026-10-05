@@ -276,6 +276,14 @@ body.night #stars{opacity:.12}
 .actions{margin-top:1rem}
 .toast{position:fixed;z-index:40;left:50%;bottom:calc(var(--edge-y) + 1rem);transform:translateX(-50%);background:var(--card);border:1px solid var(--gas);border-radius:var(--radius-sm);padding:.7rem 1rem;font:500 1rem/1.3 var(--f-body);max-width:90vw;text-align:center}
 
+/* guest Wi-Fi: the code, big, in the middle of the screen */
+.wifi-card{position:fixed;top:0;left:0;right:0;bottom:0;z-index:35;background:rgba(4,5,13,.88);display:flex;align-items:center;justify-content:center;padding:var(--edge-y) var(--edge-x)}
+.wifi-card .card{text-align:center;padding:1.2rem 2rem;max-width:90vw}
+.wifi-card .qr{width:15rem;height:15rem;margin:.6rem auto;max-width:70vw;max-height:70vw}
+.wifi-card .qr svg{display:block;width:100%;height:100%;border-radius:var(--radius-sm)}
+.wifi-card .net{font:600 1.5rem/1.3 var(--f-body);margin-top:.4rem}
+.wifi-card .pw{font-size:1.3rem;color:var(--gas);margin-top:.2rem;word-break:break-all}
+
 /* embedded in the phone's Screen page: just the picture */
 body.embed .bar,body.embed .toast{display:none!important}
 
@@ -303,6 +311,7 @@ body.embed .bar,body.embed .toast{display:none!important}
 <header class="bar" id="bar">
   <nav class="picker" id="picker" role="tablist" aria-label="Display mode"></nav>
   <div class="bar-actions">
+    <button class="btn" id="wifiBtn" type="button">Guest Wi-Fi</button>
     <button class="btn" id="setBtn" type="button">Settings</button>
     <button class="btn" id="fsBtn" type="button">Full screen</button>
     <a class="btn" id="dashBtn" href="index.html">Phone pages</a>
@@ -473,6 +482,17 @@ body.embed .bar,body.embed .toast{display:none!important}
     </div>
     <p class="help" id="setupOut"></p>
   </form>
+</div>
+
+<!-- ================= GUEST WI-FI ================= -->
+<div class="wifi-card" id="wifiCard" role="dialog" aria-labelledby="wifiTitle" hidden>
+  <div class="card">
+    <h2 class="label" id="wifiTitle">Guest Wi-Fi</h2>
+    <div class="qr" id="wifiQr"></div>
+    <p class="net" id="wifiNet"></p>
+    <p class="pw mono" id="wifiPw"></p>
+    <p class="help">Point your phone's camera at the code to join. Any key closes this.</p>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>
@@ -1398,13 +1418,15 @@ function inWindow(now, from, to){
 
 const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
-  bins: [], ical: '',
+  bins: [], ical: '', wifi: null, dates: [],
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
 };
 function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
   s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
   if (MODE_ALIASES[s.mode]) s.mode = MODE_ALIASES[s.mode];
+  s.dates = Array.isArray(s.dates) ? s.dates.filter(d => d && d.name && /^\d{4}-\d\d-\d\d$/.test(d.date)) : [];
+  s.wifi = s.wifi && s.wifi.ssid ? { ssid: String(s.wifi.ssid), password: String(s.wifi.password || ''), security: s.wifi.security === 'WEP' || s.wifi.security === 'nopass' ? s.wifi.security : 'WPA', hidden: !!s.wifi.hidden } : null;
   return s;
 }
 
@@ -1689,6 +1711,39 @@ function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
+/* ---------- birthdays and countdowns ---------- */
+/**
+ * Dates worth counting down to, soonest first: birthdays and anniversaries every year (dates: [{ name, date, kind }],
+ * kind birthday, anniversary or once), Christmas, the next bank holiday, and all-day calendar events that are
+ * birthdays or anniversaries. A birthday with a year of birth says how old. Within `within` days (default 120).
+ */
+function countdowns(o, now){
+  const today = startOfDay(new Date(now)), out = [], within = nz(o.within, 120);
+  const next = (m, d) => { let w = new Date(today.getFullYear(), m, d); if (+w < +today) w = new Date(today.getFullYear() + 1, m, d); return w; };
+  const add = (title, when, kind, extra) => {
+    const days = Math.round((+startOfDay(when) - +today) / 864e5);
+    if (days < 0 || days > within || out.some(x => x.title === title && x.days === days)) return;
+    out.push(Object.assign({ title, date: startOfDay(when), days, kind, when: days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : days < 7 ? DAY_NAMES[when.getDay()] : 'In ' + days + ' days' }, extra || {}));
+  };
+  (o.dates || []).forEach(d => {
+    const base = keyDate(d.date);
+    if (d.kind === 'once'){ add(d.name, base, 'once'); return; }
+    const w = next(base.getMonth(), base.getDate()), years = w.getFullYear() - base.getFullYear();
+    if (d.kind === 'anniversary') add(d.name, w, 'anniversary', years > 0 && base.getFullYear() > 1900 ? { years } : null);
+    else add(/birthday/i.test(d.name) ? d.name : d.name + '\u2019s birthday', w, 'birthday', years > 0 && base.getFullYear() > 1900 ? { age: years } : null);
+  });
+  add('Christmas', next(11, 25), 'holiday');
+  const hol = (o.holidays || []).filter(h => +keyDate(h.date) >= +today && !/christmas/i.test(h.title))[0];
+  if (hol) add(hol.title, keyDate(hol.date), 'holiday');
+  (o.events || []).forEach(e => { if (e.allDay && /birthday|anniversary/i.test(e.title)) add(e.title, new Date(e.start), /anniversary/i.test(e.title) ? 'anniversary' : 'birthday'); });
+  return out.sort((a, b) => a.days - b.days || a.title.localeCompare(b.title));
+}
+
+/** "Christmas in 81 days", "Sam’s birthday tomorrow". */
+function countdownText(c){
+  return c.title + (c.days === 0 ? ' today' : c.days === 1 ? ' tomorrow' : c.days < 7 ? ' on ' + c.when : ' in ' + c.days + ' days');
+}
+
 /* ---------- heads-ups: what to act on soon ---------- */
 /**
  * The few things worth saying before anything else: a train to leave for, bins to put out, rain on its way.
@@ -1711,6 +1766,9 @@ function headsUp(o, now){
     if (first.days === 1 && hour >= 15) out.push({ kind: 'bins', tone: 'warn', title: 'Bins out tonight', sub: names + note, colours: same.map(b => b.colour) });
     else if (first.days === 0 && hour < 10) out.push({ kind: 'bins', tone: 'warn', title: 'Bins go this morning', sub: names + note, colours: same.map(b => b.colour) });
   }
+  (o.countdowns || []).filter(c => c.days <= 1 && (c.kind === 'birthday' || c.kind === 'anniversary')).slice(0, 2).forEach(c => {
+    out.push({ kind: 'cake', tone: 'neg', title: c.title + (c.days === 0 ? ' today' : ' tomorrow'), sub: c.age ? (c.days === 0 ? 'Turns ' : 'Turning ') + c.age : c.years ? c.years + ' years' : c.days === 0 ? 'Say happy birthday' : 'Tomorrow' });
+  });
   const floods = o.floods || [];
   for (let i = 0; i < floods.length && i < 2; i++) out.push({ kind: 'flood', tone: floods[i].level <= 2 ? 'bad' : 'warn', title: floods[i].title, sub: floods[i].area });
   const soon = o.nowcast ? rainSoon(o.nowcast, now) : null;
@@ -1792,7 +1850,7 @@ async function loadTrainsLive(from, to){
 /* ---------- household settings shared by every screen (household.json, editable on GitHub) ---------- */
 /** Defaults, then the household file, then this device's own changes. */
 function mergeSettings(household, device){
-  const h = Object.assign({}, household || {}); delete h.ical;   // a secret address never comes from a public file
+  const h = Object.assign({}, household || {}); delete h.ical; delete h.wifi; delete h.dates;   // secrets and family dates never come from a public file
   const s = displaySettings(Object.assign({}, h, device || {}));
   if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
   return s;
@@ -1810,7 +1868,7 @@ function deviceChanges(form, household){
 // A screen makes an eight-letter code and listens on a topic named from it. A phone that knows the code can ask
 // the screen to change view, wake up or start afresh, and ask what it's showing. Only these small requests and the
 // screen's answer pass through the relay: no prices, readings or settings. The one exception is the Octopus account,
-// which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
+// and the household's private settings (guest Wi-Fi, family dates, the calendar address), which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
 // was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
 
 const RELAY = 'https://ntfy.sh';
@@ -1830,7 +1888,7 @@ const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account'];
+const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 function readRemote(data){
   let m, c;
@@ -1870,21 +1928,172 @@ function boxKey(code, secret){
   return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'PBKDF2' }, false, ['deriveKey'])
     .then(base => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('hse-account:' + code), iterations: 100000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
 }
-/** Seals { account, key, gasUnit, pay } for the screen with this code. */
-async function sealAccount(code, secret, acct){
+/**
+ * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical }.
+ */
+async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
-  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(acct)));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(details)));
   return { iv: toB64(iv), data: toB64(data) };
 }
-/** Opens a sealed account, or null if it wasn't sealed with this PIN and code, or isn't an account. */
-async function openAccount(code, secret, box){
+/** Opens sealed details and keeps only what's well formed; null if it wasn't sealed with this PIN and code, or holds nothing. */
+async function openDetails(code, secret, box){
+  let d;
   try {
     const k = await boxKey(code, secret);
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, k, fromB64(box.data));
-    const a = JSON.parse(new TextDecoder().decode(plain));
-    if (!a || !/^A-[0-9A-Z]{6,10}$/i.test(String(a.account)) || !/^sk_\w{6,}$/.test(String(a.key))) return null;
-    return { account: String(a.account).toUpperCase(), key: String(a.key), gasUnit: a.gasUnit === 'kwh' ? 'kwh' : 'm3', pay: a.pay === 'NON_DIRECT_DEBIT' ? 'NON_DIRECT_DEBIT' : 'DIRECT_DEBIT' };
+    d = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, k, fromB64(box.data))));
   } catch(e){ return null; }
+  if (!d || typeof d !== 'object') return null;
+  const out = {}, a = d.account;
+  if (a && /^A-[0-9A-Z]{6,10}$/i.test(String(a.account)) && /^sk_\w{6,}$/.test(String(a.key)))
+    out.account = { account: String(a.account).toUpperCase(), key: String(a.key), gasUnit: a.gasUnit === 'kwh' ? 'kwh' : 'm3', pay: a.pay === 'NON_DIRECT_DEBIT' ? 'NON_DIRECT_DEBIT' : 'DIRECT_DEBIT' };
+  if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
+  if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
+  if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  return Object.keys(out).length ? out : null;
+}
+/* QR codes, made here so nothing has to be loaded: byte mode, medium error correction, the smallest version that fits. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+// Follows ISO/IEC 18004; the structure is after Project Nayuki's QR Code generator (MIT licence).
+
+// Medium error correction: codewords per block and the number of blocks, by version (1 to 40).
+const QR_ECC = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28];
+const QR_BLOCKS = [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49];
+
+function qrRawModules(v){
+  let r = (16 * v + 128) * v + 64;
+  if (v >= 2){ const n = Math.floor(v / 7) + 2; r -= (25 * n - 10) * n - 55; if (v >= 7) r -= 36; }
+  return r;
+}
+const qrDataCodewords = v => Math.floor(qrRawModules(v) / 8) - QR_ECC[v] * QR_BLOCKS[v];
+function qrAlignment(v){
+  if (v === 1) return [];
+  const n = Math.floor(v / 7) + 2, step = v === 32 ? 26 : Math.ceil((v * 4 + 4) / (n * 2 - 2)) * 2, out = [6];
+  for (let pos = v * 4 + 10; out.length < n; pos -= step) out.splice(1, 0, pos);
+  return out;
+}
+// Reed-Solomon over GF(2^8) with the polynomial 0x11D
+function gfMul(x, y){ let z = 0; for (let i = 7; i >= 0; i--){ z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z; }
+function rsDivisor(degree){
+  const r = []; for (let i = 0; i < degree; i++) r.push(0);
+  r[degree - 1] = 1; let root = 1;
+  for (let i = 0; i < degree; i++){
+    for (let j = 0; j < r.length; j++){ r[j] = gfMul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; }
+    root = gfMul(root, 2);
+  }
+  return r;
+}
+function rsRemainder(data, div){
+  const r = div.map(() => 0);
+  data.forEach(b => { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= gfMul(c, f); }); });
+  return r;
+}
+
+/** The modules of a QR code for some text: { size, dark(x, y) }. Null if it's too long (about 2,300 bytes). */
+function qrEncode(text){
+  const bytes = [], utf8 = unescape(encodeURIComponent(String(text)));
+  for (let i = 0; i < utf8.length; i++) bytes.push(utf8.charCodeAt(i));
+  let v = 1;
+  for (; v <= 40; v++) if (4 + (v < 10 ? 8 : 16) + 8 * bytes.length <= qrDataCodewords(v) * 8) break;
+  if (v > 40) return null;
+  // the data: byte mode, its length, the bytes, a terminator, then padding
+  const bits = [], put = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+  put(4, 4); put(bytes.length, v < 10 ? 8 : 16); bytes.forEach(b => put(b, 8));
+  const cap = qrDataCodewords(v) * 8;
+  put(0, Math.min(4, cap - bits.length)); put(0, (8 - bits.length % 8) % 8);
+  for (let pad = 0xEC; bits.length < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
+  const data = []; for (let i = 0; i < bits.length; i += 8){ let b = 0; for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j]; data.push(b); }
+  // error correction, in blocks, interleaved
+  const nb = QR_BLOCKS[v], ecl = QR_ECC[v], raw = Math.floor(qrRawModules(v) / 8), nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = rsDivisor(ecl), blocks = [];
+  for (let i = 0, k = 0; i < nb; i++){
+    const d = data.slice(k, k + shortLen - ecl + (i < nShort ? 0 : 1)); k += d.length;
+    const e = rsRemainder(d, div); if (i < nShort) d.push(0);
+    blocks.push(d.concat(e));
+  }
+  const words = [];
+  for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - ecl || j >= nShort) words.push(b[i]); });
+  // the patterns every code has
+  const size = v * 4 + 17, mod = [], fn = [];
+  for (let y = 0; y < size; y++){ mod.push([]); fn.push([]); for (let x = 0; x < size; x++){ mod[y].push(false); fn[y].push(false); } }
+  const set = (x, y, d) => { mod[y][x] = d; fn[y][x] = true; };
+  for (let i = 0; i < size; i++){ set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  [[3, 3], [size - 4, 3], [3, size - 4]].forEach(c => {
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++){
+      const d = Math.max(Math.abs(dx), Math.abs(dy)), x = c[0] + dx, y = c[1] + dy;
+      if (x >= 0 && x < size && y >= 0 && y < size) set(x, y, d !== 2 && d !== 4);
+    }
+  });
+  const al = qrAlignment(v), n = al.length;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
+    if ((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)) continue;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(al[i] + dx, al[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+  }
+  const format = mask => {
+    const d = mask;   // medium error correction's format bits are 00
+    let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >>> 9) * 0x537);
+    const b = ((d << 10) | r) ^ 0x5412, bit = i => ((b >>> i) & 1) !== 0;
+    for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+    for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, true);
+  };
+  format(0);
+  if (v >= 7){
+    let r = v; for (let i = 0; i < 12; i++) r = (r << 1) ^ ((r >>> 11) * 0x1F25);
+    const b = (v << 12) | r;
+    for (let i = 0; i < 18; i++){ const d = ((b >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, d); set(c, a, d); }
+  }
+  // the codewords, in a zigzag up and down from the right
+  let bi = 0;
+  for (let right = size - 1; right >= 1; right -= 2){
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++){
+      const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert;
+      if (!fn[y][x] && bi < words.length * 8){ mod[y][x] = ((words[bi >>> 3] >>> (7 - (bi & 7))) & 1) !== 0; bi++; }
+    }
+  }
+  // the mask that leaves the fewest runs, blocks and imbalance
+  const masked = (m, x, y) => [(x + y) % 2, y % 2, x % 3, (x + y) % 3, (Math.floor(x / 3) + Math.floor(y / 2)) % 2, x * y % 2 + x * y % 3, (x * y % 2 + x * y % 3) % 2, ((x + y) % 2 + x * y % 3) % 2][m] === 0;
+  const flip = m => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && masked(m, x, y)) mod[y][x] = !mod[y][x]; };
+  const penalty = () => {
+    let p = 0, dark = 0;
+    for (let a = 0; a < 2; a++) for (let i = 0; i < size; i++){
+      let run = 1;
+      for (let j = 1; j <= size; j++){
+        const same = j < size && (a ? mod[j][i] === mod[j - 1][i] : mod[i][j] === mod[i][j - 1]);
+        if (same) run++; else { if (run >= 5) p += run - 2; run = 1; }
+      }
+    }
+    for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++){ const c = mod[y][x]; if (c === mod[y][x + 1] && c === mod[y + 1][x] && c === mod[y + 1][x + 1]) p += 3; }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (mod[y][x]) dark++;
+    return p + Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+  };
+  let best = 0, bestP = Infinity;
+  for (let m = 0; m < 8; m++){ flip(m); format(m); const p = penalty(); if (p < bestP){ bestP = p; best = m; } flip(m); }
+  flip(best); format(best);
+  return { size, version: v, dark: (x, y) => x >= 0 && y >= 0 && x < size && y < size && mod[y][x] };
+}
+
+/** A QR code as an SVG, with the four-module quiet zone scanners need. */
+function qrSvg(text, opts){
+  const q = qrEncode(text), o = opts || {};
+  if (!q) return '';
+  const n = q.size + 8;
+  let d = '';
+  for (let y = 0; y < q.size; y++) for (let x = 0; x < q.size; x++) if (q.dark(x, y)) d += `M${x + 4} ${y + 4}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${n} ${n}" shape-rendering="crispEdges" role="img" aria-label="${o.label || 'QR code'}"${o.size ? ` width="${o.size}" height="${o.size}"` : ''}><rect width="${n}" height="${n}" fill="#fff"/><path d="${d}" fill="#000"/></svg>`;
+}
+
+/** What a phone's camera reads to join a Wi-Fi network. */
+function wifiCode(w){
+  if (!w || !w.ssid) return null;
+  const esc = s => String(s).replace(/([\\;,:"])/g, '\\$1');
+  const t = w.security === 'nopass' || !w.password ? 'nopass' : w.security === 'WEP' ? 'WEP' : 'WPA';
+  return `WIFI:T:${t};S:${esc(w.ssid)};${t === 'nopass' ? '' : `P:${esc(w.password)};`}${w.hidden ? 'H:true;' : ''};`;
 }
 /* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
@@ -3426,7 +3635,8 @@ const ICON = {
   bins: '<path d="M4 6h16M9 6V4h6v2M6 6l1 15h10l1-15"/>',
   rain: '<path d="M7 15a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3 3 0 0 1 0 6z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>',
   flood: '<path d="M3 17c2 0 2-1.5 4.5-1.5S9.5 17 12 17s2.5-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S9.5 21 12 21s2.5-1.5 4.5-1.5S19 21 21 21M12 3v9M8.5 8.5 12 12l3.5-3.5"/>',
-  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  cake: '<path d="M4 21h16M5 21v-8h14v8M8 13v-3M12 13v-3M16 13v-3M8 7.5a1 1 0 0 0 1-1C9 5.7 8 4.5 8 4.5S7 5.7 7 6.5a1 1 0 0 0 1 1zM12 7.5a1 1 0 0 0 1-1C13 5.7 12 4.5 12 4.5s-1 1.2-1 2a1 1 0 0 0 1 1zM16 7.5a1 1 0 0 0 1-1c0-.8-1-2-1-2s-1 1.2-1 2a1 1 0 0 0 1 1zM5 16.5c2.3 1 4.7 1 7 0s4.7-1 7 0"/>'
 };
 const icon = k => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
 
@@ -3663,11 +3873,12 @@ function rainBands(now, end){
 function renderToday(){
   const now = Date.now(), W = SRC.weather.data, s = D.set;
   const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
-  $('#dDate').textContent = longDay(new Date(now)) + (today ? ` · sunset ${hhmm(today.set)}` : '');
+  const cds = countdowns({ dates: s.dates, holidays: SRC.holidays.data, events: SRC.cal.data }, now);
+  $('#dDate').textContent = longDay(new Date(now)) + (cds.length ? ' · ' + countdownText(cds[0]) : today ? ` · sunset ${hhmm(today.set)}` : '');
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).slice(0, 3));
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds }, now).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
   const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
@@ -3767,7 +3978,7 @@ function renderTravel(){
 
 function renderNight(){
   const now = Date.now(), cur = agileNow(now), W = SRC.weather.data;
-  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).filter(h => h.kind !== 'rain')[0];
+  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: countdowns({ dates: D.set.dates, holidays: SRC.holidays.data }, now) }, now).filter(h => h.kind !== 'rain')[0];
   $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : '', hu ? hu.title : ''].filter(Boolean).join(' · ');
 }
 
@@ -3817,7 +4028,8 @@ function startRemote(){
     if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
     else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
     else if (r.cmd === 'reload'){ location.reload(); return; }
-    else if (r.cmd === 'account'){ takeAccount(r.box); return; }
+    else if (r.cmd === 'account'){ takeDetails(r.box); return; }
+    else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
@@ -3830,17 +4042,41 @@ function tellRemote(note){
   D.sentState = key;
   sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
 }
-/** An Octopus account sent from the phone, sealed with the site's PIN (see src/lib/remote.js). */
-async function takeAccount(box){
+/** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
+async function takeDetails(box){
   const secret = lockSecret();
-  const a = secret && canSeal() ? await openAccount(D.remote, secret, box) : null;
-  if (!a){ toast('Your phone sent an account this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
-  store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
-  NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
-  ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
-  toast(`Octopus account ${a.account} connected, from your phone`, 5000);
-  render(); tellRemote('Account connected');
+  const d = secret && canSeal() ? await openDetails(D.remote, secret, box) : null;
+  if (!d){ toast('Your phone sent something this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
+  const got = [], changes = {};
+  if (d.account){
+    const a = d.account;
+    store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
+    NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
+    ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+    got.push('your Octopus account');
+  }
+  if (d.wifi){ changes.wifi = d.wifi; got.push('guest Wi-Fi'); }
+  if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
+  if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
+  if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
+  const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
+  toast(`From your phone: ${list}.`, 6000);
+  render(); tellRemote('Received ' + list);
 }
+
+/* ---------- guest Wi-Fi: a code a visitor's phone camera can read ---------- */
+function showWifi(ms){
+  const w = D.set.wifi, code = wifiCode(w);
+  if (!code){ toast('No guest Wi-Fi yet: add it on your phone (Settings, then Household) and send it from Screen.', 6000); return; }
+  $('#wifiQr').innerHTML = qrSvg(code, { label: 'Guest Wi-Fi code' });
+  $('#wifiNet').textContent = w.ssid;
+  $('#wifiPw').textContent = w.security === 'nopass' || !w.password ? 'No password' : w.password;
+  $('#wifiCard').hidden = false; hideChrome();
+  clearTimeout(showWifi.timer); showWifi.timer = setTimeout(hideWifi, ms || 3 * MIN);
+}
+function hideWifi(){ $('#wifiCard').hidden = true; clearTimeout(showWifi.timer); }
+const wifiOpen = () => !$('#wifiCard').hidden;
+
 function newPairing(){
   if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }
   store.set('remote', newRemoteCode()); startRemote();
@@ -3884,6 +4120,7 @@ const COLOUR_KEYS = { 403: 'energy', 404: 'home', 405: 'travel', 406: 'screensav
 function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
+  if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
@@ -3913,6 +4150,7 @@ function onKey(e){
   // preventDefault stops the letter also landing in the first settings box.
   if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
   if (e.key === 's' || e.key === 'S'){ e.preventDefault(); openSheet(); }
+  if (e.key === 'w' || e.key === 'W'){ e.preventDefault(); showWifi(); }
 }
 function toggleFullscreen(){
   try {
@@ -3988,6 +4226,8 @@ function wire(){
   $('#picker').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-mode]'); if (b){ setMode(b.getAttribute('data-mode')); showChrome(); } });
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
+  $('#wifiBtn').addEventListener('click', () => showWifi());
+  $('#wifiCard').addEventListener('click', hideWifi);
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
   $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });

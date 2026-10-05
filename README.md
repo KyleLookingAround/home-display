@@ -6,8 +6,8 @@ A home energy dashboard for your Octopus account, and a household display for th
   - **Now:** should you use power now, the next twelve hours of prices with rain and your next train, your live draw, and when to run the washing machine, dishwasher and dryer.
   - **Money:** this month so far and where it's heading, the year ahead against your Direct Debit, your tariff, this week and rewards.
   - **Usage:** every day, your day as a clock, every day you have as a heat map, heating against the weather, anything unusual, and carbon.
-  - **Home:** bins, today's and tomorrow's events, trains and the weather; upgrades (tariffs, battery, solar, insulation, the certificate) with a saving, a cost and a payback each; and the change log.
-  - **Screen:** the wall display's views, live, buttons that change what your TV shows, and "Send my account to the TV", sealed with your PIN.
+  - **Home:** bins, today's and tomorrow's events, trains and the weather; birthdays and countdowns; a guest Wi-Fi code visitors can scan; upgrades (tariffs, battery, solar, insulation, the certificate) with a saving, a cost and a payback each; and the change log.
+  - **Screen:** the wall display's views, live, buttons that change what your TV shows, and Send to the TV (your account, guest Wi-Fi, birthdays and calendar, sealed with your PIN).
 
   Once you've seen them, the pages open straight away and with no signal, with the last data they had.
   - **Settings** (the gear at the top): the account, notifications, the household, appliances, other screens, your data and the look.

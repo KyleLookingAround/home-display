@@ -5,7 +5,7 @@
 // A screen makes an eight-letter code and listens on a topic named from it. A phone that knows the code can ask
 // the screen to change view, wake up or start afresh, and ask what it's showing. Only these small requests and the
 // screen's answer pass through the relay: no prices, readings or settings. The one exception is the Octopus account,
-// which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
+// and the household's private settings (guest Wi-Fi, family dates, the calendar address), which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
 // was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
 import { MODES } from './household.js';
 
@@ -26,7 +26,7 @@ export const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 export const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account'];
+export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 export function readRemote(data){
   let m, c;
@@ -66,19 +66,28 @@ function boxKey(code, secret){
   return crypto.subtle.importKey('raw', enc.encode(secret), { name: 'PBKDF2' }, false, ['deriveKey'])
     .then(base => crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('hse-account:' + code), iterations: 100000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']));
 }
-/** Seals { account, key, gasUnit, pay } for the screen with this code. */
-export async function sealAccount(code, secret, acct){
+/**
+ * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical }.
+ */
+export async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
-  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(acct)));
+  const data = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, k, new TextEncoder().encode(JSON.stringify(details)));
   return { iv: toB64(iv), data: toB64(data) };
 }
-/** Opens a sealed account, or null if it wasn't sealed with this PIN and code, or isn't an account. */
-export async function openAccount(code, secret, box){
+/** Opens sealed details and keeps only what's well formed; null if it wasn't sealed with this PIN and code, or holds nothing. */
+export async function openDetails(code, secret, box){
+  let d;
   try {
     const k = await boxKey(code, secret);
-    const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, k, fromB64(box.data));
-    const a = JSON.parse(new TextDecoder().decode(plain));
-    if (!a || !/^A-[0-9A-Z]{6,10}$/i.test(String(a.account)) || !/^sk_\w{6,}$/.test(String(a.key))) return null;
-    return { account: String(a.account).toUpperCase(), key: String(a.key), gasUnit: a.gasUnit === 'kwh' ? 'kwh' : 'm3', pay: a.pay === 'NON_DIRECT_DEBIT' ? 'NON_DIRECT_DEBIT' : 'DIRECT_DEBIT' };
+    d = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(box.iv) }, k, fromB64(box.data))));
   } catch(e){ return null; }
+  if (!d || typeof d !== 'object') return null;
+  const out = {}, a = d.account;
+  if (a && /^A-[0-9A-Z]{6,10}$/i.test(String(a.account)) && /^sk_\w{6,}$/.test(String(a.key)))
+    out.account = { account: String(a.account).toUpperCase(), key: String(a.key), gasUnit: a.gasUnit === 'kwh' ? 'kwh' : 'm3', pay: a.pay === 'NON_DIRECT_DEBIT' ? 'NON_DIRECT_DEBIT' : 'DIRECT_DEBIT' };
+  if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
+  if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
+  if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  return Object.keys(out).length ? out : null;
 }

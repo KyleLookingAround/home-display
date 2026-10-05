@@ -170,11 +170,12 @@ function rainBands(now, end){
 function renderToday(){
   const now = Date.now(), W = SRC.weather.data, s = D.set;
   const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
-  $('#dDate').textContent = longDay(new Date(now)) + (today ? ` · sunset ${hhmm(today.set)}` : '');
+  const cds = countdowns({ dates: s.dates, holidays: SRC.holidays.data, events: SRC.cal.data }, now);
+  $('#dDate').textContent = longDay(new Date(now)) + (cds.length ? ' · ' + countdownText(cds[0]) : today ? ` · sunset ${hhmm(today.set)}` : '');
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).slice(0, 3));
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds }, now).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
   const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
@@ -274,7 +275,7 @@ function renderTravel(){
 
 function renderNight(){
   const now = Date.now(), cur = agileNow(now), W = SRC.weather.data;
-  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).filter(h => h.kind !== 'rain')[0];
+  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: countdowns({ dates: D.set.dates, holidays: SRC.holidays.data }, now) }, now).filter(h => h.kind !== 'rain')[0];
   $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : '', hu ? hu.title : ''].filter(Boolean).join(' · ');
 }
 
@@ -324,7 +325,8 @@ function startRemote(){
     if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
     else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
     else if (r.cmd === 'reload'){ location.reload(); return; }
-    else if (r.cmd === 'account'){ takeAccount(r.box); return; }
+    else if (r.cmd === 'account'){ takeDetails(r.box); return; }
+    else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
@@ -337,17 +339,41 @@ function tellRemote(note){
   D.sentState = key;
   sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
 }
-/** An Octopus account sent from the phone, sealed with the site's PIN (see src/lib/remote.js). */
-async function takeAccount(box){
+/** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
+async function takeDetails(box){
   const secret = lockSecret();
-  const a = secret && canSeal() ? await openAccount(D.remote, secret, box) : null;
-  if (!a){ toast('Your phone sent an account this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
-  store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
-  NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
-  ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
-  toast(`Octopus account ${a.account} connected, from your phone`, 5000);
-  render(); tellRemote('Account connected');
+  const d = secret && canSeal() ? await openDetails(D.remote, secret, box) : null;
+  if (!d){ toast('Your phone sent something this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
+  const got = [], changes = {};
+  if (d.account){
+    const a = d.account;
+    store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
+    NET.creds = { account: a.account, key: a.key }; NET.token = null; D.deviceId = null;
+    ['live', 'tariff'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+    got.push('your Octopus account');
+  }
+  if (d.wifi){ changes.wifi = d.wifi; got.push('guest Wi-Fi'); }
+  if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
+  if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
+  if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
+  const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
+  toast(`From your phone: ${list}.`, 6000);
+  render(); tellRemote('Received ' + list);
 }
+
+/* ---------- guest Wi-Fi: a code a visitor's phone camera can read ---------- */
+function showWifi(ms){
+  const w = D.set.wifi, code = wifiCode(w);
+  if (!code){ toast('No guest Wi-Fi yet: add it on your phone (Settings, then Household) and send it from Screen.', 6000); return; }
+  $('#wifiQr').innerHTML = qrSvg(code, { label: 'Guest Wi-Fi code' });
+  $('#wifiNet').textContent = w.ssid;
+  $('#wifiPw').textContent = w.security === 'nopass' || !w.password ? 'No password' : w.password;
+  $('#wifiCard').hidden = false; hideChrome();
+  clearTimeout(showWifi.timer); showWifi.timer = setTimeout(hideWifi, ms || 3 * MIN);
+}
+function hideWifi(){ $('#wifiCard').hidden = true; clearTimeout(showWifi.timer); }
+const wifiOpen = () => !$('#wifiCard').hidden;
+
 function newPairing(){
   if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }
   store.set('remote', newRemoteCode()); startRemote();
@@ -391,6 +417,7 @@ const COLOUR_KEYS = { 403: 'energy', 404: 'home', 405: 'travel', 406: 'screensav
 function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
+  if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
@@ -420,6 +447,7 @@ function onKey(e){
   // preventDefault stops the letter also landing in the first settings box.
   if (e.key === 'f' || e.key === 'F'){ e.preventDefault(); toggleFullscreen(); }
   if (e.key === 's' || e.key === 'S'){ e.preventDefault(); openSheet(); }
+  if (e.key === 'w' || e.key === 'W'){ e.preventDefault(); showWifi(); }
 }
 function toggleFullscreen(){
   try {
@@ -495,6 +523,8 @@ function wire(){
   $('#picker').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-mode]'); if (b){ setMode(b.getAttribute('data-mode')); showChrome(); } });
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
+  $('#wifiBtn').addEventListener('click', () => showWifi());
+  $('#wifiCard').addEventListener('click', hideWifi);
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
   $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });

@@ -341,6 +341,8 @@ test('display: the remote control drives everything', async () => {
   await page.keyboard.press('Enter');
   assert.equal(await visibleMode(page), 'screensaver');
   await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'wifiBtn', 'guest Wi-Fi is on the toolbar');
+  await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'setBtn');
   await page.keyboard.press('Enter');
   assert.equal(await page.isVisible('#sheet'), true);
@@ -561,11 +563,11 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   const code = await tv.page.evaluate(() => localStorage.getItem('hse.remote'));
   assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.account')), null, 'the TV starts with no account');
   // the phone, in its own browser, with its account and the same PIN remembered
-  const phone = await open('/screen.html', { clock: false, settings: SETTINGS, withHelper: false });
+  const phone = await open('/screen.html', { clock: false, settings: { ...SETTINGS, wifi: { ssid: 'Harold Guests', password: 'cuppa-tea-22', security: 'WPA' }, dates: [{ name: 'Sam', date: '2019-10-06', kind: 'birthday' }] }, withHelper: false });
   const phoneSent = await relay(phone.page, () => []);
   await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test_test123456'); } catch (e) {} }, [LOCK, code]);
   await phone.page.reload(); await ready(phone.page);
-  await phone.page.click('text=Send my account to the TV');
+  await phone.page.click('#tvAccount button.primary');
   for (let i = 0; i < 50 && !phoneSent.some(s => s.msg.cmd === 'account' && s.msg.box); i++) await phone.page.waitForTimeout(100);
   const sealed = phoneSent.filter(s => s.msg.cmd === 'account' && s.msg.box)[0];
   assert.ok(sealed, 'the phone sent it');
@@ -576,7 +578,18 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   await tv.page.waitForFunction(() => localStorage.getItem('hse.account') === 'A-TEST1234', null, { timeout: 10000 });
   assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.key')), 'sk_test_test123456');
   for (let i = 0; i < 30 && !tvSent.some(s => s.msg.state && s.msg.state.account); i++) await tv.page.waitForTimeout(100);
-  assert.ok(tvSent.some(s => s.msg.state && s.msg.state.account && /connected/.test(s.msg.state.note)), 'the TV says it has it');
+  assert.ok(tvSent.some(s => s.msg.state && s.msg.state.account && /^Received your Octopus account/.test(s.msg.state.note)), 'the TV says it has it');
+  assert.doesNotMatch(JSON.stringify(sealed.msg), /cuppa|Harold Guests|Sam/, 'nor the Wi-Fi or the dates');
+  const set = await tv.page.evaluate(() => JSON.parse(localStorage.getItem('hse.display')));
+  assert.equal(set.wifi.ssid, 'Harold Guests'); assert.equal(set.dates[0].name, 'Sam');
+  // the guest Wi-Fi code, big on the TV, and Sam's birthday counting down on Today
+  await tv.page.keyboard.press('w');
+  await tv.page.waitForSelector('#wifiCard:not([hidden]) svg');
+  assert.match(await tv.page.textContent('#wifiCard'), /Harold Guests[\s\S]*cuppa-tea-22/);
+  await shot(tv.page, 'tv-wifi');
+  await tv.page.keyboard.press('Enter');
+  assert.equal(await tv.page.isVisible('#wifiCard'), false, 'any key closes it');
+  assert.match(await tv.page.textContent('#dDate'), /Sam\u2019s birthday/);
   // a TV with a different PIN can't open it
   await tv.page.evaluate(() => { localStorage.removeItem('hse.account'); localStorage.removeItem('hse.key'); });
   await tv.page.addInitScript(() => { try { localStorage.setItem('staticrypt_passphrase', 'some-other-pin'); } catch (e) {} });
@@ -693,7 +706,9 @@ test('cockpit frame budget', { skip: !process.env.BENCH }, async () => {
 // PAGES=index,money,usage,home,settings (with SHOTS=1; OPEN='#tariffs summary' opens folds first): each page of the app, whole, on a phone and a laptop, connected (ACCOUNT=1) or not.
 test('page shots', { skip: !process.env.PAGES }, async () => {
   for (const [width, height] of [[390, 844], [1280, 900]]) {
-    const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, account: !!process.env.ACCOUNT });
+    // HOUSE=1: a household with bins, a station, guest Wi-Fi and birthdays set
+    const house = process.env.HOUSE ? { ...SETTINGS, wifi: { ssid: 'Harold Guests', password: 'cuppa-tea-22', security: 'WPA' }, dates: [{ name: 'Sam', date: '2019-10-06', kind: 'birthday' }, { name: 'Wedding anniversary', date: '2015-11-20', kind: 'anniversary' }] } : null;
+    const { page, ctx, errors } = await open('/index.html', { width, height, settings: house, account: !!process.env.ACCOUNT });
     for (const id of process.env.PAGES.split(',')) {
       await page.goto(`${base}/${id}.html`);
       await page.waitForTimeout(1200);

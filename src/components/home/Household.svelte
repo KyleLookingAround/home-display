@@ -6,6 +6,12 @@
   import { BIN_COLOURS, relDay, weatherText, leaveBy } from '../../lib/household.js';
   import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
   import Radar from '../charts/Radar.svelte';
+  import { qrSvg, wifiCode } from '../../lib/qr.js';
+  import { cleanCode, sendRemote } from '../../lib/remote.js';
+  import { store } from '../../lib/browser.js';
+  let shown = $state('');
+  const tvCode = () => cleanCode(store.get('remoteTV'));
+  async function wifiOnTv(){ const c = tvCode(); if (!c) return; shown = (await sendRemote(c, { from: 'phone', cmd: 'wifi' })) ? 'On the TV for three minutes.' : 'The relay didn\'t take that. Try again.'; }
   import { hhmm, startOfDay, addDays } from '../../lib/format.js';
   import { errorText } from '../../lib/net.js';
   onMount(() => watchHouse({ air: true, radar: true }));
@@ -18,6 +24,8 @@
   const bins = $derived(app.collections);
   const soon = $derived(app.nowcast ? rainSoon(app.nowcast, app.now) : null);
   const air = $derived(app.air);
+  const cds = $derived(app.countdowns ? app.countdowns.slice(0, 6) : null);
+  const wifi = $derived(app.house ? app.house.wifi : null);
   const pollen = $derived(air ? [['grass', 'Grass'], ['tree', 'Tree']].map(([k, n]) => ({ n, l: pollenLabel(air.pollen[k], k) })).filter(x => x.l && x.l !== 'None') : []);
   const binDays = $derived.by(() => {
     if (!bins) return [];
@@ -103,6 +111,24 @@
     {:else if app.house && !app.house.trainFrom}<p class="note">Choose your station <a href="./settings.html#household">in Settings</a>.</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
   </section>
+  <section class="card">
+    <h2 class="label">Coming up</h2>
+    {#if cds && cds.length}
+      <ul class="rows">
+        {#each cds as c}<li><span class="main-t"><span>{c.title}</span>{#if c.age || c.years}<span class="sub">{c.age ? (c.days === 0 ? 'Turns ' : 'Turning ') + c.age : c.years + ' years'}</span>{/if}</span><span class="side {c.days <= 1 ? 'neg' : ''}">{c.when}</span></li>{/each}
+      </ul>
+    {:else if cds}<p class="note">Nothing in the next few months.</p>{/if}
+    <p class="note">Add birthdays and dates <a href="./settings.html#household">in Settings</a>. They stay on this phone.</p>
+  </section>
+
+  <section class="card">
+    <h2 class="label">Guest Wi-Fi</h2>
+    {#if wifi}
+      <div class="wifi"><div class="qr">{@html qrSvg(wifiCode(wifi), { label: 'Guest Wi-Fi code' })}</div>
+        <div class="main-t"><span class="net">{wifi.ssid}</span><span class="sub mono">{wifi.security === 'nopass' || !wifi.password ? 'No password' : wifi.password}</span><span class="sub">A visitor points their phone's camera at the code.</span></div></div>
+      {#if tvCode()}<div class="actions"><button class="btn small" type="button" onclick={wifiOnTv}>Show it on the TV</button>{#if shown}<span class="note" role="status">{shown}</span>{/if}</div>{/if}
+    {:else}<p class="note">Add your guest network <a href="./settings.html#household">in Settings</a> for a code visitors can scan. It stays on this phone.</p>{/if}
+  </section>
 </div>
 
 <style>
@@ -122,4 +148,11 @@
   .dots{display:flex;gap:4px;flex:none}
   .dots i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
   .mono{font-family:var(--f-mono);font-weight:500}
+  .wifi{display:flex;align-items:center;gap:var(--s4)}
+  .wifi .qr{width:132px;height:132px;flex:none}
+  .wifi .qr :global(svg){display:block;width:100%;height:100%;border-radius:6px}
+  .wifi .net{font-size:17px;font-weight:600}
+  .wifi .main-t{display:grid;gap:4px;min-width:0}
+  .wifi .sub{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+  .wifi .sub.mono{color:var(--gas);font-size:15px}
 </style>

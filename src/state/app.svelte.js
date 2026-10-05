@@ -6,7 +6,7 @@
 import { buildModel, gasRegression } from '../lib/analysis.js';
 import { store } from '../lib/browser.js';
 import { unitPriceAt } from '../lib/octopus.js';
-import { mergeBins, councilBins, nextCollections } from '../lib/household.js';
+import { mergeBins, councilBins, nextCollections, countdowns } from '../lib/household.js';
 
 class App {
   raw = $state.raw(null);                     // account data, or example data when no account is connected
@@ -53,6 +53,7 @@ class App {
 
   get demo(){ return !this.raw || !!this.raw.demo; }
   get bins(){ return this.house ? mergeBins(this.house.bins, councilBins(this.council, this.now)) : []; }
+  get countdowns(){ return this.house ? countdowns({ dates: this.house.dates, holidays: this.holidays, events: this.events }, this.now) : null; }
   get collections(){ return this.house ? nextCollections(this.bins, this.now, this.holidays) : null; }
   get eRateNow(){ return this.raw ? unitPriceAt(this.raw.eSets, Date.now()) : null; }
   get gRateNow(){ return this.raw ? unitPriceAt(this.raw.gSets, Date.now()) : null; }

@@ -9,9 +9,9 @@ import { execFileSync } from 'node:child_process';
 import { shared } from './shared.mjs';
 
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'voyage');
+const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -41,21 +41,53 @@ test('the price verdict says the same thing on the phone and the TV', () => {
   assert.deepEqual(plain([-1, 5, 20, 30, null].map(A.priceTone)), ['neg', 'cheap', 'normal', 'peak', 'muted']);
 });
 
-test('the account goes to the TV sealed with the PIN: the wrong PIN or code opens nothing', async () => {
+test('details go to the TV sealed with the PIN: the wrong PIN or code opens nothing', async () => {
   const R = await import('../src/lib/remote.js');
-  const acct = { account: 'A-1234ABCD', key: 'sk_test_abcdef123456', gasUnit: 'm3', pay: 'DIRECT_DEBIT' };
-  const box = await R.sealAccount('ABCDEFGH', 'hashed-pin', acct);
-  assert.doesNotMatch(JSON.stringify(box), /1234ABCD|sk_test/, 'nothing readable in the box');
-  assert.deepEqual(await R.openAccount('ABCDEFGH', 'hashed-pin', box), acct);
-  assert.equal(await R.openAccount('ABCDEFGH', 'another-pin', box), null);
-  assert.equal(await R.openAccount('ABCDEFGJ', 'hashed-pin', box), null);
-  const junk = await R.sealAccount('ABCDEFGH', 'hashed-pin', { account: 'nope', key: 'x' });
-  assert.equal(await R.openAccount('ABCDEFGH', 'hashed-pin', junk), null, 'only something shaped like an account is taken');
+  const details = { account: { account: 'A-1234ABCD', key: 'sk_test_abcdef123456', gasUnit: 'm3', pay: 'DIRECT_DEBIT' }, wifi: { ssid: 'Guests', password: 'hunter22', security: 'WPA', hidden: false }, dates: [{ name: 'Sam', date: '2019-10-09', kind: 'birthday' }, { name: 'nope' }], ical: 'https://calendar.google.com/x/basic.ics' };
+  const box = await R.sealDetails('ABCDEFGH', 'hashed-pin', details);
+  assert.doesNotMatch(JSON.stringify(box), /1234ABCD|sk_test|hunter22|Sam|calendar/, 'nothing readable in the box');
+  const got = await R.openDetails('ABCDEFGH', 'hashed-pin', box);
+  assert.deepEqual(got.account, details.account);
+  assert.deepEqual(got.wifi, details.wifi);
+  assert.deepEqual(got.dates, [{ name: 'Sam', date: '2019-10-09', kind: 'birthday' }], 'half-filled dates are dropped');
+  assert.equal(got.ical, details.ical);
+  assert.equal(await R.openDetails('ABCDEFGH', 'another-pin', box), null);
+  assert.equal(await R.openDetails('ABCDEFGJ', 'hashed-pin', box), null);
+  const junk = await R.sealDetails('ABCDEFGH', 'hashed-pin', { account: { account: 'nope', key: 'x' }, ical: 'javascript:alert(1)' });
+  assert.equal(await R.openDetails('ABCDEFGH', 'hashed-pin', junk), null, 'only well-formed details are taken');
   const msg = m => JSON.stringify({ event: 'message', message: JSON.stringify(m) });
   assert.deepEqual(R.readRemote(msg({ from: 'phone', cmd: 'account', box })).box, box);
-  assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'account' })), null, 'an account request needs its box');
+  assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'account' })), null, 'a send needs its box');
+  assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'wifi' })).cmd, 'wifi');
   assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'shell', mode: 'x' })), null);
   assert.equal(R.cleanCode('abcd-efgh'), 'ABCDEFGH'); assert.equal(R.cleanCode('abcd-efg0'), null);
+});
+
+test('QR codes scan back to what went in, Wi-Fi codes included', async () => {
+  const jsQR = (await import('jsqr')).default;
+  const read = text => {
+    const q = A.qrEncode(text), s = 3, n = (q.size + 8) * s, px = new Uint8ClampedArray(n * n * 4);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++){ const d = q.dark(Math.floor(x / s) - 4, Math.floor(y / s) - 4), i = (y * n + x) * 4; px[i] = px[i + 1] = px[i + 2] = d ? 0 : 255; px[i + 3] = 255; }
+    const r = jsQR(px, n, n); return r && r.data;
+  };
+  const wifi = A.wifiCode({ ssid: 'Harold; Guest', password: 'pa:ss"\\word', security: 'WPA' });
+  assert.equal(wifi, 'WIFI:T:WPA;S:Harold\\; Guest;P:pa\\:ss\\"\\\\word;;', 'special characters escaped as phones expect');
+  for (const t of [wifi, 'Café ☕', 'x'.repeat(150), 'y'.repeat(400)]) assert.equal(read(t), t);
+  assert.equal(A.wifiCode({ ssid: 'Open', password: '' }), 'WIFI:T:nopass;S:Open;;');
+  assert.equal(A.wifiCode(null), null);
+});
+
+test('birthdays and countdowns: every year, with ages, Christmas and the next bank holiday', () => {
+  const now = at('2026-10-05T12:00:00');
+  const c = plain(A.countdowns({ dates: [{ name: 'Sam', date: '2019-10-06', kind: 'birthday' }, { name: 'Wedding anniversary', date: '2015-11-20', kind: 'anniversary' }, { name: 'Holiday to Wales', date: '2026-10-24', kind: 'once' }, { name: 'Gone', date: '2026-10-01', kind: 'once' }],
+    holidays: [{ date: '2026-12-25', title: 'Christmas Day' }, { date: '2026-12-28', title: 'Boxing Day' }], events: [{ title: 'Grandad\u2019s birthday', start: at('2026-10-12T00:00:00'), allDay: true }] }, now));
+  assert.deepEqual(c.map(x => [x.title, x.days]), [['Sam\u2019s birthday', 1], ['Grandad\u2019s birthday', 7], ['Holiday to Wales', 19], ['Wedding anniversary', 46], ['Christmas', 81], ['Boxing Day', 84]]);
+  assert.equal(c[0].age, 7); assert.equal(c[0].when, 'Tomorrow'); assert.equal(c[3].years, 11);
+  assert.equal(A.countdownText(c[0]), 'Sam\u2019s birthday tomorrow');
+  assert.equal(A.countdownText(c[4]), 'Christmas in 81 days');
+  const hu = plain(A.headsUp({ countdowns: c }, now));
+  assert.deepEqual(hu.map(h => [h.title, h.sub]), [['Sam\u2019s birthday tomorrow', 'Turning 7']]);
+  assert.equal(A.mergeSettings({ wifi: { ssid: 'x' }, dates: [{ name: 'a', date: '2020-01-01' }] }, null).wifi, null, 'never from the public file');
 });
 
 test('night window works across midnight', () => {
@@ -410,7 +442,7 @@ test('the built display matches the source', () => {
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'voyage']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

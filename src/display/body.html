@@ -4,6 +4,7 @@
 <header class="bar" id="bar">
   <nav class="picker" id="picker" role="tablist" aria-label="Display mode"></nav>
   <div class="bar-actions">
+    <button class="btn" id="wifiBtn" type="button">Guest Wi-Fi</button>
     <button class="btn" id="setBtn" type="button">Settings</button>
     <button class="btn" id="fsBtn" type="button">Full screen</button>
     <a class="btn" id="dashBtn" href="index.html">Phone pages</a>
@@ -174,6 +175,17 @@
     </div>
     <p class="help" id="setupOut"></p>
   </form>
+</div>
+
+<!-- ================= GUEST WI-FI ================= -->
+<div class="wifi-card" id="wifiCard" role="dialog" aria-labelledby="wifiTitle" hidden>
+  <div class="card">
+    <h2 class="label" id="wifiTitle">Guest Wi-Fi</h2>
+    <div class="qr" id="wifiQr"></div>
+    <p class="net" id="wifiNet"></p>
+    <p class="pw mono" id="wifiPw"></p>
+    <p class="help">Point your phone's camera at the code to join. Any key closes this.</p>
+  </div>
 </div>
 
 <div class="toast" id="toast" role="status" hidden></div>
