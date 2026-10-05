@@ -4,7 +4,7 @@
 const D = {
   household: null, preview: {},
   set: mergeSettings(null, store.getJ('display', null)),
-  mode: 'energy', override: null, resume: null,
+  mode: 'today', override: null, resume: null, embed: false, remote: null, stopRemote: null, sentState: '',
   lastInput: Date.now(), lastPick: 0, chromeUntil: 0, rotateAt: 0, reloadAt: 0,
   deviceId: null, wake: null, ticks: 0
 };
@@ -27,7 +27,13 @@ const SRC = {
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
-  trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) }
+  trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
+  // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
+  nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
+  air:     { label: 'Air',     every: () => 60*MIN, need: () => true, run: loadAir },
+  floods:  { label: 'Floods',  every: () => 15*MIN, need: () => true, run: loadFloods },
+  grid:    { label: 'Grid mix', every: () => 30*MIN, need: () => true, run: () => loadGridMix(CI_REGION[region()]) },
+  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
 
@@ -75,21 +81,22 @@ function applyMode(){
   Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.at && !s.err && Date.now() - s.at > s.every()) s.last = 0; });
   if (m === 'screensaver') startSaver(); else stopSaver();
   render();
+  tellRemote();
 }
 /** Once a second: night window, idle screensaver, rotation, the nightly fresh start, and any data that's due. */
 function tick(){
   const now = Date.now(), set = D.set;
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
-  const idle = now - D.lastInput;
-  const night = set.night && inWindow(now, set.nightFrom, set.nightTo);
+  const idle = D.embed ? 0 : now - D.lastInput;
+  const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
   else if (!night && D.override === 'night') setOverride(null);
   else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open()) setOverride('screensaver');
   if (set.rotate > 0 && !D.override && ROTATING.indexOf(D.mode) >= 0 && now >= D.rotateAt && now - D.lastPick > 2*MIN && !open()){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
-  if (now >= D.reloadAt){
+  if (now >= D.reloadAt && !D.embed){
     if (navigator.onLine !== false && !open()){ store.set('display.reloaded', String(now)); location.reload(); return; }
     D.reloadAt = now + 5*MIN;
   }
@@ -100,18 +107,17 @@ function tick(){
 
 /** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
 const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
+const collections = now => nextCollections(binsNow(now), now, SRC.holidays.data);
 
 /* ---------- rendering ---------- */
 function render(){
   const m = shown();
-  if (m === 'energy') renderEnergy();
-  else if (m === 'home') renderHome();
+  if (m === 'today') renderToday();
+  else if (m === 'energy') renderEnergy();
   else if (m === 'travel') renderTravel();
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
 }
-function priceColour(p){ return p < 0 ? 'var(--neg)' : p < 15 ? 'var(--good)' : p < 25 ? 'var(--warn)' : 'var(--bad)'; }
-function priceCls(p){ return p < 0 ? 'p-neg' : p < 15 ? 'p-low' : p < 25 ? 'p-mid' : 'p-high'; }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
   const now = Date.now(), parts = [], offline = navigator.onLine === false;
@@ -125,97 +131,108 @@ function foot(keys){
   if (offline) parts.unshift('<span class="warn">Offline, will retry</span>');
   return parts.join('') + (latest ? `<span>Updated ${hhmm(latest)}</span>` : '');
 }
+/** The same answer the phone's Now page gives. */
+function verdictHtml(now, big){
+  const v = priceVerdict(SRC.agile.data, now);
+  if (!v) return `<p class="big muted">${SRC.agile.err ? 'No prices' : 'Prices…'}</p><p class="line muted">${SRC.agile.err ? 'No signal from Octopus, trying again' : 'Waiting for Agile prices'}</p>`;
+  return `<p class="big glow-${v.tone}">${esc(v.big)}</p><p class="line">${esc(v.line)}</p>${big ? '' : `<p class="note">Agile, region ${region()}</p>`}`;
+}
+function weatherHtml(now){
+  const W = SRC.weather.data;
+  if (!W) return `<p class="d">${SRC.weather.err ? 'No weather signal' : 'Checking the weather…'}</p>`;
+  const wn = weatherText(W.now.code), today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0];
+  return `<span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span><p class="d">${esc(wn.text)}<br>${today ? `High ${Math.round(today.max)}° · low ${Math.round(today.min)}°` : `Feels ${Math.round(W.now.feels)}°`}</p>`;
+}
+/** What's live now: the Home Mini, today's cost, grid carbon and its mix, and the air. */
+function nowStats(now){
+  const L = SRC.live.data, T = SRC.tariff.data, out = [];
+  if (!NET.creds) out.push(['Live draw', '<span class="muted small">Connect your account</span>']);
+  else if (L && L.none) out.push(['Live draw', '<span class="muted small">No Home Mini</span>']);
+  else out.push(['Drawing now', L && L.demand != null ? `<span class="elec">${Math.round(Math.max(0, L.demand)).toLocaleString('en-GB')} W</span>` : '—']);
+  if (L && L.today != null){ const c = todayCost(L.rows, T && T.eSets, now); out.push(['Today so far', `${kwh(L.today)}${c != null ? ' · ' + gbp(c) : ''}`]); }
+  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
+  if (cin) out.push([`Grid carbon, ${esc(cin.index)}`, `<span class="${/low/.test(cin.index) ? 'cheap' : /high/.test(cin.index) ? 'peak' : 'normal'}">${cin.v} g</span>`]);
+  const A = SRC.air.data;
+  if (A && A.aqi != null) out.push(['Air · UV today', `<span class="small">${aqiLabel(A.aqi)} · ${uvLabel(A.uvMax) || '—'}</span>`]);
+  return out.map(r => `<div class="stat"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join('') + mixHtml(SRC.grid.data);
+}
+function stripFor(el, o){ el.innerHTML = stripSvg(Object.assign({ width: el.clientWidth || 800, height: el.clientHeight || 200 }, o)); }
+/** Rain bands for the strip: the quarter-hour forecast near now, the hourly chance after that. */
+function rainBands(now, end){
+  const out = [], add = (a, b) => { const l = out[out.length - 1]; if (l && a <= l.to + 1) l.to = Math.max(l.to, b); else out.push({ from: a, to: b }); };
+  const nc = SRC.nowcast.data || [], ncEnd = nc.length ? nc[nc.length - 1].t + 15*MIN : now;
+  nc.forEach(s => { if (s.mm >= 0.1 && s.t + 15*MIN > now) add(Math.max(now, s.t), s.t + 15*MIN); });
+  const W = SRC.weather.data;
+  (W ? W.hours : []).forEach(h => { if (h.t >= ncEnd && h.t < end && wetKind(h)) add(h.t, h.t + 60*MIN); });
+  return out;
+}
+
+function renderToday(){
+  const now = Date.now(), W = SRC.weather.data, s = D.set;
+  const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
+  $('#dDate').textContent = longDay(new Date(now)) + (today ? ` · sunset ${hhmm(today.set)}` : '');
+  $('#dVerdict').innerHTML = verdictHtml(now);
+  $('#dWx').innerHTML = weatherHtml(now);
+  const bins = collections(now);
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).slice(0, 3));
+  // the next twelve hours, as on the phone's Now page
+  const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
+  const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
+  $('#dCheap').textContent = v.dock ? `Cheapest ${hhmm(v.dock.from)}–${hhmm(v.dock.to)} · ${pence(v.dock.avg)}` : '';
+  if (v.range) stripFor($('#dStrip'), { from: now - 30*MIN, to: v.to, rates: SRC.agile.data, cheap: v.dock, rain: rainBands(now, v.to), markers, now, aria: 'Agile prices for the next 12 hours' });
+  else $('#dStrip').innerHTML = `<p class="empty">${SRC.agile.err ? 'No prices from Octopus yet, trying again' : 'Waiting for Agile prices'}</p>`;
+  // trains
+  const T = SRC.trains.data;
+  $('#dTrainsH').textContent = T && T.station ? `Trains from ${T.station}` : 'Trains';
+  let tr = '';
+  if (!s.trainFrom) tr = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
+  else if (T){
+    const rows = T.list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 3);
+    tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, s.trainWalk, now), late = d.exp && d.exp - d.sched >= 60e3;
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</span></li>`; }).join('')}</ul>` : '<p class="empty">No trains in the next couple of hours.</p>';
+  } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
+  $('#dTrains').innerHTML = tr;
+  // today and tomorrow: bins, then the calendar
+  const rows = [], hour = new Date(now).getHours();
+  const days = []; bins.forEach(b => { const l = days[days.length - 1]; if (l && +l.date === +b.date) l.bins.push(b); else days.push({ date: b.date, days: b.days, bins: [b] }); });
+  days.slice(0, 2).forEach(d => rows.push(`<li><span class="main"><span class="dots lead">${d.bins.map(b => `<i style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>`).join('')}</span>${esc(d.bins.map(b => b.name).join(', '))}</span><span class="side ${d.days <= 1 ? 'warn' : ''}">${d.days === 0 ? 'Today' : d.days === 1 ? (hour >= 12 ? 'Out tonight' : 'Tomorrow') : relDay(+d.date, now)}${d.bins[0].moved ? '*' : ''}</span></li>`));
+  const evs = SRC.cal.data ? SRC.cal.data.filter(e => e.end > now && e.start < +addDays(startOfDay(new Date(now)), 2)) : [];
+  evs.slice(0, 5 - rows.length).forEach(e => rows.push(`<li><span class="main">${esc(e.title)}${e.where ? `<span class="sub">${esc(e.where)}</span>` : ''}</span><span class="side">${relDay(e.start, now) === 'Today' ? '' : 'Tmrw '}${e.allDay ? 'All day' : hhmm(Math.max(e.start, now))}</span></li>`));
+  const moved = days.slice(0, 2).filter(d => d.bins[0].moved)[0];
+  $('#dDay').innerHTML = rows.length ? `<ul class="rows">${rows.join('')}</ul>` + (moved ? `<p class="note">* A day later for ${esc(moved.bins[0].moved)}, probably.</p>` : !s.ical ? '<p class="note">Add your calendar on your phone to see what\'s on.</p>' : '') : '<p class="empty">Nothing on today or tomorrow.</p>';
+  $('#dNow').innerHTML = nowStats(now);
+  $('#dFoot').innerHTML = `<span>Harold Street · region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
+}
 
 function renderEnergy(){
-  const now = Date.now(), cur = agileNow(now), a = SRC.agile.data, el = $('#ePrice');
-  if (cur){
-    const col = priceColour(cur.p);
-    el.textContent = pence(cur.p); el.style.color = col; el.style.textShadow = `0 0 40px ${col}`;
-    $('#eLabel').textContent = cur.p < 0 ? 'Agile now · you\'re paid to use power' : cur.p < 15 ? 'Agile now · power is cheap' : 'Agile price now, per kWh';
-    const best = cheapestWindow(a, 4, now);
-    $('#eNext').textContent = best ? `Cheapest 2 hours ${dayKey(best.from) === dayKey(now) ? '' : DOW[new Date(best.from).getDay()] + ' '}${hhmm(best.from)}–${hhmm(best.to)} · ${pence(best.avg)}` : '';
-  } else {
-    el.textContent = '--'; el.style.color = ''; el.style.textShadow = '';
-    $('#eLabel').textContent = SRC.agile.err ? 'No signal from Octopus' : 'Waiting for Agile prices';
-    $('#eNext').textContent = SRC.agile.err ? 'Trying again shortly' : '';
-  }
-  $('#eStrip').innerHTML = a && a.length ? priceStrip(a, now) : '';
-  const chips = [], L = SRC.live.data, T = SRC.tariff.data;
-  if (!NET.creds) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">Live draw: connect your account on the dashboard on this device</span></div>`);
-  else if (L && L.none) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">No Home Mini found for live draw</span></div>`);
-  else chips.push(`<div class="chip"><span class="v" style="color:var(--elec)">${L && L.demand != null ? Math.round(L.demand).toLocaleString('en-GB') + ' W' : '—'}</span><span class="k">Drawing now${L && L.at ? ' · ' + hhmm(L.at) : ''}</span></div>`);
-  if (L && L.today != null){
-    const c = todayCost(L.rows, T && T.eSets, now);
-    chips.push(`<div class="chip"><span class="v">${kwh(L.today)}</span><span class="k">Used today${c != null ? ' · ' + gbp(c) + ' with standing charge' : ''}</span></div>`);
-  }
-  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
-  if (cin){
-    const g = cheapestWindow(ci.map(r => ({ from: r.from, to: r.to, p: r.v })), 6, now);
-    chips.push(`<div class="chip"><span class="v">${cin.v} g</span><span class="k">Grid carbon · ${esc(cin.index)}${g ? ` · greenest ${hhmm(g.from)}–${hhmm(g.to)}` : ''}</span></div>`);
-  }
-  const er = T ? unitPriceAt(T.eSets, now) : null;
-  if (er != null) chips.push(`<div class="chip"><span class="v">${pence(er)}</span><span class="k">Your tariff now, per kWh</span></div>`);
-  else if (a){
-    const fut = a.filter(r => r.to > now), max = fut.length ? fut.reduce((x, y) => y.p > x.p ? y : x) : null;
-    if (max) chips.push(`<div class="chip"><span class="v">${pence(max.p)}</span><span class="k">Highest to come, at ${hhmm(max.from)}</span></div>`);
-  }
-  $('#eChips').innerHTML = chips.join('');
-  $('#eFoot').innerHTML = `<span>Region ${region()} · ${REGIONS[region()]}</span>` + foot(['agile', 'carbon', 'live', 'tariff']);
-}
-/** Next 24 hours of Agile as a strip of bars, coloured by price, with a line at now. */
-function priceStrip(rates, now){
-  const start = Math.floor(now / 1800e3) * 1800e3 - 2*3600e3, list = rates.filter(r => r.from >= start).slice(0, 52);
-  if (!list.length) return '';
-  const n = list.length, W = 1000, H = 100, lo = Math.min(0, Math.min.apply(null, list.map(r => r.p))), hi = Math.max(10, Math.max.apply(null, list.map(r => r.p)));
-  const y = v => H - (v - lo) / (hi - lo) * H, bw = W / n;
-  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Agile prices for the next day">`;
-  list.forEach((r, i) => {
-    const top = Math.min(y(r.p), y(0)), h = Math.max(1, Math.abs(y(r.p) - y(0)));
-    s += `<rect class="${priceCls(r.p)}${r.to <= now ? ' past' : ''}" x="${(i*bw + bw*0.12).toFixed(1)}" y="${top.toFixed(1)}" width="${(bw*0.76).toFixed(1)}" height="${h.toFixed(1)}"/>`;
-  });
-  const nx = ((now - list[0].from) / 1800e3) * bw;
-  s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="0" y2="${H}" vector-effect="non-scaling-stroke"/></svg><div class="ticks">`;
-  list.forEach((r, i) => {
-    const d = new Date(r.from);
-    if (d.getMinutes() === 0 && d.getHours() % 6 === 0 && i > 1 && i < n - 3) s += `<span style="left:${(i / n * 100).toFixed(2)}%">${d.getHours() === 0 ? DOW[d.getDay()] : pad2(d.getHours()) + ':00'}</span>`;
-  });
-  return s + '</div>';
-}
-
-function renderHome(){
-  const now = Date.now(), W = SRC.weather.data;
-  $('#hDate').textContent = longDay(new Date(now));
-  if (W){
-    const today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0], wn = weatherText(W.now.code);
-    $('#hSun').textContent = today ? `Sunrise ${hhmm(today.rise)} · sunset ${hhmm(today.set)}` : '';
-    $('#hNow').innerHTML = `<div><span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span></div>
-      <p class="d">${esc(wn.text)} · feels ${Math.round(W.now.feels)}° · wind ${Math.round(W.now.wind)} mph</p>
-      ${today ? `<p class="d">High ${Math.round(today.max)}° · low ${Math.round(today.min)}°</p>` : ''}`;
-    $('#hHours').innerHTML = W.hours.map(h => { const w = weatherText(h.code); return `<div><span class="h">${pad2(new Date(h.t).getHours())}:00</span><span class="i" title="${esc(w.text)}">${w.icon}</span>${Math.round(h.temp)}°<span class="r">${h.rain != null ? h.rain + '%' : ''}</span></div>`; }).join('');
-  } else {
-    $('#hSun').textContent = '';
-    $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
-    $('#hHours').innerHTML = '';
-  }
-  const council = !!councilBins(SRC.council.data, now), bins = nextCollections(binsNow(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins to household.json, or in settings.</p>' : `<ul class="list">${bins.map(b => {
-    const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
-    return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
+  const now = Date.now(), cur = agileNow(now), a = SRC.agile.data;
+  $('#eVerdict').innerHTML = verdictHtml(now, true);
+  const el = $('#ePrice');
+  if (cur){ el.textContent = pence(cur.p); el.className = 'price ' + priceTone(cur.p); }
+  else { el.textContent = '--'; el.className = 'price muted'; }
+  const best = a ? cheapestWindow(a, 4, now) : null, ci = SRC.carbon.data;
+  const green = ci ? cheapestWindow(ci.map(r => ({ from: r.from, to: r.to, p: r.v })), 4, now) : null;
+  const when = t => (dayKey(t) === dayKey(now) ? '' : DOW[new Date(t).getDay()] + ' ') + hhmm(t);
+  $('#eNext').textContent = best ? `Cheapest two hours ${when(best.from)}–${hhmm(best.to)}, ${pence(best.avg)}` : '';
+  const end = a && a.length ? Math.max.apply(null, a.map(r => r.to)) : +addDays(startOfDay(new Date(now)), 1);
+  $('#eWhen').textContent = green ? `Greenest ${when(green.from)}–${hhmm(green.to)}` : '';
+  if (a && a.length) stripFor($('#eStrip'), { from: +startOfDay(new Date(now)), to: end, rates: a, cheap: best, now, aria: 'Agile prices today and tomorrow' });
+  else $('#eStrip').innerHTML = '<p class="empty">Waiting for Agile prices.</p>';
+  // the washing machine, dishwasher and tumble dryer: now, or the cheapest start
+  const lead = store.getJ('leadActs', ['wash', 'dish', 'dryer']), acts = store.getJ('acts', {}), fut = a ? a.filter(r => r.to > now) : [];
+  $('#eRun').innerHTML = `<ul class="rows">${lead.map(id => ACTIVITIES.filter(x => x.id === id)[0]).filter(Boolean).map(x => {
+    const k = +nz(acts[x.id], x.kwh), slots = Math.max(1, Math.round(nz(x.hours, .5) * 2));
+    const nowC = fut.length >= slots ? k * fut.slice(0, slots).reduce((s2, r) => s2 + r.p, 0) / slots : null, b = fut.length ? cheapestWindow(fut, slots, now) : null;
+    return `<li><span class="main">${esc(x.label)}<span class="sub">${nowC != null ? gbp(nowC) + ' if you start now' : 'Waiting for prices'}</span></span><span class="side">${b ? `<span class="cheap">${when(b.from)}</span> · ${gbp(k * b.avg)}` : '—'}</span></li>`;
   }).join('')}</ul>`;
-  const C = SRC.cal;
-  let evs = null, note = '';
-  if (!D.set.ical) note = 'Add a calendar\'s iCal address in settings to see what\'s coming up.';
-  else if (C.data) evs = C.data.filter(e => e.end > now);
-  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
-  else note = 'Reading the calendar…';
-  $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
-  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins checked with Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
+  $('#eChips').innerHTML = nowStats(now);
+  $('#eFoot').innerHTML = `<span>Region ${region()} · ${REGIONS[region()]}</span>` + foot(['agile', 'carbon', 'live', 'tariff']);
 }
 
 function renderTravel(){
   const now = Date.now(), s = D.set, T = SRC.trains;
   let html = '', list = null;
-  if (!s.trainFrom) html = '<p class="empty">Set a railway station in settings.</p>';
+  if (!s.trainFrom) html = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
   else if (T.data) list = T.data.list;
   else if (T.err) html = `<p class="empty">No departures signal: ${esc(errorText(T.err)[0])} Trying again shortly.</p>`;
   else html = '<p class="empty">Checking departures…</p>';
@@ -223,10 +240,10 @@ function renderTravel(){
   $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
   if (list){
     const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 7);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th>Status</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
+    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
       const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
-      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}</td><td class="t opt">${esc(d.platform || '—')}</td><td class="st">${st}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
+      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Expected ${hhmm(d.exp)}</span>` : '<span class="muted">On time</span>';
+      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
     }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
     if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
   }
@@ -252,12 +269,13 @@ function renderTravel(){
     }
     $('#tTrams').innerHTML = html;
   }
-  $('#tFoot').innerHTML = '<span>Live trains from National Rail, via Huxley2</span>' + foot(['trains', 'trams']);
+  $('#tFoot').innerHTML = '<span>Live trains from National Rail</span>' + foot(['trains', 'trams']);
 }
 
 function renderNight(){
   const now = Date.now(), cur = agileNow(now), W = SRC.weather.data;
-  $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : ''].filter(Boolean).join(' · ');
+  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).filter(h => h.kind !== 'rain')[0];
+  $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : '', hu ? hu.title : ''].filter(Boolean).join(' · ');
 }
 
 /* ---------- screensaver: the view from the cockpit (cockpit.js draws it) ---------- */
@@ -294,6 +312,35 @@ function cockpitInfo(now){
 function renderSaver(){ Cockpit.update(cockpitInfo(Date.now())); }
 function startSaver(){ renderSaver(); Cockpit.start(); }
 function stopSaver(){ Cockpit.stop(); }
+
+/* ---------- the phone as a remote (src/lib/remote.js) ---------- */
+function startRemote(){
+  if (D.embed || D.stopRemote) return;
+  D.remote = cleanCode(store.get('remote')) || newRemoteCode();
+  store.set('remote', D.remote);
+  D.stopRemote = listenRemote(D.remote, r => {
+    if (r.from !== 'phone') return;
+    D.lastInput = Date.now();
+    if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
+    else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
+    else if (r.cmd === 'reload'){ location.reload(); return; }
+    D.sentState = ''; tellRemote();
+  });
+  D.sentState = ''; tellRemote();
+}
+/** Tells a listening phone what's on screen, when that changes. */
+function tellRemote(){
+  if (!D.remote || D.embed) return;
+  const key = D.mode + '/' + shown();
+  if (key === D.sentState) return;
+  D.sentState = key;
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now() } });
+}
+function newPairing(){
+  if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }
+  store.set('remote', newRemoteCode()); startRemote();
+  $('#pairCode').textContent = showCode(D.remote);
+}
 
 /* ---------- toolbar, settings and remote control ---------- */
 const open = () => !$('#sheet').hidden;
@@ -394,10 +441,11 @@ function fillSheet(){
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
   [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date); setv('bE' + i, b.every || 2); });
   setv('fIcal', s.ical); setv('fTrainFrom', s.trainFrom); setv('fTrainTo', s.trainTo); setv('fTrainWalk', s.trainWalk); setv('fTramStop', s.tramStop); setv('fTramWalk', s.tramWalk);
-  $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on the dashboard on this device.` : 'For live draw and today\'s cost, connect your Octopus account once on the dashboard on this device.';
+  $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on this screen.` : 'For live draw and today\'s cost, open the phone pages on this screen once (Settings, then Account) and connect your Octopus account.';
   $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
     : `Home server helper found. Trains: ${NET.keys.rtt ? 'token set' : 'no Realtime Trains token yet'}. Trams: ${NET.keys.tfgm ? 'key set' : 'no TfGM key yet'}.`;
   $('#setupOut').textContent = '';
+  $('#pairCode').textContent = D.remote ? showCode(D.remote) : 'Starting…';
 }
 function readSheet(){
   const v = id => $('#' + id).value.trim();
@@ -436,6 +484,7 @@ function wire(){
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
   $('#closeSheet').addEventListener('click', closeSheet);
+  $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
   $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });
   $('#copySetup').addEventListener('click', () => {
     const link = setupLink(readSheet(), $('#fRegion').value), out = $('#setupOut');
@@ -445,7 +494,7 @@ function wire(){
   document.addEventListener('keydown', onKey);
   const wake = () => { D.lastInput = Date.now(); if (D.override && D.override !== D.mode){ D.override = null; applyMode(); return true; } return false; };
   let lastMove = 0;
-  document.addEventListener('mousemove', () => { const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });
+  document.addEventListener('mousemove', () => { if (D.embed) return; const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });
   let tx = null, ty = null;
   document.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; }, { passive: true });
   document.addEventListener('touchend', e => {
@@ -473,6 +522,9 @@ function wire(){
     const r = await Promise.race([fetch('household.json', { cache: 'no-cache' }), new Promise((_, no) => setTimeout(no, 4000))]);
     if (r.ok){ D.household = await r.json(); D.set = mergeSettings(D.household, store.getJ('display', null)); }
   } catch(e){}
+  D.embed = hashOptions(location.hash).embed === '1';
+  document.body.classList.toggle('embed', D.embed);
+  try { if (store.get('corners') === 'sharp') document.documentElement.setAttribute('data-corners', 'sharp'); } catch(e){}
   const imported = importSetup(location.hash);
   D.mode = modeFromHash(imported ? '' : location.hash, D.set.mode);
   D.preview = imported ? {} : hashOptions(location.hash);
@@ -480,8 +532,9 @@ function wire(){
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), D.set.reloadAt, Math.random()*10);
   applyMode();
-  if (store.get('display.reloaded')){ store.del('display.reloaded'); } else { showChrome(); }
-  keepAwake();
+  if (store.get('display.reloaded') || D.embed){ store.del('display.reloaded'); } else { showChrome(); }
+  if (!D.embed) keepAwake();
   await detectProxy();
+  startRemote();
   tick(); setInterval(tick, 1000);
 })();

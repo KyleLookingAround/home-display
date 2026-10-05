@@ -8,6 +8,9 @@ import { boot } from './session.js';
 import { store } from '../lib/browser.js';
 import { NET } from '../lib/net.js';
 import { findHomeMini, liveReading } from '../lib/octopus.js';
+import { loadBankHolidays, loadNowcast, loadRadar, loadAir, loadFloods } from '../lib/outdoors.js';
+import { loadGridMix } from '../lib/carbon.js';
+import { CI_REGION } from '../lib/format.js';
 import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive } from '../lib/household.js';
 
 const MIN = 60e3;
@@ -41,6 +44,12 @@ async function cached(key, age, run, set, setErr, force){
   catch (e){ setErr(e); const old = await cacheGet(key); if (old) set(old.value); return null; }
 }
 export const loadWeather = force => cached('weather', 15 * MIN, loadDisplayWeather, v => { app.weather = v; }, e => { app.weatherErr = e; }, force);
+export const loadHolidays = force => cached('holidays', 7 * 24 * 60 * MIN, loadBankHolidays, v => { app.holidays = v; }, () => {}, force);
+export const loadRain = force => cached('nowcast', 10 * MIN, loadNowcast, v => { app.nowcast = v; }, () => {}, force);
+export const loadRadarFrames = force => cached('radar', 5 * MIN, loadRadar, v => { app.radar = v; }, () => {}, force);
+export const loadAirNow = force => cached('air', 60 * MIN, loadAir, v => { app.air = v; }, () => {}, force);
+export const loadFloodWarnings = force => cached('floods', 15 * MIN, loadFloods, v => { app.floods = v; }, () => {}, force);
+export const loadGrid = force => cached('gridmix:' + app.region, 30 * MIN, () => loadGridMix(CI_REGION[app.region]), v => { app.gridMix = v; }, () => {}, force);
 export const loadCouncil = force => cached('council', 3 * 60 * MIN, loadCouncilBins, v => { app.council = v; }, () => {}, force);
 export async function loadTrains(force){
   const s = await houseSettings();
@@ -53,16 +62,30 @@ export async function loadEvents(force){
   return cached('events', 15 * MIN, () => loadCalendar(s.ical), v => { app.events = v; }, e => { app.eventsErr = e; }, force);
 }
 
-/** Starts the household sources a page shows, and keeps them fresh while it's open. Returns a stop function. */
-export function watchHouse({ weather = true, bins = true, trains = true, events = true } = {}){
+/**
+ * Starts the household sources a page shows, and keeps them fresh while it's open. Several cards can ask: the
+ * page runs one set of timers for everything any of them wants. Returns a stop function.
+ */
+const LOADERS = {
+  weather: loadWeather, bins: f => { loadCouncil(f); loadHolidays(f); }, trains: loadTrains, events: loadEvents,
+  rain: loadRain, radar: loadRadarFrames, air: loadAirNow, floods: loadFloodWarnings, grid: loadGrid
+};
+const wanted = {};
+let timers = null;
+export function watchHouse(ask = {}){
   boot(); houseSettings();
-  const run = force => { if (document.hidden) return; if (weather) loadWeather(force); if (bins) loadCouncil(force); if (trains) loadTrains(force); if (events) loadEvents(force); };
-  run(false);
-  const t1 = setInterval(() => { if (!document.hidden && trains) loadTrains(true); }, 2 * MIN);
-  const t2 = setInterval(() => run(false), 15 * MIN);
-  const back = () => { if (!document.hidden) run(false); };
-  document.addEventListener('visibilitychange', back);
-  return () => { clearInterval(t1); clearInterval(t2); document.removeEventListener('visibilitychange', back); };
+  const want = Object.assign({ weather: true, bins: true, trains: true, events: true, rain: true, floods: true }, ask);
+  const fresh = Object.keys(want).filter(k => want[k] && !wanted[k] && LOADERS[k]);
+  fresh.forEach(k => { wanted[k] = true; });
+  const run = (force, keys) => { if (!document.hidden) keys.forEach(k => LOADERS[k](force)); };
+  run(false, fresh);
+  if (!timers){
+    const all = () => Object.keys(wanted);
+    const back = () => { if (!document.hidden) run(false, all()); };
+    document.addEventListener('visibilitychange', back);
+    timers = [setInterval(() => { if (!document.hidden && wanted.trains) loadTrains(true); }, 2 * MIN), setInterval(() => run(false, all()), 5 * MIN), back];
+  }
+  return () => {};   // the page's timers stop when the page goes
 }
 
 /**

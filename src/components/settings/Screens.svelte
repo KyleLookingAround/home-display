@@ -23,7 +23,7 @@
 
 <section class="card" id="screens">
   <h2 class="label">Screens</h2>
-  <p class="note">The wall display is made for a tablet or the TV, with big text and the remote. Open a mode:</p>
+  <p class="note">The wall display is made for a tablet or the TV, with big text and the remote. To see it here, or change what your TV shows from this phone, go to <a href="./screen.html">Screen</a>. Open a view:</p>
   <div class="actions">{#each MODES as m}<a class="btn small" href="display.html#{m.id}">{m.label}</a>{/each}</div>
   <h3 class="sub-h">Set up another screen</h3>
   <div class="inline-fields">

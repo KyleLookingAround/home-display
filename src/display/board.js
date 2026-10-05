@@ -1,0 +1,77 @@
+/* ===================== display: drawing helpers for Today, Energy and Travel, in the dashboard's look ===================== */
+// Plain script for TV browsers (Chromium 63): no ?. or ??. Draws with strings; display.js puts them on the page.
+
+const PRICE_COL = { neg: '#b892ff', cheap: '#46e6a1', normal: '#ffd166', peak: '#ff6b7d', muted: '#9aa2c8' };
+const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+/** Line icons, the same set the phone uses. */
+const ICON = {
+  train: '<rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l-2 2M15 20l2 2M9 16v4M15 16v4"/>',
+  bins: '<path d="M4 6h16M9 6V4h6v2M6 6l1 15h10l1-15"/>',
+  rain: '<path d="M7 15a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3 3 0 0 1 0 6z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>',
+  flood: '<path d="M3 17c2 0 2-1.5 4.5-1.5S9.5 17 12 17s2.5-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S9.5 21 12 21s2.5-1.5 4.5-1.5S19 21 21 21M12 3v9M8.5 8.5 12 12l3.5-3.5"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+};
+const icon = k => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
+
+/** A heads-up, as on the phone's Now page. */
+function headsHtml(items){
+  return items.map(it => `<div class="hu ${it.tone}">${icon(it.kind)}<span class="t"><b>${esc(it.title)}</b><span class="s">${esc(it.sub)}</span></span>${it.colours ? `<span class="dots">${it.colours.map(c => `<i style="background:${BIN_COLOURS[c] || BIN_COLOURS.grey}"></i>`).join('')}</span>` : ''}</div>`).join('');
+}
+
+/** What the region's power is made of, as a bar and its biggest three. */
+const FUEL_COL = { wind: '#4fd6ff', solar: '#ffd166', hydro: '#2f7bff', nuclear: '#b892ff', biomass: '#46e6a1', gas: '#ff8a5c', coal: '#6c7399', imports: '#9aa2c8', other: '#6c7399' };
+function mixHtml(g){
+  if (!g) return '';
+  return `<div class="mix">${g.mix.map(f => `<i style="flex:${f.perc};background:${FUEL_COL[f.fuel] || '#6c7399'}"></i>`).join('')}</div>`
+    + `<p class="legend">${g.mix.slice(0, 2).map(f => `<span><i style="background:${FUEL_COL[f.fuel] || '#6c7399'}"></i>${esc(f.name)} ${Math.round(f.perc)}%</span>`).join('')}</p>`;
+}
+
+/**
+ * The price strip: Agile over a stretch of time as a smooth line coloured by price, the cheapest two hours shaded,
+ * rain as bands, events and your train as markers, and now as a dashed line. Sized in real pixels so its text stays sharp.
+ * o: { from, to, rates, cheap, rain: [{ from, to }], markers: [{ t, kind, label }], now, width, height }
+ */
+function stripSvg(o){
+  const W = Math.max(200, o.width), H = Math.max(80, o.height), fs = Math.round(remPx() * 0.9);
+  const top = fs * 1.6, bottom = fs * 1.7, ih = H - top - bottom;
+  const span = o.to - o.from, x = t => (t - o.from) / span * W;
+  const rates = (o.rates || []).filter(r => r.to > o.from && r.from < o.to);
+  if (!rates.length) return '';
+  const ps = rates.map(r => r.p), lo = Math.min(0, Math.min.apply(null, ps)), hi = Math.max(20, Math.max.apply(null, ps));
+  const y = v => top + ih - (v - lo) / (hi - lo) * ih;
+  const pts = rates.map(r => [x(Math.max(o.from, Math.min(o.to, (r.from + r.to) / 2))), y(r.p)]);
+  pts.unshift([0, pts[0][1]]); pts.push([W, pts[pts.length - 1][1]]);
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const id = 'g' + Math.round(Math.random() * 1e6);
+  const stops = rates.map(r => { const off = Math.max(0, Math.min(1, x((r.from + r.to) / 2) / W)); return `<stop offset="${off.toFixed(4)}" stop-color="${PRICE_COL[priceTone(r.p)]}"/>`; }).join('');
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || 'Agile prices')}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="${W}" y2="0" gradientUnits="userSpaceOnUse">${stops}</linearGradient>`
+    + `<linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="${id}m"><rect x="0" y="0" width="${W}" height="${H}" fill="url(#${id}f)"/></mask></defs>`;
+  (o.rain || []).forEach(b => { const a = Math.max(0, x(b.from)), e = Math.min(W, x(b.to)); if (e > a) s += `<rect class="rainb" x="${a.toFixed(1)}" y="${top.toFixed(1)}" width="${(e - a).toFixed(1)}" height="${ih.toFixed(1)}"/><text class="lbl rain" x="${(a + 6).toFixed(1)}" y="${(top + fs).toFixed(1)}" font-size="${fs}">Rain</text>`; });
+  if (o.cheap){ const a = Math.max(0, x(o.cheap.from)), e = Math.min(W, x(o.cheap.to)); if (e > a) s += `<rect class="cheapb" x="${a.toFixed(1)}" y="${top.toFixed(1)}" width="${(e - a).toFixed(1)}" height="${ih.toFixed(1)}"/><text class="lbl cheap" x="${((a + e) / 2).toFixed(1)}" y="${(top - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Cheapest</text>`; }
+  if (lo < 0) s += `<line class="zero" x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>`;
+  s += `<path d="${d}L${W} ${(top + ih).toFixed(1)}L0 ${(top + ih).toFixed(1)}Z" fill="url(#${id})" mask="url(#${id}m)"/><path d="${d}" fill="none" stroke="url(#${id})" stroke-width="${Math.max(3, fs * 0.14).toFixed(1)}" stroke-linecap="round"/>`;
+  (o.markers || []).forEach(m => {
+    if (m.t < o.from || m.t > o.to) return;
+    const mx = x(m.t), my = top + ih * 0.18;
+    s += `<line class="mk" x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${my.toFixed(1)}" y2="${(top + ih).toFixed(1)}"/>`
+      + (m.kind === 'train' ? `<circle class="mkt" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${(fs * 0.32).toFixed(1)}"/>` : `<rect class="mke" x="${(mx - fs * 0.28).toFixed(1)}" y="${(my - fs * 0.28).toFixed(1)}" width="${(fs * 0.56).toFixed(1)}" height="${(fs * 0.56).toFixed(1)}" transform="rotate(45 ${mx.toFixed(1)} ${my.toFixed(1)})"/>`);
+  });
+  if (o.now >= o.from && o.now <= o.to){ const nx = x(o.now); s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${(top - fs * 0.2).toFixed(1)}" y2="${(top + ih).toFixed(1)}"/><circle class="nowd" cx="${nx.toFixed(1)}" cy="${y(lookup(rates, o.now) != null ? lookup(rates, o.now) : rates[0].p).toFixed(1)}" r="${(fs * 0.26).toFixed(1)}"/>`; }
+  // hour labels along the bottom, spaced so they never touch
+  const step = span > 26 * 3600e3 ? 6 : 3, first = new Date(o.from); first.setMinutes(0, 0, 0);
+  let last = -1e9;
+  for (let t = +first + 3600e3; t < o.to; t += 3600e3){
+    const dt = new Date(t); if (dt.getHours() % step) continue;
+    const tx = x(t); if (tx < fs * 1.5 || tx > W - fs * 1.5 || tx - last < fs * 4.2 || (o.now >= o.from && Math.abs(tx - x(o.now)) < fs * 3.6)) continue;
+    s += `<text class="lbl" x="${tx.toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">${dt.getHours() === 0 ? DOW[dt.getDay()] : pad2(dt.getHours()) + ':00'}</text>`;
+    last = tx;
+  }
+  if (o.now >= o.from && o.now <= o.to) s += `<text class="lbl now" x="${Math.max(fs * 1.4, x(o.now)).toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Now</text>`;
+  return s + '</svg>';
+}

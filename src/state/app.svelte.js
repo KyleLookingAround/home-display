@@ -6,7 +6,7 @@
 import { buildModel, gasRegression } from '../lib/analysis.js';
 import { store } from '../lib/browser.js';
 import { unitPriceAt } from '../lib/octopus.js';
-import { mergeBins, councilBins } from '../lib/household.js';
+import { mergeBins, councilBins, nextCollections } from '../lib/household.js';
 
 class App {
   raw = $state.raw(null);                     // account data, or example data when no account is connected
@@ -33,6 +33,12 @@ class App {
   events = $state.raw(null); eventsErr = $state.raw(null);
   council = $state.raw(null);                 // the council's bin dates, when the weekly check has published them
   live = $state.raw(null); liveErr = $state.raw(null); liveState = $state('');   // the Home Mini: '' | looking | none | on
+  holidays = $state.raw(null);                // bank holidays, England and Wales
+  nowcast = $state.raw(null);                 // rain every quarter hour for the next three hours
+  radar = $state.raw(null);                   // the rain radar's frames
+  air = $state.raw(null);                     // air quality, UV and pollen
+  floods = $state.raw(null);                  // Environment Agency warnings within 15 km
+  gridMix = $state.raw(null);                 // what the region's power is made of right now
 
   compare = $state.raw(null);                 // the tariff comparison, once run
   compareOpts = $state.raw(null);             // the tariffs it priced, which the battery simulator offers too
@@ -47,6 +53,7 @@ class App {
 
   get demo(){ return !this.raw || !!this.raw.demo; }
   get bins(){ return this.house ? mergeBins(this.house.bins, councilBins(this.council, this.now)) : []; }
+  get collections(){ return this.house ? nextCollections(this.bins, this.now, this.holidays) : null; }
   get eRateNow(){ return this.raw ? unitPriceAt(this.raw.eSets, Date.now()) : null; }
   get gRateNow(){ return this.raw ? unitPriceAt(this.raw.gSets, Date.now()) : null; }
 }

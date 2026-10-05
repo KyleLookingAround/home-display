@@ -8,7 +8,7 @@
   import { cheapestWindow } from '../../lib/analysis.js';
   import { hhmm, pence, startOfDay, addDays } from '../../lib/format.js';
   import Strip from '../charts/Strip.svelte';
-  onMount(() => watchHouse({ bins: false }));
+  onMount(() => watchHouse({ bins: false, events: true }));
   const v = $derived(voyageFor({ agile: app.agileToday && app.agileToday.unit, carbon: app.carbonFc, weather: app.weather, events: app.events, trains: app.trains, walk: app.house ? app.house.trainWalk : 0 }, app.now));
   const markers = $derived([
     ...v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })),

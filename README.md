@@ -2,15 +2,17 @@
 
 A home energy dashboard for your Octopus account, and a household display for the wall tablet, phones and the TV.
 
-- **Dashboard**, made for your phone, five pages:
+- **Dashboard**, made for your phone:
   - **Now:** should you use power now, the next twelve hours of prices with rain and your next train, your live draw, and when to run the washing machine, dishwasher and dryer.
   - **Money:** this month so far and where it's heading, the year ahead against your Direct Debit, your tariff, this week and rewards.
   - **Usage:** every day, your day as a clock, every day you have as a heat map, heating against the weather, anything unusual, and carbon.
   - **Home:** bins, today's and tomorrow's events, trains and the weather; upgrades (tariffs, battery, solar, insulation, the certificate) with a saving, a cost and a payback each; and the change log.
-  - **Settings:** the account, notifications, the household, appliances, other screens, your data and the look.
+  - **Screen:** the wall display's views, live, and buttons that change what your TV shows.
+  - **Settings** (the gear at the top): the account, notifications, the household, appliances, other screens, your data and the look.
 
   Your account's data is kept in the browser for half an hour, so moving between pages is quick; Refresh fetches it again.
-- **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
+- **Display** (`display.html`): five views made for a screen across the room, in the same look as the phone pages. It runs entirely in the browser from GitHub Pages; no home server is needed. See it, and change what the TV shows, from the phone's **Screen** tab.
+  - **Today:** the household at a glance. The clock, whether now's a good time to use power, the weather, heads-ups (leave for your train, bins out tonight, rain soon, flood warnings), the next twelve hours of prices with rain, events and your train on them, the next trains, bins and the calendar, and what's live.
   - **Screensaver: the voyage.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
     - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, nebulae, planets and traffic give it depth.
     - **The Harold Street Express:** every few minutes a space train passes with one fact on each carriage: the price, the cheapest hours, grid carbon, the weather, sunset, what's coming up.
@@ -35,13 +37,14 @@ A home energy dashboard for your Octopus account, and a household display for th
       - The sun, moon, dawn and dusk follow Stockport's sunrise and sunset.
     - **Power price:** it sets the ship's speed. Warp when you're paid to use power, and the stars streak; slow at peak price. High grid carbon hazes the view.
   - **Energy:** Agile price now, the next day's prices, the cheapest two hours, grid carbon, Home Mini live draw and today's cost.
-  - **Home:** clock, date, weather now and for the next 12 hours, sunrise and sunset, bin day and your calendar.
   - **Travel:** live trains from your station, with "leave in 6 min" countdowns that allow for the walk.
-  - **Night:** a very dim clock and price, from a set time.
+  - **Night:** a very dim clock, the price and the next thing to act on, from a set time.
 
 ## The display
 
-Open https://kylelookingaround.github.io/home-display/display.html, or open a mode from Settings → Screens on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
+Open https://kylelookingaround.github.io/home-display/display.html, or open a mode from Settings → Screens on the dashboard. Each view has its own link, so each screen can open its favourite: `display.html#today`, `#energy`, `#travel`, `#screensaver` or `#night`.
+
+**Your phone as a remote:** on the TV, open Settings and find the eight-letter code under "Your phone as a remote". On your phone, open Screen and enter it. The phone can then change the TV's view, wake it or give it a fresh start. Those requests, and nothing else, pass through [ntfy.sh](https://ntfy.sh), a free relay.
 
 To see the cockpit in any weather, add it to the link. For example, `display.html#screensaver&wx=thunder&phase=night` or `#screensaver&price=-3`:
 - `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;

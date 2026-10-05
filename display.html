@@ -17,128 +17,147 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Exo+2:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
 <style>
-/* Household display. Ten-foot rules: on a 1080p TV the root font is about 27px and nothing is smaller than 0.9rem (24px);
-   focus rings are loud; every action works with arrows and Enter; a safe margin keeps clear of TV overscan.
-   Written for older TV browsers (Chromium 63+): no inset, no flex gap, no :focus-visible, clamp() only with a fallback. */
+/* Household display, in the dashboard's look (src/styles/app.css) at ten-foot sizes. On a 1080p TV the root font is
+   about 27px and nothing is smaller than 0.9rem (24px); focus rings are loud; every action works with arrows and Enter;
+   a safe margin keeps clear of TV overscan. Written for older TV browsers (Chromium 63+): no inset, no flex gap
+   (grid-gap for grids), no :focus-visible, and clamp() or min() only after a fallback. */
 :root{
-  --void:#04050d; --surface:rgba(14,18,40,.74); --surface-2:rgba(4,5,13,.6);
-  --ink:#e9ecff; --muted:#9aa2c9; --line:rgba(134,152,255,.2); --line-hot:rgba(134,152,255,.45);
-  --elec:#ffb547; --gas:#4fd6ff; --nebula:#8f6bff; --nebula-2:#ff5fae;
-  --good:#46e6a1; --warn:#ffd166; --bad:#ff6b7d; --neg:#b892ff;
+  --void:#04050d; --card:rgba(14,18,40,.72); --card-2:rgba(8,10,26,.6); --surface:rgba(14,18,40,.74); --surface-2:rgba(4,5,13,.6);
+  --ink:#e9ecff; --muted:#9aa2c8; --faint:#6c7399; --line:rgba(134,152,255,.14); --line-hot:rgba(134,152,255,.34);
+  --elec:#ffb547; --gas:#4fd6ff; --neg:#b892ff; --cal:#ff7ad9; --nebula:#8f6bff; --nebula-2:#ff5fae;
+  --cheap:#46e6a1; --normal:#ffd166; --peak:#ff6b7d; --good:#46e6a1; --warn:#ffd166; --bad:#ff6b7d;
+  --radius:.55rem; --radius-sm:.35rem;
   --f-display:"Syncopate","Eurostile","Arial Black",ui-sans-serif,sans-serif;
   --f-body:"Exo 2",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   --edge-x:16px; --edge-y:14px;
   color-scheme:dark;
 }
+:root[data-corners="sharp"]{--radius:.15rem;--radius-sm:.1rem}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;font-size:16px}
-/* TV and big screens: scale with the screen, about 27px at 1920 x 1080, and keep 5% clear for overscan. */
+/* TV and big screens: scale with the screen, about 27px at 1920 x 1080, and keep 4.5% clear for overscan. */
 @media (min-width:1144px){
   html{font-size:1.4vw;font-size:min(1.4vw,2.5vh)}
   :root{--edge-x:4.5vw;--edge-y:4.5vh}
 }
 body{margin:0;color:var(--ink);font:1rem/1.4 var(--f-body);background-color:var(--void);min-height:100vh;overflow-x:hidden;
-  background-image:radial-gradient(60vw 45vw at 88% -8%, rgba(143,107,255,.2), transparent 70%),radial-gradient(50vw 40vw at -10% 35%, rgba(79,214,255,.1), transparent 70%),radial-gradient(45vw 35vw at 70% 105%, rgba(255,95,174,.1), transparent 70%)}
+  background-image:radial-gradient(60vw 45vw at 88% -8%, rgba(143,107,255,.12), transparent 70%),radial-gradient(50vw 40vw at -10% 35%, rgba(79,214,255,.06), transparent 70%)}
 [hidden]{display:none!important}
-#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block;transition:opacity 2s}
+#stars{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;display:block;transition:opacity 2s;opacity:.7}
 a{color:var(--gas)}
 p{margin:0}
-h1,h2,h3{font-family:var(--f-display);margin:0;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+h1,h2,h3{margin:0;font-weight:600}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .muted{color:var(--muted)}
-.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)} .neg{color:var(--neg)}
-.tag{display:inline-block;font:500 .9rem/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;padding:.25em .45em;border-radius:3px;border:1px solid currentColor;color:var(--warn);margin-left:.5em;vertical-align:.1em}
+.cheap,.good{color:var(--cheap)} .normal,.warn{color:var(--normal)} .peak,.bad{color:var(--peak)} .neg{color:var(--neg)} .elec{color:var(--elec)} .gas{color:var(--gas)}
+.label{font:500 .9rem/1.3 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0}
+.title{font:700 1.4rem/1 var(--f-display);letter-spacing:.1em;text-transform:uppercase}
 
 /* the screen */
 .screen{position:relative;z-index:1;min-height:100vh;padding:calc(var(--edge-y) + env(safe-area-inset-top,0px)) calc(var(--edge-x) + env(safe-area-inset-right,0px)) calc(var(--edge-y) + env(safe-area-inset-bottom,0px)) calc(var(--edge-x) + env(safe-area-inset-left,0px));display:flex;flex-direction:column}
 .mode{flex:1 1 auto;display:flex;flex-direction:column;min-width:0}
-.mode-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;margin-bottom:.6rem}
-.eyebrow{font:500 .9rem/1.4 var(--f-mono);text-transform:uppercase;letter-spacing:.14em;color:var(--gas)}
-.eyebrow::before{content:"\25B8 ";opacity:.7}
-.clock-sm{font:500 1.6rem/1 var(--f-mono);letter-spacing:.04em}
-.mode-foot{margin-top:auto;padding-top:.8rem;font:500 .9rem/1.4 var(--f-mono);color:var(--muted);display:flex;flex-wrap:wrap;justify-content:space-between}
-.mode-foot > *{margin-right:1.2rem}
-.mode-foot .warn{color:var(--warn)}
+.mode:not(.mode-saver) > * + *{margin-top:.6rem}
+.foot{margin-top:auto!important;padding-top:.6rem;font:500 .9rem/1.4 var(--f-mono);color:var(--faint);display:flex;flex-wrap:wrap;justify-content:space-between}
+.foot > *{margin-right:1.2rem}
+.foot .warn{color:var(--warn)}
+
+/* cards */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:.65rem .95rem;min-width:0}
+.card > .label{margin-bottom:.4rem}
+.card-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem}
+.card-head .aside{font:500 .9rem/1.3 var(--f-mono);color:var(--cheap)}
+.grid3,.grid2{display:grid;grid-template-columns:1fr;grid-gap:.75rem;gap:.75rem}
+@media (min-width:900px){ .grid3{grid-template-columns:1.15fr 1fr 1fr} .grid2{grid-template-columns:1fr 1fr} }
+.rows{margin:0;padding:0;list-style:none}
+.rows li{display:flex;align-items:center;justify-content:space-between;padding:.3rem 0;border-top:1px solid var(--line);min-width:0}
+.rows li:first-child{border-top:0;padding-top:0}
+.rows .main{min-width:0;flex:1 1 auto;margin-right:.6rem}
+.rows .main b{font-weight:600}
+.rows .sub{display:block;font-size:.9rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rows .side{font:500 1rem/1.3 var(--f-mono);text-align:right;white-space:nowrap}
+.empty,.note{font-size:.9rem;color:var(--muted)}
+.dots{display:inline-flex;margin-left:.6rem}
+.dots.lead{margin:0 .6rem 0 0}
+.dots i{width:.9rem;height:.9rem;border-radius:50%;border:1px solid rgba(255,255,255,.25);margin-left:.25rem;display:inline-block}
+.legend{display:flex;flex-wrap:wrap;font-size:.9rem;color:var(--muted);margin-top:.4rem}
+.legend span{margin-right:1rem;display:inline-flex;align-items:center}
+.legend i{width:.7rem;height:.7rem;border-radius:.2rem;display:inline-block;margin-right:.4rem}
+.mix{display:flex;height:.45rem;border-radius:.25rem;overflow:hidden;margin-top:.6rem}
+.mix i{display:block;min-width:2px;margin-right:2px}
+.stat{display:flex;align-items:baseline;justify-content:space-between;padding:.3rem 0;border-top:1px solid var(--line)}
+.stat:first-child{border-top:0;padding-top:0}
+.stat .v{font:500 1.2rem/1.2 var(--f-mono);white-space:nowrap}
+.stat .v .small{font:500 1rem/1.2 var(--f-body)}
+.stat .k{font-size:.9rem;color:var(--muted);margin-right:.8rem}
+
+/* the top of a view: clock, answer, weather */
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.top.slim{align-items:baseline}
+.when .clock{font:500 3.8rem/1 var(--f-mono);letter-spacing:.02em}
+.clock.sm{font:500 1.6rem/1 var(--f-mono)}
+.date{font-size:1.05rem;color:var(--muted);margin-top:.3rem}
+.verdict{flex:1 1 18rem;margin:0 1.5rem;min-width:0}
+.verdict .big{font:700 2rem/1.1 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:0}
+.verdict.big .big{font-size:2.6rem}
+.verdict .line{font-size:1.2rem;margin-top:.35rem}
+.verdict .note{margin-top:.2rem}
+.glow-cheap{color:var(--cheap);text-shadow:0 0 1.2rem rgba(70,230,161,.45)} .glow-normal{color:var(--normal);text-shadow:0 0 1.2rem rgba(255,209,102,.4)}
+.glow-peak{color:var(--peak);text-shadow:0 0 1.2rem rgba(255,107,125,.45)} .glow-neg{color:var(--neg);text-shadow:0 0 1.2rem rgba(184,146,255,.5)}
+.wx{display:flex;align-items:center;text-align:right}
+.wx .i{font-size:2.6rem;line-height:1;margin-right:.6rem}
+.wx .t{font:500 3rem/1 var(--f-mono)}
+.wx .d{font-size:.95rem;color:var(--muted);margin-left:.8rem;text-align:left}
+.price-now{text-align:right}
+.price-now .label{display:block}
+.price{display:block;font:500 4.4rem/1 var(--f-mono);letter-spacing:-.02em}
+.price-now .sub{display:block;font-size:1rem;color:var(--muted);margin-top:.3rem}
+
+/* heads-ups */
+.heads{display:flex;flex-wrap:wrap;margin:0 -.375rem}
+.heads:empty{display:none}
+.hu{flex:1 1 18rem;margin:.375rem;display:flex;align-items:center;padding:.45rem .9rem;border-radius:var(--radius);background:var(--card);border:1px solid var(--line);border-left:.22rem solid currentColor;min-width:0}
+.hu .ic{width:1.6rem;height:1.6rem;flex:none;margin-right:.8rem;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.hu .t{color:var(--ink);min-width:0}
+.hu b{display:block;font-weight:600;font-size:1.15rem}
+.hu .s{display:block;font-size:.9rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hu .dots{margin-left:auto}
+
+/* the price strip */
+.strip{position:relative;height:7rem;margin:0 -.2rem}
+.strip-card.tall .strip{height:10.6rem}
+.strip svg{display:block}
+.strip .lbl{fill:var(--muted);font-family:var(--f-mono)}
+.strip .lbl.cheap{fill:var(--cheap)} .strip .lbl.rain{fill:var(--gas)} .strip .lbl.now{fill:var(--ink)}
+.strip .cheapb{fill:rgba(70,230,161,.1)} .strip .rainb{fill:rgba(79,214,255,.08)}
+.strip .nowl{stroke:var(--ink);stroke-width:1.5;stroke-dasharray:4 4;opacity:.7}
+.strip .nowd{fill:var(--ink)}
+.strip .zero{stroke:var(--neg);stroke-width:1;stroke-dasharray:3 4;opacity:.6}
+.strip .mk{stroke:var(--line-hot);stroke-width:1.5}
+.strip .mkt{fill:var(--gas)} .strip .mke{fill:var(--cal)}
+
+/* departures */
+.deps{width:100%;border-collapse:collapse;font-size:1.1rem}
+.deps th{font:500 .9rem/1.3 var(--f-mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:0 .6rem .4rem 0;font-weight:500}
+.deps td{padding:.4rem .6rem .4rem 0;border-top:1px solid var(--line);vertical-align:baseline}
+.deps .t{font-family:var(--f-mono);white-space:nowrap}
+.deps .dest{width:100%}
+.deps .sub{display:block;font-size:.9rem;color:var(--muted)}
+.deps .sub .warn{color:var(--warn)} .deps .sub .bad{color:var(--bad)}
+.deps .lv{text-align:right;white-space:nowrap;font-family:var(--f-mono);padding-right:0}
+@media (max-width:520px){.deps .opt{display:none}}
 
 /* toolbar: hidden until a key, tap or mouse move, then fades after a few seconds */
-.bar{position:fixed;z-index:20;top:0;left:0;right:0;padding:calc(var(--edge-y) * .6 + env(safe-area-inset-top,0px)) var(--edge-x) .7rem;background:rgba(4,5,13,.97);border-bottom:1px solid var(--line-hot);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;transform:translateY(-110%);opacity:0;transition:transform .3s,opacity .3s;visibility:hidden}
+.bar{position:fixed;z-index:20;top:0;left:0;right:0;padding:calc(var(--edge-y) * .6 + env(safe-area-inset-top,0px)) var(--edge-x) .7rem;background:rgba(4,5,13,.96);border-bottom:1px solid var(--line-hot);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;transform:translateY(-110%);opacity:0;transition:transform .3s,opacity .3s;visibility:hidden}
 .chrome-on .bar{transform:none;opacity:1;visibility:visible}
 .picker,.bar-actions{display:flex;flex-wrap:wrap;align-items:center}
 .picker{overflow-x:auto;max-width:100%;scrollbar-width:none}
 .picker::-webkit-scrollbar{display:none}
-.btn{font:500 .9rem/1 var(--f-mono);text-transform:uppercase;letter-spacing:.08em;color:var(--ink);background:rgba(14,18,40,.7);border:2px solid var(--line-hot);border-radius:4px;padding:.65em .9em;margin:.2rem .5rem .2rem 0;cursor:pointer;text-decoration:none;display:inline-block;white-space:nowrap}
-.btn[aria-selected="true"],.btn.primary{background:var(--gas);border-color:var(--gas);color:#05060f;box-shadow:0 0 16px -3px var(--gas)}
-.btn .k{opacity:.6;margin-right:.4em}
+.btn{font:500 .9rem/1 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.65em 1em;margin:.2rem .5rem .2rem 0;cursor:pointer;text-decoration:none;display:inline-block;white-space:nowrap}
+.btn[aria-selected="true"],.btn.primary{background:var(--gas);border-color:var(--gas);color:#04101a;font-weight:600}
+.btn .k{opacity:.55;margin-right:.45em;font-family:var(--f-mono)}
 .btn:focus,select:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
 .btn::-moz-focus-inner{border:0}
-
-/* chips and panels */
-.row{display:flex;flex-wrap:wrap;margin:0 -.5rem}
-.row > *{margin:.5rem;flex:1 1 13rem;min-width:0}
-.chip{border:1px solid var(--line);border-radius:4px;padding:.7rem .9rem;background:var(--surface);min-width:0}
-.chip .v{display:block;font:500 1.7rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.chip .k{display:block;font-size:.9rem;color:var(--muted);margin-top:.2rem}
-.panel{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:.9rem 1.1rem;min-width:0}
-.panel::before,.panel::after{content:"";position:absolute;width:.9rem;height:.9rem;border:2px solid var(--gas);opacity:.75;pointer-events:none}
-.panel::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
-.panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
-.panel h2{font-size:.95rem;margin-bottom:.6rem;color:var(--ink)}
-.empty{color:var(--muted);font:1rem/1.4 var(--f-mono)}
-.note{color:var(--muted);font-size:.9rem;margin-top:.5rem}
-
-/* energy */
-.price-wrap{text-align:center;margin:.6rem 0 1rem;animation:drift-sm 300s ease-in-out infinite alternate}
-.price-label{font:500 1.1rem/1.4 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.14em}
-.price{display:block;font:700 22vw/1 var(--f-mono);font-variant-numeric:tabular-nums;margin:.15em 0;transition:color .6s,text-shadow .6s}
-@media (min-width:700px){.price{font-size:8.5rem}}
-.price-sub{font:500 1.1rem/1.4 var(--f-mono);color:var(--muted)}
-.strip{position:relative;margin:.4rem 0 1.6rem;overflow:hidden}
-.strip svg{display:block;width:100%;height:5.5rem}
-.strip .ticks{position:relative;height:1.3rem}
-.strip .ticks span{position:absolute;top:.2rem;transform:translateX(-50%);font:500 .9rem/1 var(--f-mono);color:var(--muted);white-space:nowrap}
-.p-neg{fill:var(--neg)} .p-low{fill:var(--good)} .p-mid{fill:var(--warn)} .p-high{fill:var(--bad)}
-.strip .past{opacity:.3}
-.strip .nowl{stroke:var(--gas);stroke-width:2;stroke-dasharray:4 4}
-
-/* home */
-.home-top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;margin-bottom:.8rem}
-.home-top > *{margin:0 1rem .6rem 0}
-.clock-xl{font:500 20vw/1 var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:.02em;text-shadow:0 0 30px rgba(143,107,255,.45)}
-@media (min-width:700px){.clock-xl{font-size:6.5rem}}
-.date-l{font:600 1.4rem/1.3 var(--f-body)}
-.sun{font:500 1rem/1.4 var(--f-mono);color:var(--muted);margin-top:.2rem}
-.wx-now{text-align:right}
-.wx-now .t{font:500 4rem/1 var(--f-mono)}
-.wx-now .i{font-size:3rem;margin-right:.3em;color:var(--elec);font-variant-emoji:text}
-.wx-now .d{font:500 1rem/1.4 var(--f-mono);color:var(--muted)}
-.hours{display:flex;overflow:hidden;border:1px solid var(--line);border-radius:4px;background:var(--surface-2);margin-bottom:1rem}
-.hours > div{flex:1 1 0;min-width:0;text-align:center;padding:.5rem .2rem;border-right:1px solid var(--line);font:500 1rem/1.35 var(--f-mono)}
-.hours > div:last-child{border-right:0}
-.hours .h{color:var(--muted);font-size:.9rem;display:block}
-.hours .i{display:block;font-size:1.4rem;color:var(--elec);font-variant-emoji:text}
-.hours .r{display:block;font-size:.9rem;color:var(--gas)}
-.cols{display:flex;flex-wrap:wrap;margin:0 -.5rem}
-.cols > *{margin:.5rem;flex:1 1 18rem;min-width:0}
-.list{list-style:none;margin:0;padding:0}
-.list li{display:flex;justify-content:space-between;align-items:baseline;padding:.35rem 0;border-bottom:1px solid var(--line)}
-.list li:last-child{border-bottom:0}
-.list li > *{min-width:0}
-.list .when{font:500 1rem/1.3 var(--f-mono);color:var(--muted);margin-left:1rem;text-align:right;max-width:60%;flex-shrink:0}
-.list .what{overflow-wrap:anywhere}
-.bin{display:inline-block;width:1.1rem;height:1.1rem;border-radius:3px;margin-right:.6rem;vertical-align:-.1rem;border:1px solid rgba(233,236,255,.5)}
-.soon{color:var(--elec);font-weight:600}
-
-/* travel */
-.deps{width:100%;border-collapse:collapse;font-size:1rem}
-.deps td,.deps th{padding:.4rem .5rem .4rem 0;border-bottom:1px solid var(--line);text-align:left;vertical-align:baseline}
-.deps th{font:500 .9rem/1.3 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
-.deps tr:last-child td{border-bottom:0}
-.deps .t{font-family:var(--f-mono);white-space:nowrap}
-.deps .dest{overflow-wrap:anywhere;width:45%}
-.deps .lv{font-family:var(--f-mono);white-space:nowrap;text-align:right}
-.deps .st{font-family:var(--f-mono);white-space:nowrap}
-@media (max-width:520px){.deps .opt{display:none}}
 
 /* screensaver: a side window onto space. Space and billboards outside, then close things, the glass, the frame and the cabin. */
 .mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a;--amb:126,146,255}
@@ -237,23 +256,28 @@ body.night #stars{opacity:.12}
 .night-wrap{margin:auto;text-align:center;animation:drift 420s ease-in-out infinite alternate;color:#4a4f6a}
 .night-clock{font:500 22vw/1 var(--f-mono);letter-spacing:.02em}
 @media (min-width:700px){.night-clock{font-size:8rem}}
-.night-sub{font:500 1.3rem/1.5 var(--f-mono)}
+.night-sub{font:500 1.1rem/1.5 var(--f-mono);margin-top:.6rem}
 @keyframes drift-sm{0%{transform:translate(-3vw,-1vh)}33%{transform:translate(2.5vw,1vh)}66%{transform:translate(-2vw,1.5vh)}100%{transform:translate(3vw,-.5vh)}}
 @keyframes drift{0%{transform:translate(-6vw,-4vh)}25%{transform:translate(5vw,-2vh)}50%{transform:translate(4vw,5vh)}75%{transform:translate(-5vw,3vh)}100%{transform:translate(6vw,-3vh)}}
 
 /* settings */
-.sheet{position:fixed;top:0;left:0;right:0;bottom:0;z-index:30;background:rgba(4,5,13,.94);overflow-y:auto;padding:var(--edge-y) var(--edge-x)}
-.sheet form{max-width:60rem;margin:0 auto}
-.sheet h2{font-size:1.1rem;margin:1.2rem 0 .6rem}
-.sheet h3{font-size:.95rem;margin:1rem 0 .4rem;color:var(--gas)}
+.sheet{position:fixed;top:0;left:0;right:0;bottom:0;z-index:30;background:rgba(4,5,13,.96);overflow-y:auto;padding:var(--edge-y) var(--edge-x)}
+.sheet form{max-width:62rem;margin:0 auto}
+.sheet-head h2{font:700 1.3rem/1.2 var(--f-display);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem}
+.sheet .card{margin-top:.8rem}
 .fields{display:flex;flex-wrap:wrap;margin:0 -.5rem}
 .field{margin:.4rem .5rem;flex:1 1 13rem;min-width:0}
+.field.wide{flex-basis:30rem}
 .field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
-.field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--surface-2);border:2px solid var(--line-hot);border-radius:4px;padding:.5em .6em;width:100%}
-.field input[type=checkbox]{width:1.4rem;height:1.4rem;accent-color:var(--gas);vertical-align:middle}
+.field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.5em .6em;width:100%}
 .help{font-size:.9rem;color:var(--muted);margin:.3rem 0;max-width:62ch}
+.pair{font-size:1.1rem}
+.pair .code{font:700 1.8rem/1 var(--f-mono);letter-spacing:.18em;color:var(--gas);margin-left:.6rem}
 .actions{margin-top:1rem}
-.toast{position:fixed;z-index:40;left:50%;bottom:calc(var(--edge-y) + 1rem);transform:translateX(-50%);background:var(--surface);border:1px solid var(--gas);border-radius:4px;padding:.7rem 1rem;font:500 1rem/1.3 var(--f-mono);max-width:90vw;text-align:center}
+.toast{position:fixed;z-index:40;left:50%;bottom:calc(var(--edge-y) + 1rem);transform:translateX(-50%);background:var(--card);border:1px solid var(--gas);border-radius:var(--radius-sm);padding:.7rem 1rem;font:500 1rem/1.3 var(--f-body);max-width:90vw;text-align:center}
+
+/* embedded in the phone's Screen page: just the picture */
+body.embed .bar,body.embed .toast{display:none!important}
 
 @media (max-width:699px){
   .board,.board.wide{width:80vw}
@@ -265,8 +289,10 @@ body.night #stars{opacity:.12}
   .bar{display:block;padding-bottom:.4rem}
   .picker,.bar-actions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .bar-actions::-webkit-scrollbar{display:none}
-  .wx-now{text-align:left}
-  .hours > div:nth-child(n+7){display:none}
+  .verdict{margin:.6rem 0;flex-basis:100%;order:3}
+  .when .clock{font-size:3rem}
+  .price{font-size:3.2rem}
+  .price-now{text-align:left;margin-top:.6rem}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -279,51 +305,51 @@ body.night #stars{opacity:.12}
   <div class="bar-actions">
     <button class="btn" id="setBtn" type="button">Settings</button>
     <button class="btn" id="fsBtn" type="button">Full screen</button>
-    <a class="btn" id="dashBtn" href="index.html">Dashboard</a>
+    <a class="btn" id="dashBtn" href="index.html">Phone pages</a>
   </div>
 </header>
 
 <div class="screen" id="screen">
 
-  <!-- ================= ENERGY ================= -->
-  <section class="mode" data-mode="energy" aria-label="Energy" hidden>
-    <div class="mode-head"><p class="eyebrow">Harold Street · energy</p><span class="clock-sm mono" data-clock>--:--</span></div>
-    <div class="price-wrap">
-      <span class="price-label" id="eLabel">Agile price now, per kWh</span>
-      <span class="price" id="ePrice">--</span>
-      <span class="price-sub" id="eNext"></span>
+  <!-- ================= TODAY: the household at a glance ================= -->
+  <section class="mode" data-mode="today" aria-label="Today" hidden>
+    <div class="top">
+      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p></div>
+      <div class="verdict" id="dVerdict"></div>
+      <div class="wx" id="dWx"></div>
     </div>
-    <div class="strip" id="eStrip"></div>
-    <div class="row" id="eChips"></div>
-    <p class="mode-foot" id="eFoot"></p>
+    <div class="heads" id="dHeads"></div>
+    <section class="card strip-card"><div class="card-head"><h2 class="label">The next 12 hours</h2><span class="aside" id="dCheap"></span></div><div class="strip" id="dStrip"></div></section>
+    <div class="grid3">
+      <section class="card"><h2 class="label" id="dTrainsH">Trains</h2><div id="dTrains"></div></section>
+      <section class="card"><h2 class="label">Today and tomorrow</h2><div id="dDay"></div></section>
+      <section class="card"><h2 class="label">Right now</h2><div id="dNow"></div></section>
+    </div>
+    <p class="foot" id="dFoot"></p>
   </section>
 
-  <!-- ================= HOME ================= -->
-  <section class="mode" data-mode="home" aria-label="Home" hidden>
-    <div class="home-top">
-      <div>
-        <div class="clock-xl" data-clock>--:--</div>
-        <p class="date-l" id="hDate"></p>
-        <p class="sun" id="hSun"></p>
-      </div>
-      <div class="wx-now" id="hNow"></div>
+  <!-- ================= ENERGY ================= -->
+  <section class="mode" data-mode="energy" aria-label="Energy" hidden>
+    <div class="top">
+      <div class="verdict big" id="eVerdict"></div>
+      <div class="price-now"><span class="label">Agile now</span><span class="price" id="ePrice">--</span><span class="sub" id="eNext"></span></div>
     </div>
-    <div class="hours" id="hHours"></div>
-    <div class="cols">
-      <section class="panel"><h2>Bins</h2><div id="hBins"></div></section>
-      <section class="panel"><h2>Coming up</h2><div id="hCal"></div></section>
+    <section class="card strip-card tall"><div class="card-head"><h2 class="label">Today and tomorrow</h2><span class="aside" id="eWhen"></span></div><div class="strip" id="eStrip"></div></section>
+    <div class="grid2">
+      <section class="card"><h2 class="label">Run it now or later?</h2><div id="eRun"></div></section>
+      <section class="card"><h2 class="label">Right now</h2><div id="eChips"></div></section>
     </div>
-    <p class="mode-foot" id="hFoot"></p>
+    <p class="foot" id="eFoot"></p>
   </section>
 
   <!-- ================= TRAVEL ================= -->
   <section class="mode" data-mode="travel" aria-label="Travel" hidden>
-    <div class="mode-head"><p class="eyebrow">Departures</p><span class="clock-sm mono" data-clock>--:--</span></div>
-    <div class="cols">
-      <section class="panel"><h2 id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
-      <section class="panel"><h2 id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
+    <div class="top slim"><h1 class="title">Travel</h1><span class="clock sm" data-clock>--:--</span></div>
+    <div class="grid2 travel">
+      <section class="card"><h2 class="label" id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
+      <section class="card"><h2 class="label" id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
     </div>
-    <p class="mode-foot" id="tFoot"></p>
+    <p class="foot" id="tFoot"></p>
   </section>
 
   <!-- ================= SCREENSAVER: a side window onto space ================= -->
@@ -395,50 +421,50 @@ body.night #stars{opacity:.12}
 <!-- ================= SETTINGS ================= -->
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <form id="setForm" autocomplete="off">
-    <h2 id="sheetTitle">Display settings</h2>
-    <p class="help">These are kept on this device only. Use the arrows to move, Enter to choose and Back to close. Set things up on a phone, then send the setup link to the TV.</p>
+    <div class="sheet-head"><h2 id="sheetTitle">Settings</h2><p class="help">Kept on this screen. Arrows to move, Enter to choose, Back to close. It's easiest to set things up on your phone (Settings, then Screens) and send this screen a setup link.</p></div>
 
-    <h3>This screen</h3>
+    <section class="card"><h3 class="label">This screen</h3>
     <div class="fields">
       <div class="field"><label for="fMode">Opens on</label><select id="fMode"></select></div>
-      <div class="field"><label for="fRotate">Change mode every</label><select id="fRotate"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
-      <div class="field"><label for="fDetail">Screensaver detail</label><select id="fDetail"><option value="auto">Automatic: less on TVs and slow screens</option><option value="high">Full detail</option><option value="low">Lighter, for a slow TV</option></select></div>
+      <div class="field"><label for="fRotate">Change view every</label><select id="fRotate"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
       <div class="field"><label for="fSaver">Screensaver after</label><select id="fSaver"><option value="0">Never</option><option value="5">5 idle minutes</option><option value="10">10 idle minutes</option><option value="15">15 idle minutes</option><option value="30">30 idle minutes</option><option value="60">An idle hour</option></select></div>
+      <div class="field"><label for="fDetail">Screensaver detail</label><select id="fDetail"><option value="auto">Automatic</option><option value="high">Full detail</option><option value="low">Lighter, for a slow TV</option></select></div>
     </div>
     <div class="fields">
       <div class="field"><label for="fNight">Night clock</label><select id="fNight"><option value="1">On</option><option value="0">Off</option></select></div>
       <div class="field"><label for="fNightFrom">Night from</label><select id="fNightFrom" data-times></select></div>
       <div class="field"><label for="fNightTo">Night until</label><select id="fNightTo" data-times></select></div>
       <div class="field"><label for="fReload">Fresh start each night at</label><select id="fReload" data-times></select></div>
-    </div>
+    </div></section>
 
-    <h3>Energy</h3>
+    <section class="card"><h3 class="label">Your phone as a remote</h3>
+    <p class="pair">Code <b class="code" id="pairCode">----</b></p>
+    <p class="help">On your phone, open Screen and enter this code. Then the phone can change what this screen shows. Only those requests pass through ntfy.sh, a free relay; nothing else does.</p>
+    <div class="actions"><button class="btn" type="button" id="newCode">New code</button></div></section>
+
+    <section class="card"><h3 class="label">Energy</h3>
+    <div class="fields"><div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div></div>
+    <p class="help" id="acctHelp"></p></section>
+
+    <section class="card"><h3 class="label">Bins</h3>
+    <p class="help">For each bin, one collection date you know and how often it comes. Bank holiday weeks move it a day later.</p>
+    <div id="binRows"></div></section>
+
+    <section class="card"><h3 class="label">Calendar</h3>
+    <div class="fields"><div class="field wide"><label for="fIcal">Secret iCal address</label><input id="fIcal" type="url" inputmode="url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div></div>
+    <p class="help">In Google Calendar: Settings, your calendar, then Secret address in iCal format. It stays on this screen. Google's address needs the home server helper.</p></section>
+
+    <section class="card"><h3 class="label">Travel</h3>
     <div class="fields">
-      <div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div>
-    </div>
-    <p class="help" id="acctHelp"></p>
-
-    <h3>Bins</h3>
-    <p class="help">For each bin, give one collection date you know and how often it comes. Bank holiday changes aren't included.</p>
-    <div id="binRows"></div>
-
-    <h3>Calendar</h3>
-    <div class="fields">
-      <div class="field" style="flex-basis:30rem"><label for="fIcal">Secret iCal address</label><input id="fIcal" type="url" inputmode="url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div>
-    </div>
-    <p class="help">In Google Calendar: Settings → your calendar → Integrate calendar → Secret address in iCal format. Anyone with the address can read the calendar, so it stays on this device. Google's address needs the home server helper.</p>
-
-    <h3>Travel</h3>
-    <div class="fields">
-      <div class="field"><label for="fTrainFrom">Railway station code</label><input id="fTrainFrom" class="mono" maxlength="8" placeholder="SPT"></div>
-      <div class="field"><label for="fTrainTo">Only trains calling at</label><input id="fTrainTo" class="mono" maxlength="8" placeholder="e.g. MAN (optional)"></div>
-      <div class="field"><label for="fTrainWalk">Walk to the station (min)</label><select id="fTrainWalk" data-walk></select></div>
+      <div class="field"><label for="fTrainFrom">Station code</label><input id="fTrainFrom" class="mono" maxlength="8" placeholder="SPT"></div>
+      <div class="field"><label for="fTrainTo">Only trains calling at</label><input id="fTrainTo" class="mono" maxlength="8" placeholder="e.g. MAN"></div>
+      <div class="field"><label for="fTrainWalk">Walk to the station</label><select id="fTrainWalk" data-walk></select></div>
     </div>
     <div class="fields">
       <div class="field"><label for="fTramStop">Metrolink stop</label><input id="fTramStop" placeholder="e.g. East Didsbury"></div>
-      <div class="field"><label for="fTramWalk">Walk to the stop (min)</label><select id="fTramWalk" data-walk></select></div>
+      <div class="field"><label for="fTramWalk">Walk to the stop</label><select id="fTramWalk" data-walk></select></div>
     </div>
-    <p class="help" id="travelHelp"></p>
+    <p class="help" id="travelHelp"></p></section>
 
     <div class="actions">
       <button class="btn primary" type="submit">Save</button>
@@ -809,6 +835,17 @@ async function loadCarbonHistory(regionId, from, to){
   }
   return out.map(x => ({ from: x.from, to: x.to, p: x.v })).sort((a, b) => a.from - b.from);
 }
+
+/* ---------- what the region's power is made of right now ---------- */
+async function loadGridMix(regionId){ return parseGridMix(await request(`https://api.carbonintensity.org.uk/regional/regionid/${regionId}`, { headers: { Accept: 'application/json' } })); }
+const FUEL_NAMES = { wind: 'Wind', solar: 'Solar', hydro: 'Hydro', nuclear: 'Nuclear', biomass: 'Biomass', gas: 'Gas', coal: 'Coal', imports: 'Imports', other: 'Other' };
+function parseGridMix(j){
+  const d = j && j.data && j.data[0], slot = d && d.data && d.data[0];
+  if (!slot || !slot.generationmix) return null;
+  const mix = slot.generationmix.filter(f => f.perc > 0).map(f => ({ fuel: f.fuel, name: FUEL_NAMES[f.fuel] || f.fuel, perc: f.perc })).sort((a, b) => b.perc - a.perc);
+  const share = list => Math.round(mix.filter(f => list.indexOf(f.fuel) >= 0).reduce((s, f) => s + f.perc, 0));
+  return { from: +new Date(slot.from), mix, renewable: share(['wind', 'solar', 'hydro']), lowCarbon: share(['wind', 'solar', 'hydro', 'nuclear', 'biomass']) };
+}
 /* Analysis: pure functions with no DOM. Example data, the period roll-up, patterns, projections, comparisons and simulators. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
@@ -1140,6 +1177,28 @@ function cheapestWindow(rates, slots, now = Date.now()){
   return best;
 }
 
+/** Price tone: below zero, cheap (under 15p), normal (under 25p) or peak. */
+const priceTone = p => p == null ? 'muted' : p < 0 ? 'neg' : p < 15 ? 'cheap' : p < 25 ? 'normal' : 'peak';
+/**
+ * Is now a good time to use power? One word or two, and a line, from Agile's half hours (rates: { from, to, p }).
+ * Both the phone and the wall display say it the same way.
+ */
+function priceVerdict(rates, now){
+  const all = (rates || []).filter(r => isFinite(r.to));
+  let i = -1;
+  for (let k = 0; k < all.length; k++) if (all[k].from <= now && now < all[k].to){ i = k; break; }
+  if (i < 0) return null;
+  const when = t => (dayKey(t) === dayKey(now) ? '' : DOW[new Date(t).getDay()] + ' ') + hhmm(t);
+  const cur = all[i], ahead = all.slice(i).filter(r => r.from < now + 12 * 3600e3);
+  const best = ahead.length >= 4 ? cheapestWindow(ahead, 4, now) : null;
+  const runUntil = test => { let j = i; while (j + 1 < all.length && test(all[j + 1].p)) j++; return all[j].to; };
+  const out = (tone, big, line) => ({ tone, big, line, p: cur.p, best });
+  if (cur.p < 0) return out('neg', 'Paid to use power', `${pence(cur.p)} now, below zero until ${when(runUntil(p => p < 0))}`);
+  if (cur.p < 15 || (best && cur.p <= best.avg * 1.1 && cur.p < 25)) return out('cheap', 'Good time', `${pence(cur.p)} now, cheap until ${when(runUntil(p => p < Math.max(15, cur.p * 1.1)))}`);
+  if (best && best.from > now && best.avg < cur.p * 0.8) return out(priceTone(cur.p), 'Wait if you can', `${pence(cur.p)} now, ${pence(best.avg)} from ${when(best.from)}`);
+  return out(priceTone(cur.p), cur.p >= 25 ? 'Peak price' : 'Normal price', `${pence(cur.p)} now, no cheaper spell in the next 12 hours`);
+}
+
 /* ---------- weekly log ---------- */
 function weekLog(raw){
   const end = startOfDay(new Date());
@@ -1189,6 +1248,83 @@ function toCSV(raw){
   }
   return lines.join('\n');
 }
+/* Outdoors: bank holidays, rain in the next hours, the rain radar, air quality, UV and pollen, and flood warnings. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+
+/* ---------- bank holidays (GOV.UK, England and Wales) ---------- */
+async function loadBankHolidays(){ return parseBankHolidays(await request('https://www.gov.uk/bank-holidays.json')); }
+function parseBankHolidays(j){
+  const ev = j && j['england-and-wales'] && j['england-and-wales'].events;
+  return (ev || []).map(e => ({ date: e.date, title: e.title })).filter(e => /^\d{4}-\d\d-\d\d$/.test(e.date)).sort((a, b) => a.date < b.date ? -1 : 1);
+}
+
+/* ---------- rain in the next hours (Open-Meteo, every 15 minutes) ---------- */
+async function loadNowcast(){
+  const j = await request(`https://api.open-meteo.com/v1/forecast?latitude=${HOME.lat}&longitude=${HOME.lon}&minutely_15=precipitation,precipitation_probability&forecast_minutely_15=12&past_minutely_15=1&timezone=Europe%2FLondon`);
+  return parseNowcast(j);
+}
+function parseNowcast(j){
+  const m = (j && j.minutely_15) || {};
+  return (m.time || []).map((k, i) => ({ t: +new Date(k), mm: nz(m.precipitation[i], 0), chance: m.precipitation_probability ? m.precipitation_probability[i] : null }));
+}
+/** Is it raining, and when does that change in the next three hours? Rain counts from 0.1 mm in a quarter hour. */
+function rainSoon(slots, now){
+  const wet = s => s.mm >= 0.1;
+  const live = (slots || []).filter(s => s.t + 15 * 60e3 > now);
+  if (!live.length) return null;
+  const nowWet = wet(live[0]);
+  for (let i = 1; i < live.length; i++){
+    if (wet(live[i]) !== nowWet){
+      const t = live[i].t, mins = Math.max(0, Math.round((t - now) / 60e3));
+      return nowWet ? { raining: true, stops: t, text: 'Rain stops around ' + hhmm(t) } : { raining: false, starts: t, mins, text: mins <= 15 ? 'Rain starting soon' : 'Rain from ' + hhmm(t), heavy: Math.max.apply(null, live.slice(i).map(s => s.mm)) >= 1 };
+    }
+  }
+  return nowWet ? { raining: true, stops: null, text: 'Raining for the next few hours' } : null;
+}
+
+/* ---------- the rain radar (RainViewer frames over CARTO's dark map, © OpenStreetMap contributors © CARTO) ---------- */
+async function loadRadar(){
+  const j = await request('https://api.rainviewer.com/public/weather-maps.json');
+  const past = (j && j.radar && j.radar.past) || [], ahead = (j && j.radar && j.radar.nowcast) || [];
+  return { host: j.host, frames: past.concat(ahead).map(f => ({ t: f.time * 1000, path: f.path, ahead: ahead.indexOf(f) >= 0 })) };
+}
+/** The map tile holding a place, and where in it the place sits (0 to 1). */
+function tileOf(lat, lon, z){
+  const n = Math.pow(2, z), x = (lon + 180) / 360 * n, r = lat * Math.PI / 180;
+  const y = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
+  return { x: Math.floor(x), y: Math.floor(y), fx: x - Math.floor(x), fy: y - Math.floor(y) };
+}
+const RADAR_ZOOM = 7;
+const baseTile = (z, x, y) => `https://a.basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
+const radarTile = (host, path, z, x, y) => `${host}${path}/256/${z}/${x}/${y}/2/1_1.png`;
+
+/* ---------- air quality, UV and pollen (Open-Meteo's air quality service, from CAMS) ---------- */
+async function loadAir(){
+  const j = await request(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${HOME.lat}&longitude=${HOME.lon}&current=european_aqi,uv_index,grass_pollen,birch_pollen,alder_pollen&hourly=uv_index&forecast_days=1&timezone=Europe%2FLondon`);
+  return parseAir(j);
+}
+function parseAir(j){
+  const c = (j && j.current) || {}, h = (j && j.hourly) || {};
+  const uvMax = (h.uv_index || []).reduce((m, v) => v != null && v > m ? v : m, 0);
+  return { aqi: nz(c.european_aqi, null), uv: nz(c.uv_index, null), uvMax, pollen: { grass: nz(c.grass_pollen, null), tree: Math.max(nz(c.birch_pollen, 0), nz(c.alder_pollen, 0)) } };
+}
+const band = (v, cuts, names) => { if (v == null) return null; let i = 0; while (i < cuts.length && v >= cuts[i]) i++; return names[i]; };
+/** European Air Quality Index bands. */
+const aqiLabel = v => band(v, [20, 40, 60, 80, 100], ['Good', 'Fair', 'Moderate', 'Poor', 'Very poor', 'Extremely poor']);
+/** UV index bands, as the Met Office gives them. */
+const uvLabel = v => band(v, [3, 6, 8, 11], ['Low', 'Moderate', 'High', 'Very high', 'Extreme']);
+/** Pollen in grains per cubic metre, on the Met Office's bands: grass 30, 50, 150; trees (birch) 40, 80, 200. */
+const pollenLabel = (v, kind) => band(v, kind === 'grass' ? [1, 30, 50, 150] : [1, 40, 80, 200], ['None', 'Low', 'Moderate', 'High', 'Very high']);
+
+/* ---------- flood warnings (Environment Agency, within 15 km) ---------- */
+async function loadFloods(){ return parseFloods(await request(`https://environment.data.gov.uk/flood-monitoring/id/floods?lat=${HOME.lat}&long=${HOME.lon}&dist=15`)); }
+const FLOOD_LEVELS = { 1: 'Severe flood warning', 2: 'Flood warning', 3: 'Flood alert' };
+function parseFloods(j){
+  return ((j && j.items) || []).filter(f => f.severityLevel >= 1 && f.severityLevel <= 3)
+    .map(f => ({ level: f.severityLevel, title: FLOOD_LEVELS[f.severityLevel], area: f.description || (f.floodArea && f.floodArea.label) || '', message: String(f.message || '').trim(), raised: +new Date(f.timeRaised) || null }))
+    .sort((a, b) => a.level - b.level);
+}
 /* The household's data: settings shared by every screen, modes, bins, weather, the calendar, trains and trams. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
@@ -1204,14 +1340,20 @@ function relDay(t, now){
 
 /* ---------- display modes ---------- */
 const MODES = [
-  { id: 'energy', label: 'Energy', key: '1' },
-  { id: 'home', label: 'Home', key: '2' },
+  { id: 'today', label: 'Today', key: '1' },
+  { id: 'energy', label: 'Energy', key: '2' },
   { id: 'travel', label: 'Travel', key: '3' },
   { id: 'screensaver', label: 'Screensaver', key: '4' },
   { id: 'night', label: 'Night', key: '5' }
 ];
-const ROTATING = ['energy', 'home', 'travel'];
-const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+const ROTATING = ['today', 'energy', 'travel'];
+/** Older links and settings named the overview "home". */
+const MODE_ALIASES = { home: 'today' };
+const modeFromHash = (hash, fallback) => {
+  let id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase();
+  if (MODE_ALIASES[id]) id = MODE_ALIASES[id];
+  return MODES.some(m => m.id === id) ? id : fallback;
+};
 /** Extras after the mode in a link, such as #screensaver&wx=rain&phase=night&price=-2, for previewing the cockpit. */
 function hashOptions(hash){
   const out = {};
@@ -1235,21 +1377,47 @@ const DISPLAY_DEFAULTS = {
 function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
   s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
+  if (MODE_ALIASES[s.mode]) s.mode = MODE_ALIASES[s.mode];
   return s;
 }
 
 /* ---------- bins ---------- */
 const BIN_COLOURS = { black:'#2a2d3a', blue:'#2f7bff', brown:'#8a5a32', green:'#2fb36b', grey:'#8a90a8', purple:'#8f6bff', red:'#e5484d', yellow:'#ffd166' };
-/** Next collection of each bin, from one known collection date and a repeat in weeks. Bank holiday changes aren't known. */
-function nextCollections(bins, now = Date.now()){
+/**
+ * Next collection of each bin, from one known collection date and a repeat in weeks. With bank holidays (from
+ * GOV.UK), a repeat that falls in a week with a weekday bank holiday on or before its day is moved a day later and
+ * marked `moved`, which is a likely guess, not the council's word; around Christmas and New Year it's marked `check`.
+ * Dates the council gave (every: 0) are kept as they are.
+ */
+function nextCollections(bins, now = Date.now(), holidays){
   const today = +startOfDay(new Date(now));
+  const hol = (holidays || []).map(h => typeof h === 'string' ? { date: h, title: 'Bank holiday' } : h);
+  const shift = d => {
+    const dow = (d.getDay() + 6) % 7, monday = addDays(d, -dow);
+    for (let i = 0; i < hol.length; i++){
+      const h = keyDate(hol[i].date), hd = (h.getDay() + 6) % 7;
+      if (hd < 5 && +h >= +monday && +h <= +d) return { date: addDays(d, 1), moved: hol[i].title };
+    }
+    return { date: d, moved: null };
+  };
+  const xmas = d => (d.getMonth() === 11 && d.getDate() >= 24) || (d.getMonth() === 0 && d.getDate() <= 2);
   return bins.map(b => {
     // every: 0 is a single known date, as the council gives; it drops off once it has passed.
     const every = +b.every === 0 ? 0 : Math.max(1, Math.round(+b.every || 1)) * 7;
-    let d = keyDate(b.date);
+    let d = keyDate(b.date), moved = null;
     const gap = Math.round((today - +d) / 864e5);
     if (gap > 0){ if (!every) return null; d = addDays(d, Math.ceil(gap / every) * every); }
-    return { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
+    if (every && hol.length){
+      // last time's collection may have been moved to today or later
+      const prev = gap > 0 && Math.ceil(gap / every) > 0 ? shift(addDays(d, -every)) : null;
+      const next = shift(d);
+      const pick = prev && +prev.date >= today ? prev : next;
+      d = pick.date; moved = pick.moved;
+    }
+    const out = { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
+    if (moved) out.moved = moved;
+    if (every && xmas(d)) out.check = true;
+    return out;
   }).filter(Boolean).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
 /** The council's dates from bins.json (published each week by a GitHub Action), if they're recent; else null. */
@@ -1494,6 +1662,43 @@ function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
+/* ---------- heads-ups: what to act on soon ---------- */
+/**
+ * The few things worth saying before anything else: a train to leave for, bins to put out, rain on its way.
+ * bins from nextCollections(), trains from parseHuxley() (or parseTrains), weather from parseWeather(); walk in minutes.
+ */
+function headsUp(o, now){
+  const out = [], hour = new Date(now).getHours();
+  const trains = o.trains && o.trains.list ? o.trains.list : [], walk = +o.walk || 0;
+  for (let i = 0; i < trains.length; i++){
+    const tr = trains[i]; if (tr.cancelled) continue;
+    const l = leaveBy(tr.exp || tr.sched, walk, now);
+    if (l.mins < 0) continue;
+    if (l.mins <= 20) out.push({ kind: 'train', tone: l.cls, title: l.text, sub: hhmm(tr.sched) + ' to ' + tr.dest + (tr.exp && tr.exp !== tr.sched ? ', expected ' + hhmm(tr.exp) : '') + (tr.platform ? ', platform ' + tr.platform : '') });
+    break;
+  }
+  const bins = o.bins || [];
+  if (bins.length){
+    const first = bins[0], same = bins.filter(b => b.days === first.days), names = same.map(b => b.name).join(' and ');
+    const note = first.moved ? ', a day later for ' + first.moved + ' (probably)' : first.check ? ': check the council\'s Christmas dates' : '';
+    if (first.days === 1 && hour >= 15) out.push({ kind: 'bins', tone: 'warn', title: 'Bins out tonight', sub: names + note, colours: same.map(b => b.colour) });
+    else if (first.days === 0 && hour < 10) out.push({ kind: 'bins', tone: 'warn', title: 'Bins go this morning', sub: names + note, colours: same.map(b => b.colour) });
+  }
+  const floods = o.floods || [];
+  for (let i = 0; i < floods.length && i < 2; i++) out.push({ kind: 'flood', tone: floods[i].level <= 2 ? 'bad' : 'warn', title: floods[i].title, sub: floods[i].area });
+  const soon = o.nowcast ? rainSoon(o.nowcast, now) : null;
+  if (soon && (!soon.raining || soon.stops)) out.push({ kind: 'rain', tone: 'gas', title: soon.text, sub: soon.raining ? 'Dry after that for a while' : soon.heavy ? 'Heavy at times' : 'Light' });
+  else if (!o.nowcast){
+    const hours = o.weather && o.weather.hours ? o.weather.hours : [];
+    if (hours.length && nz(hours[0].rain, 0) < 50){
+      for (let i = 1; i < hours.length && hours[i].t < now + 3 * 3600e3; i++){
+        if (nz(hours[i].rain, 0) >= 60){ out.push({ kind: 'rain', tone: 'gas', title: 'Rain likely from ' + hhmm(hours[i].t), sub: hours[i].rain + '% chance' }); break; }
+      }
+    }
+  }
+  return out;
+}
+
 /* ---------- prices for the display ---------- */
 /** Cost of the Home Mini's half hours today on your tariff, with the standing charge. */
 function todayCost(rows, eSets, now = Date.now()){
@@ -1570,6 +1775,57 @@ function deviceChanges(form, household){
   const base = mergeSettings(household, null), out = {};
   Object.keys(form).forEach(k => { if (JSON.stringify(form[k]) !== JSON.stringify(base[k])) out[k] = form[k]; });
   return out;
+}
+/* The phone as a remote for a screen, through ntfy.sh: a free relay that needs no account and allows browser calls. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+//
+// A screen makes an eight-letter code and listens on a topic named from it. A phone that knows the code can ask
+// the screen to change view, wake up or start afresh, and ask what it's showing. Only these small requests and the
+// screen's answer pass through the relay: no prices, readings, settings or keys.
+
+const RELAY = 'https://ntfy.sh';
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I/L, for reading off a TV
+function newRemoteCode(rand){
+  const r = rand || Math.random;
+  let s = '';
+  for (let i = 0; i < 8; i++) s += CODE_CHARS[Math.floor(r() * CODE_CHARS.length)];
+  return s;
+}
+/** "abcd-efgh", "ABCD EFGH" and "abcdefgh" are the same code. Null if it isn't one. */
+function cleanCode(code){
+  const c = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return c.length === 8 && c.split('').every(ch => CODE_CHARS.indexOf(ch) >= 0) ? c : null;
+}
+const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
+const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
+
+/** What a phone may ask. Anything else on the topic is ignored. */
+const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload'];
+/** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
+function readRemote(data){
+  let m, c;
+  try { m = JSON.parse(data); if (m.event !== 'message') return null; c = JSON.parse(m.message); } catch(e){ return null; }
+  if (!c || typeof c !== 'object') return null;
+  if (c.from === 'phone' && REMOTE_CMDS.indexOf(c.cmd) >= 0){
+    if (c.cmd === 'mode' && !MODES.some(x => x.id === c.mode)) return null;
+    return { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null };
+  }
+  if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
+    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, name: String(c.state.name || '').slice(0, 40) } };
+  }
+  return null;
+}
+function sendRemote(code, msg){
+  try { return fetch(RELAY + '/' + remoteTopic(code), { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
+  catch(e){ return Promise.resolve(false); }
+}
+/** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
+function listenRemote(code, onMsg){
+  if (typeof EventSource === 'undefined') return () => {};
+  const es = new EventSource(RELAY + '/' + remoteTopic(code) + '/sse');
+  es.onmessage = e => { const r = readRemote(e.data); if (r) onMsg(r); };
+  return () => { try { es.close(); } catch(e){} };
 }
 /* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
@@ -3099,13 +3355,90 @@ const Cockpit = (() => {
     running: () => on
   };
 })();
+/* ===================== display: drawing helpers for Today, Energy and Travel, in the dashboard's look ===================== */
+// Plain script for TV browsers (Chromium 63): no ?. or ??. Draws with strings; display.js puts them on the page.
+
+const PRICE_COL = { neg: '#b892ff', cheap: '#46e6a1', normal: '#ffd166', peak: '#ff6b7d', muted: '#9aa2c8' };
+const remPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+/** Line icons, the same set the phone uses. */
+const ICON = {
+  train: '<rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l-2 2M15 20l2 2M9 16v4M15 16v4"/>',
+  bins: '<path d="M4 6h16M9 6V4h6v2M6 6l1 15h10l1-15"/>',
+  rain: '<path d="M7 15a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3 3 0 0 1 0 6z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>',
+  flood: '<path d="M3 17c2 0 2-1.5 4.5-1.5S9.5 17 12 17s2.5-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S9.5 21 12 21s2.5-1.5 4.5-1.5S19 21 21 21M12 3v9M8.5 8.5 12 12l3.5-3.5"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+};
+const icon = k => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${ICON[k] || ''}</svg>`;
+
+/** A heads-up, as on the phone's Now page. */
+function headsHtml(items){
+  return items.map(it => `<div class="hu ${it.tone}">${icon(it.kind)}<span class="t"><b>${esc(it.title)}</b><span class="s">${esc(it.sub)}</span></span>${it.colours ? `<span class="dots">${it.colours.map(c => `<i style="background:${BIN_COLOURS[c] || BIN_COLOURS.grey}"></i>`).join('')}</span>` : ''}</div>`).join('');
+}
+
+/** What the region's power is made of, as a bar and its biggest three. */
+const FUEL_COL = { wind: '#4fd6ff', solar: '#ffd166', hydro: '#2f7bff', nuclear: '#b892ff', biomass: '#46e6a1', gas: '#ff8a5c', coal: '#6c7399', imports: '#9aa2c8', other: '#6c7399' };
+function mixHtml(g){
+  if (!g) return '';
+  return `<div class="mix">${g.mix.map(f => `<i style="flex:${f.perc};background:${FUEL_COL[f.fuel] || '#6c7399'}"></i>`).join('')}</div>`
+    + `<p class="legend">${g.mix.slice(0, 2).map(f => `<span><i style="background:${FUEL_COL[f.fuel] || '#6c7399'}"></i>${esc(f.name)} ${Math.round(f.perc)}%</span>`).join('')}</p>`;
+}
+
+/**
+ * The price strip: Agile over a stretch of time as a smooth line coloured by price, the cheapest two hours shaded,
+ * rain as bands, events and your train as markers, and now as a dashed line. Sized in real pixels so its text stays sharp.
+ * o: { from, to, rates, cheap, rain: [{ from, to }], markers: [{ t, kind, label }], now, width, height }
+ */
+function stripSvg(o){
+  const W = Math.max(200, o.width), H = Math.max(80, o.height), fs = Math.round(remPx() * 0.9);
+  const top = fs * 1.6, bottom = fs * 1.7, ih = H - top - bottom;
+  const span = o.to - o.from, x = t => (t - o.from) / span * W;
+  const rates = (o.rates || []).filter(r => r.to > o.from && r.from < o.to);
+  if (!rates.length) return '';
+  const ps = rates.map(r => r.p), lo = Math.min(0, Math.min.apply(null, ps)), hi = Math.max(20, Math.max.apply(null, ps));
+  const y = v => top + ih - (v - lo) / (hi - lo) * ih;
+  const pts = rates.map(r => [x(Math.max(o.from, Math.min(o.to, (r.from + r.to) / 2))), y(r.p)]);
+  pts.unshift([0, pts[0][1]]); pts.push([W, pts[pts.length - 1][1]]);
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6], c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += `C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  const id = 'g' + Math.round(Math.random() * 1e6);
+  const stops = rates.map(r => { const off = Math.max(0, Math.min(1, x((r.from + r.to) / 2) / W)); return `<stop offset="${off.toFixed(4)}" stop-color="${PRICE_COL[priceTone(r.p)]}"/>`; }).join('');
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || 'Agile prices')}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="${W}" y2="0" gradientUnits="userSpaceOnUse">${stops}</linearGradient>`
+    + `<linearGradient id="${id}f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="${id}m"><rect x="0" y="0" width="${W}" height="${H}" fill="url(#${id}f)"/></mask></defs>`;
+  (o.rain || []).forEach(b => { const a = Math.max(0, x(b.from)), e = Math.min(W, x(b.to)); if (e > a) s += `<rect class="rainb" x="${a.toFixed(1)}" y="${top.toFixed(1)}" width="${(e - a).toFixed(1)}" height="${ih.toFixed(1)}"/><text class="lbl rain" x="${(a + 6).toFixed(1)}" y="${(top + fs).toFixed(1)}" font-size="${fs}">Rain</text>`; });
+  if (o.cheap){ const a = Math.max(0, x(o.cheap.from)), e = Math.min(W, x(o.cheap.to)); if (e > a) s += `<rect class="cheapb" x="${a.toFixed(1)}" y="${top.toFixed(1)}" width="${(e - a).toFixed(1)}" height="${ih.toFixed(1)}"/><text class="lbl cheap" x="${((a + e) / 2).toFixed(1)}" y="${(top - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Cheapest</text>`; }
+  if (lo < 0) s += `<line class="zero" x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}"/>`;
+  s += `<path d="${d}L${W} ${(top + ih).toFixed(1)}L0 ${(top + ih).toFixed(1)}Z" fill="url(#${id})" mask="url(#${id}m)"/><path d="${d}" fill="none" stroke="url(#${id})" stroke-width="${Math.max(3, fs * 0.14).toFixed(1)}" stroke-linecap="round"/>`;
+  (o.markers || []).forEach(m => {
+    if (m.t < o.from || m.t > o.to) return;
+    const mx = x(m.t), my = top + ih * 0.18;
+    s += `<line class="mk" x1="${mx.toFixed(1)}" x2="${mx.toFixed(1)}" y1="${my.toFixed(1)}" y2="${(top + ih).toFixed(1)}"/>`
+      + (m.kind === 'train' ? `<circle class="mkt" cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${(fs * 0.32).toFixed(1)}"/>` : `<rect class="mke" x="${(mx - fs * 0.28).toFixed(1)}" y="${(my - fs * 0.28).toFixed(1)}" width="${(fs * 0.56).toFixed(1)}" height="${(fs * 0.56).toFixed(1)}" transform="rotate(45 ${mx.toFixed(1)} ${my.toFixed(1)})"/>`);
+  });
+  if (o.now >= o.from && o.now <= o.to){ const nx = x(o.now); s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${(top - fs * 0.2).toFixed(1)}" y2="${(top + ih).toFixed(1)}"/><circle class="nowd" cx="${nx.toFixed(1)}" cy="${y(lookup(rates, o.now) != null ? lookup(rates, o.now) : rates[0].p).toFixed(1)}" r="${(fs * 0.26).toFixed(1)}"/>`; }
+  // hour labels along the bottom, spaced so they never touch
+  const step = span > 26 * 3600e3 ? 6 : 3, first = new Date(o.from); first.setMinutes(0, 0, 0);
+  let last = -1e9;
+  for (let t = +first + 3600e3; t < o.to; t += 3600e3){
+    const dt = new Date(t); if (dt.getHours() % step) continue;
+    const tx = x(t); if (tx < fs * 1.5 || tx > W - fs * 1.5 || tx - last < fs * 4.2 || (o.now >= o.from && Math.abs(tx - x(o.now)) < fs * 3.6)) continue;
+    s += `<text class="lbl" x="${tx.toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">${dt.getHours() === 0 ? DOW[dt.getDay()] : pad2(dt.getHours()) + ':00'}</text>`;
+    last = tx;
+  }
+  if (o.now >= o.from && o.now <= o.to) s += `<text class="lbl now" x="${Math.max(fs * 1.4, x(o.now)).toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Now</text>`;
+  return s + '</svg>';
+}
 /* ===================== display: modes, remote control, scheduling, rendering ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
 const D = {
   household: null, preview: {},
   set: mergeSettings(null, store.getJ('display', null)),
-  mode: 'energy', override: null, resume: null,
+  mode: 'today', override: null, resume: null, embed: false, remote: null, stopRemote: null, sentState: '',
   lastInput: Date.now(), lastPick: 0, chromeUntil: 0, rotateAt: 0, reloadAt: 0,
   deviceId: null, wake: null, ticks: 0
 };
@@ -3128,7 +3461,13 @@ const SRC = {
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
-  trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) }
+  trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
+  // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
+  nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
+  air:     { label: 'Air',     every: () => 60*MIN, need: () => true, run: loadAir },
+  floods:  { label: 'Floods',  every: () => 15*MIN, need: () => true, run: loadFloods },
+  grid:    { label: 'Grid mix', every: () => 30*MIN, need: () => true, run: () => loadGridMix(CI_REGION[region()]) },
+  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
 
@@ -3176,21 +3515,22 @@ function applyMode(){
   Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.at && !s.err && Date.now() - s.at > s.every()) s.last = 0; });
   if (m === 'screensaver') startSaver(); else stopSaver();
   render();
+  tellRemote();
 }
 /** Once a second: night window, idle screensaver, rotation, the nightly fresh start, and any data that's due. */
 function tick(){
   const now = Date.now(), set = D.set;
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
-  const idle = now - D.lastInput;
-  const night = set.night && inWindow(now, set.nightFrom, set.nightTo);
+  const idle = D.embed ? 0 : now - D.lastInput;
+  const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
   else if (!night && D.override === 'night') setOverride(null);
   else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open()) setOverride('screensaver');
   if (set.rotate > 0 && !D.override && ROTATING.indexOf(D.mode) >= 0 && now >= D.rotateAt && now - D.lastPick > 2*MIN && !open()){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
-  if (now >= D.reloadAt){
+  if (now >= D.reloadAt && !D.embed){
     if (navigator.onLine !== false && !open()){ store.set('display.reloaded', String(now)); location.reload(); return; }
     D.reloadAt = now + 5*MIN;
   }
@@ -3201,18 +3541,17 @@ function tick(){
 
 /** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
 const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
+const collections = now => nextCollections(binsNow(now), now, SRC.holidays.data);
 
 /* ---------- rendering ---------- */
 function render(){
   const m = shown();
-  if (m === 'energy') renderEnergy();
-  else if (m === 'home') renderHome();
+  if (m === 'today') renderToday();
+  else if (m === 'energy') renderEnergy();
   else if (m === 'travel') renderTravel();
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
 }
-function priceColour(p){ return p < 0 ? 'var(--neg)' : p < 15 ? 'var(--good)' : p < 25 ? 'var(--warn)' : 'var(--bad)'; }
-function priceCls(p){ return p < 0 ? 'p-neg' : p < 15 ? 'p-low' : p < 25 ? 'p-mid' : 'p-high'; }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
   const now = Date.now(), parts = [], offline = navigator.onLine === false;
@@ -3226,97 +3565,108 @@ function foot(keys){
   if (offline) parts.unshift('<span class="warn">Offline, will retry</span>');
   return parts.join('') + (latest ? `<span>Updated ${hhmm(latest)}</span>` : '');
 }
+/** The same answer the phone's Now page gives. */
+function verdictHtml(now, big){
+  const v = priceVerdict(SRC.agile.data, now);
+  if (!v) return `<p class="big muted">${SRC.agile.err ? 'No prices' : 'Prices…'}</p><p class="line muted">${SRC.agile.err ? 'No signal from Octopus, trying again' : 'Waiting for Agile prices'}</p>`;
+  return `<p class="big glow-${v.tone}">${esc(v.big)}</p><p class="line">${esc(v.line)}</p>${big ? '' : `<p class="note">Agile, region ${region()}</p>`}`;
+}
+function weatherHtml(now){
+  const W = SRC.weather.data;
+  if (!W) return `<p class="d">${SRC.weather.err ? 'No weather signal' : 'Checking the weather…'}</p>`;
+  const wn = weatherText(W.now.code), today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0];
+  return `<span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span><p class="d">${esc(wn.text)}<br>${today ? `High ${Math.round(today.max)}° · low ${Math.round(today.min)}°` : `Feels ${Math.round(W.now.feels)}°`}</p>`;
+}
+/** What's live now: the Home Mini, today's cost, grid carbon and its mix, and the air. */
+function nowStats(now){
+  const L = SRC.live.data, T = SRC.tariff.data, out = [];
+  if (!NET.creds) out.push(['Live draw', '<span class="muted small">Connect your account</span>']);
+  else if (L && L.none) out.push(['Live draw', '<span class="muted small">No Home Mini</span>']);
+  else out.push(['Drawing now', L && L.demand != null ? `<span class="elec">${Math.round(Math.max(0, L.demand)).toLocaleString('en-GB')} W</span>` : '—']);
+  if (L && L.today != null){ const c = todayCost(L.rows, T && T.eSets, now); out.push(['Today so far', `${kwh(L.today)}${c != null ? ' · ' + gbp(c) : ''}`]); }
+  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
+  if (cin) out.push([`Grid carbon, ${esc(cin.index)}`, `<span class="${/low/.test(cin.index) ? 'cheap' : /high/.test(cin.index) ? 'peak' : 'normal'}">${cin.v} g</span>`]);
+  const A = SRC.air.data;
+  if (A && A.aqi != null) out.push(['Air · UV today', `<span class="small">${aqiLabel(A.aqi)} · ${uvLabel(A.uvMax) || '—'}</span>`]);
+  return out.map(r => `<div class="stat"><span class="k">${r[0]}</span><span class="v">${r[1]}</span></div>`).join('') + mixHtml(SRC.grid.data);
+}
+function stripFor(el, o){ el.innerHTML = stripSvg(Object.assign({ width: el.clientWidth || 800, height: el.clientHeight || 200 }, o)); }
+/** Rain bands for the strip: the quarter-hour forecast near now, the hourly chance after that. */
+function rainBands(now, end){
+  const out = [], add = (a, b) => { const l = out[out.length - 1]; if (l && a <= l.to + 1) l.to = Math.max(l.to, b); else out.push({ from: a, to: b }); };
+  const nc = SRC.nowcast.data || [], ncEnd = nc.length ? nc[nc.length - 1].t + 15*MIN : now;
+  nc.forEach(s => { if (s.mm >= 0.1 && s.t + 15*MIN > now) add(Math.max(now, s.t), s.t + 15*MIN); });
+  const W = SRC.weather.data;
+  (W ? W.hours : []).forEach(h => { if (h.t >= ncEnd && h.t < end && wetKind(h)) add(h.t, h.t + 60*MIN); });
+  return out;
+}
+
+function renderToday(){
+  const now = Date.now(), W = SRC.weather.data, s = D.set;
+  const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
+  $('#dDate').textContent = longDay(new Date(now)) + (today ? ` · sunset ${hhmm(today.set)}` : '');
+  $('#dVerdict').innerHTML = verdictHtml(now);
+  $('#dWx').innerHTML = weatherHtml(now);
+  const bins = collections(now);
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).slice(0, 3));
+  // the next twelve hours, as on the phone's Now page
+  const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
+  const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
+  $('#dCheap').textContent = v.dock ? `Cheapest ${hhmm(v.dock.from)}–${hhmm(v.dock.to)} · ${pence(v.dock.avg)}` : '';
+  if (v.range) stripFor($('#dStrip'), { from: now - 30*MIN, to: v.to, rates: SRC.agile.data, cheap: v.dock, rain: rainBands(now, v.to), markers, now, aria: 'Agile prices for the next 12 hours' });
+  else $('#dStrip').innerHTML = `<p class="empty">${SRC.agile.err ? 'No prices from Octopus yet, trying again' : 'Waiting for Agile prices'}</p>`;
+  // trains
+  const T = SRC.trains.data;
+  $('#dTrainsH').textContent = T && T.station ? `Trains from ${T.station}` : 'Trains';
+  let tr = '';
+  if (!s.trainFrom) tr = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
+  else if (T){
+    const rows = T.list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 3);
+    tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, s.trainWalk, now), late = d.exp && d.exp - d.sched >= 60e3;
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</span></li>`; }).join('')}</ul>` : '<p class="empty">No trains in the next couple of hours.</p>';
+  } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
+  $('#dTrains').innerHTML = tr;
+  // today and tomorrow: bins, then the calendar
+  const rows = [], hour = new Date(now).getHours();
+  const days = []; bins.forEach(b => { const l = days[days.length - 1]; if (l && +l.date === +b.date) l.bins.push(b); else days.push({ date: b.date, days: b.days, bins: [b] }); });
+  days.slice(0, 2).forEach(d => rows.push(`<li><span class="main"><span class="dots lead">${d.bins.map(b => `<i style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>`).join('')}</span>${esc(d.bins.map(b => b.name).join(', '))}</span><span class="side ${d.days <= 1 ? 'warn' : ''}">${d.days === 0 ? 'Today' : d.days === 1 ? (hour >= 12 ? 'Out tonight' : 'Tomorrow') : relDay(+d.date, now)}${d.bins[0].moved ? '*' : ''}</span></li>`));
+  const evs = SRC.cal.data ? SRC.cal.data.filter(e => e.end > now && e.start < +addDays(startOfDay(new Date(now)), 2)) : [];
+  evs.slice(0, 5 - rows.length).forEach(e => rows.push(`<li><span class="main">${esc(e.title)}${e.where ? `<span class="sub">${esc(e.where)}</span>` : ''}</span><span class="side">${relDay(e.start, now) === 'Today' ? '' : 'Tmrw '}${e.allDay ? 'All day' : hhmm(Math.max(e.start, now))}</span></li>`));
+  const moved = days.slice(0, 2).filter(d => d.bins[0].moved)[0];
+  $('#dDay').innerHTML = rows.length ? `<ul class="rows">${rows.join('')}</ul>` + (moved ? `<p class="note">* A day later for ${esc(moved.bins[0].moved)}, probably.</p>` : !s.ical ? '<p class="note">Add your calendar on your phone to see what\'s on.</p>' : '') : '<p class="empty">Nothing on today or tomorrow.</p>';
+  $('#dNow').innerHTML = nowStats(now);
+  $('#dFoot').innerHTML = `<span>Harold Street · region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
+}
 
 function renderEnergy(){
-  const now = Date.now(), cur = agileNow(now), a = SRC.agile.data, el = $('#ePrice');
-  if (cur){
-    const col = priceColour(cur.p);
-    el.textContent = pence(cur.p); el.style.color = col; el.style.textShadow = `0 0 40px ${col}`;
-    $('#eLabel').textContent = cur.p < 0 ? 'Agile now · you\'re paid to use power' : cur.p < 15 ? 'Agile now · power is cheap' : 'Agile price now, per kWh';
-    const best = cheapestWindow(a, 4, now);
-    $('#eNext').textContent = best ? `Cheapest 2 hours ${dayKey(best.from) === dayKey(now) ? '' : DOW[new Date(best.from).getDay()] + ' '}${hhmm(best.from)}–${hhmm(best.to)} · ${pence(best.avg)}` : '';
-  } else {
-    el.textContent = '--'; el.style.color = ''; el.style.textShadow = '';
-    $('#eLabel').textContent = SRC.agile.err ? 'No signal from Octopus' : 'Waiting for Agile prices';
-    $('#eNext').textContent = SRC.agile.err ? 'Trying again shortly' : '';
-  }
-  $('#eStrip').innerHTML = a && a.length ? priceStrip(a, now) : '';
-  const chips = [], L = SRC.live.data, T = SRC.tariff.data;
-  if (!NET.creds) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">Live draw: connect your account on the dashboard on this device</span></div>`);
-  else if (L && L.none) chips.push(`<div class="chip"><span class="v muted">—</span><span class="k">No Home Mini found for live draw</span></div>`);
-  else chips.push(`<div class="chip"><span class="v" style="color:var(--elec)">${L && L.demand != null ? Math.round(L.demand).toLocaleString('en-GB') + ' W' : '—'}</span><span class="k">Drawing now${L && L.at ? ' · ' + hhmm(L.at) : ''}</span></div>`);
-  if (L && L.today != null){
-    const c = todayCost(L.rows, T && T.eSets, now);
-    chips.push(`<div class="chip"><span class="v">${kwh(L.today)}</span><span class="k">Used today${c != null ? ' · ' + gbp(c) + ' with standing charge' : ''}</span></div>`);
-  }
-  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
-  if (cin){
-    const g = cheapestWindow(ci.map(r => ({ from: r.from, to: r.to, p: r.v })), 6, now);
-    chips.push(`<div class="chip"><span class="v">${cin.v} g</span><span class="k">Grid carbon · ${esc(cin.index)}${g ? ` · greenest ${hhmm(g.from)}–${hhmm(g.to)}` : ''}</span></div>`);
-  }
-  const er = T ? unitPriceAt(T.eSets, now) : null;
-  if (er != null) chips.push(`<div class="chip"><span class="v">${pence(er)}</span><span class="k">Your tariff now, per kWh</span></div>`);
-  else if (a){
-    const fut = a.filter(r => r.to > now), max = fut.length ? fut.reduce((x, y) => y.p > x.p ? y : x) : null;
-    if (max) chips.push(`<div class="chip"><span class="v">${pence(max.p)}</span><span class="k">Highest to come, at ${hhmm(max.from)}</span></div>`);
-  }
-  $('#eChips').innerHTML = chips.join('');
-  $('#eFoot').innerHTML = `<span>Region ${region()} · ${REGIONS[region()]}</span>` + foot(['agile', 'carbon', 'live', 'tariff']);
-}
-/** Next 24 hours of Agile as a strip of bars, coloured by price, with a line at now. */
-function priceStrip(rates, now){
-  const start = Math.floor(now / 1800e3) * 1800e3 - 2*3600e3, list = rates.filter(r => r.from >= start).slice(0, 52);
-  if (!list.length) return '';
-  const n = list.length, W = 1000, H = 100, lo = Math.min(0, Math.min.apply(null, list.map(r => r.p))), hi = Math.max(10, Math.max.apply(null, list.map(r => r.p)));
-  const y = v => H - (v - lo) / (hi - lo) * H, bw = W / n;
-  let s = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Agile prices for the next day">`;
-  list.forEach((r, i) => {
-    const top = Math.min(y(r.p), y(0)), h = Math.max(1, Math.abs(y(r.p) - y(0)));
-    s += `<rect class="${priceCls(r.p)}${r.to <= now ? ' past' : ''}" x="${(i*bw + bw*0.12).toFixed(1)}" y="${top.toFixed(1)}" width="${(bw*0.76).toFixed(1)}" height="${h.toFixed(1)}"/>`;
-  });
-  const nx = ((now - list[0].from) / 1800e3) * bw;
-  s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="0" y2="${H}" vector-effect="non-scaling-stroke"/></svg><div class="ticks">`;
-  list.forEach((r, i) => {
-    const d = new Date(r.from);
-    if (d.getMinutes() === 0 && d.getHours() % 6 === 0 && i > 1 && i < n - 3) s += `<span style="left:${(i / n * 100).toFixed(2)}%">${d.getHours() === 0 ? DOW[d.getDay()] : pad2(d.getHours()) + ':00'}</span>`;
-  });
-  return s + '</div>';
-}
-
-function renderHome(){
-  const now = Date.now(), W = SRC.weather.data;
-  $('#hDate').textContent = longDay(new Date(now));
-  if (W){
-    const today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0], wn = weatherText(W.now.code);
-    $('#hSun').textContent = today ? `Sunrise ${hhmm(today.rise)} · sunset ${hhmm(today.set)}` : '';
-    $('#hNow').innerHTML = `<div><span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span></div>
-      <p class="d">${esc(wn.text)} · feels ${Math.round(W.now.feels)}° · wind ${Math.round(W.now.wind)} mph</p>
-      ${today ? `<p class="d">High ${Math.round(today.max)}° · low ${Math.round(today.min)}°</p>` : ''}`;
-    $('#hHours').innerHTML = W.hours.map(h => { const w = weatherText(h.code); return `<div><span class="h">${pad2(new Date(h.t).getHours())}:00</span><span class="i" title="${esc(w.text)}">${w.icon}</span>${Math.round(h.temp)}°<span class="r">${h.rain != null ? h.rain + '%' : ''}</span></div>`; }).join('');
-  } else {
-    $('#hSun').textContent = '';
-    $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
-    $('#hHours').innerHTML = '';
-  }
-  const council = !!councilBins(SRC.council.data, now), bins = nextCollections(binsNow(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins to household.json, or in settings.</p>' : `<ul class="list">${bins.map(b => {
-    const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
-    return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
+  const now = Date.now(), cur = agileNow(now), a = SRC.agile.data;
+  $('#eVerdict').innerHTML = verdictHtml(now, true);
+  const el = $('#ePrice');
+  if (cur){ el.textContent = pence(cur.p); el.className = 'price ' + priceTone(cur.p); }
+  else { el.textContent = '--'; el.className = 'price muted'; }
+  const best = a ? cheapestWindow(a, 4, now) : null, ci = SRC.carbon.data;
+  const green = ci ? cheapestWindow(ci.map(r => ({ from: r.from, to: r.to, p: r.v })), 4, now) : null;
+  const when = t => (dayKey(t) === dayKey(now) ? '' : DOW[new Date(t).getDay()] + ' ') + hhmm(t);
+  $('#eNext').textContent = best ? `Cheapest two hours ${when(best.from)}–${hhmm(best.to)}, ${pence(best.avg)}` : '';
+  const end = a && a.length ? Math.max.apply(null, a.map(r => r.to)) : +addDays(startOfDay(new Date(now)), 1);
+  $('#eWhen').textContent = green ? `Greenest ${when(green.from)}–${hhmm(green.to)}` : '';
+  if (a && a.length) stripFor($('#eStrip'), { from: +startOfDay(new Date(now)), to: end, rates: a, cheap: best, now, aria: 'Agile prices today and tomorrow' });
+  else $('#eStrip').innerHTML = '<p class="empty">Waiting for Agile prices.</p>';
+  // the washing machine, dishwasher and tumble dryer: now, or the cheapest start
+  const lead = store.getJ('leadActs', ['wash', 'dish', 'dryer']), acts = store.getJ('acts', {}), fut = a ? a.filter(r => r.to > now) : [];
+  $('#eRun').innerHTML = `<ul class="rows">${lead.map(id => ACTIVITIES.filter(x => x.id === id)[0]).filter(Boolean).map(x => {
+    const k = +nz(acts[x.id], x.kwh), slots = Math.max(1, Math.round(nz(x.hours, .5) * 2));
+    const nowC = fut.length >= slots ? k * fut.slice(0, slots).reduce((s2, r) => s2 + r.p, 0) / slots : null, b = fut.length ? cheapestWindow(fut, slots, now) : null;
+    return `<li><span class="main">${esc(x.label)}<span class="sub">${nowC != null ? gbp(nowC) + ' if you start now' : 'Waiting for prices'}</span></span><span class="side">${b ? `<span class="cheap">${when(b.from)}</span> · ${gbp(k * b.avg)}` : '—'}</span></li>`;
   }).join('')}</ul>`;
-  const C = SRC.cal;
-  let evs = null, note = '';
-  if (!D.set.ical) note = 'Add a calendar\'s iCal address in settings to see what\'s coming up.';
-  else if (C.data) evs = C.data.filter(e => e.end > now);
-  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
-  else note = 'Reading the calendar…';
-  $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
-  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins checked with Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
+  $('#eChips').innerHTML = nowStats(now);
+  $('#eFoot').innerHTML = `<span>Region ${region()} · ${REGIONS[region()]}</span>` + foot(['agile', 'carbon', 'live', 'tariff']);
 }
 
 function renderTravel(){
   const now = Date.now(), s = D.set, T = SRC.trains;
   let html = '', list = null;
-  if (!s.trainFrom) html = '<p class="empty">Set a railway station in settings.</p>';
+  if (!s.trainFrom) html = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
   else if (T.data) list = T.data.list;
   else if (T.err) html = `<p class="empty">No departures signal: ${esc(errorText(T.err)[0])} Trying again shortly.</p>`;
   else html = '<p class="empty">Checking departures…</p>';
@@ -3324,10 +3674,10 @@ function renderTravel(){
   $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
   if (list){
     const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 7);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th>Status</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
+    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
       const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
-      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}</td><td class="t opt">${esc(d.platform || '—')}</td><td class="st">${st}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
+      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Expected ${hhmm(d.exp)}</span>` : '<span class="muted">On time</span>';
+      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
     }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
     if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
   }
@@ -3353,12 +3703,13 @@ function renderTravel(){
     }
     $('#tTrams').innerHTML = html;
   }
-  $('#tFoot').innerHTML = '<span>Live trains from National Rail, via Huxley2</span>' + foot(['trains', 'trams']);
+  $('#tFoot').innerHTML = '<span>Live trains from National Rail</span>' + foot(['trains', 'trams']);
 }
 
 function renderNight(){
   const now = Date.now(), cur = agileNow(now), W = SRC.weather.data;
-  $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : ''].filter(Boolean).join(' · ');
+  const hu = headsUp({ bins: collections(now), nowcast: SRC.nowcast.data, floods: SRC.floods.data }, now).filter(h => h.kind !== 'rain')[0];
+  $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : '', hu ? hu.title : ''].filter(Boolean).join(' · ');
 }
 
 /* ---------- screensaver: the view from the cockpit (cockpit.js draws it) ---------- */
@@ -3395,6 +3746,35 @@ function cockpitInfo(now){
 function renderSaver(){ Cockpit.update(cockpitInfo(Date.now())); }
 function startSaver(){ renderSaver(); Cockpit.start(); }
 function stopSaver(){ Cockpit.stop(); }
+
+/* ---------- the phone as a remote (src/lib/remote.js) ---------- */
+function startRemote(){
+  if (D.embed || D.stopRemote) return;
+  D.remote = cleanCode(store.get('remote')) || newRemoteCode();
+  store.set('remote', D.remote);
+  D.stopRemote = listenRemote(D.remote, r => {
+    if (r.from !== 'phone') return;
+    D.lastInput = Date.now();
+    if (r.cmd === 'mode'){ setMode(r.mode); toast(`Showing ${MODES.filter(m => m.id === r.mode)[0].label}, from your phone`, 3000); }
+    else if (r.cmd === 'wake'){ if (D.override){ D.override = null; applyMode(); } }
+    else if (r.cmd === 'reload'){ location.reload(); return; }
+    D.sentState = ''; tellRemote();
+  });
+  D.sentState = ''; tellRemote();
+}
+/** Tells a listening phone what's on screen, when that changes. */
+function tellRemote(){
+  if (!D.remote || D.embed) return;
+  const key = D.mode + '/' + shown();
+  if (key === D.sentState) return;
+  D.sentState = key;
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now() } });
+}
+function newPairing(){
+  if (D.stopRemote){ D.stopRemote(); D.stopRemote = null; }
+  store.set('remote', newRemoteCode()); startRemote();
+  $('#pairCode').textContent = showCode(D.remote);
+}
 
 /* ---------- toolbar, settings and remote control ---------- */
 const open = () => !$('#sheet').hidden;
@@ -3495,10 +3875,11 @@ function fillSheet(){
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
   [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date); setv('bE' + i, b.every || 2); });
   setv('fIcal', s.ical); setv('fTrainFrom', s.trainFrom); setv('fTrainTo', s.trainTo); setv('fTrainWalk', s.trainWalk); setv('fTramStop', s.tramStop); setv('fTramWalk', s.tramWalk);
-  $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on the dashboard on this device.` : 'For live draw and today\'s cost, connect your Octopus account once on the dashboard on this device.';
+  $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on this screen.` : 'For live draw and today\'s cost, open the phone pages on this screen once (Settings, then Account) and connect your Octopus account.';
   $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
     : `Home server helper found. Trains: ${NET.keys.rtt ? 'token set' : 'no Realtime Trains token yet'}. Trams: ${NET.keys.tfgm ? 'key set' : 'no TfGM key yet'}.`;
   $('#setupOut').textContent = '';
+  $('#pairCode').textContent = D.remote ? showCode(D.remote) : 'Starting…';
 }
 function readSheet(){
   const v = id => $('#' + id).value.trim();
@@ -3537,6 +3918,7 @@ function wire(){
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
   $('#closeSheet').addEventListener('click', closeSheet);
+  $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
   $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });
   $('#copySetup').addEventListener('click', () => {
     const link = setupLink(readSheet(), $('#fRegion').value), out = $('#setupOut');
@@ -3546,7 +3928,7 @@ function wire(){
   document.addEventListener('keydown', onKey);
   const wake = () => { D.lastInput = Date.now(); if (D.override && D.override !== D.mode){ D.override = null; applyMode(); return true; } return false; };
   let lastMove = 0;
-  document.addEventListener('mousemove', () => { const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });
+  document.addEventListener('mousemove', () => { if (D.embed) return; const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });
   let tx = null, ty = null;
   document.addEventListener('touchstart', e => { const t = e.touches[0]; tx = t.clientX; ty = t.clientY; }, { passive: true });
   document.addEventListener('touchend', e => {
@@ -3574,6 +3956,9 @@ function wire(){
     const r = await Promise.race([fetch('household.json', { cache: 'no-cache' }), new Promise((_, no) => setTimeout(no, 4000))]);
     if (r.ok){ D.household = await r.json(); D.set = mergeSettings(D.household, store.getJ('display', null)); }
   } catch(e){}
+  D.embed = hashOptions(location.hash).embed === '1';
+  document.body.classList.toggle('embed', D.embed);
+  try { if (store.get('corners') === 'sharp') document.documentElement.setAttribute('data-corners', 'sharp'); } catch(e){}
   const imported = importSetup(location.hash);
   D.mode = modeFromHash(imported ? '' : location.hash, D.set.mode);
   D.preview = imported ? {} : hashOptions(location.hash);
@@ -3581,9 +3966,10 @@ function wire(){
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), D.set.reloadAt, Math.random()*10);
   applyMode();
-  if (store.get('display.reloaded')){ store.del('display.reloaded'); } else { showChrome(); }
-  keepAwake();
+  if (store.get('display.reloaded') || D.embed){ store.del('display.reloaded'); } else { showChrome(); }
+  if (!D.embed) keepAwake();
   await detectProxy();
+  startRemote();
   tick(); setInterval(tick, 1000);
 })();
 

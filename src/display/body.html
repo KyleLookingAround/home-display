@@ -6,51 +6,51 @@
   <div class="bar-actions">
     <button class="btn" id="setBtn" type="button">Settings</button>
     <button class="btn" id="fsBtn" type="button">Full screen</button>
-    <a class="btn" id="dashBtn" href="index.html">Dashboard</a>
+    <a class="btn" id="dashBtn" href="index.html">Phone pages</a>
   </div>
 </header>
 
 <div class="screen" id="screen">
 
-  <!-- ================= ENERGY ================= -->
-  <section class="mode" data-mode="energy" aria-label="Energy" hidden>
-    <div class="mode-head"><p class="eyebrow">Harold Street · energy</p><span class="clock-sm mono" data-clock>--:--</span></div>
-    <div class="price-wrap">
-      <span class="price-label" id="eLabel">Agile price now, per kWh</span>
-      <span class="price" id="ePrice">--</span>
-      <span class="price-sub" id="eNext"></span>
+  <!-- ================= TODAY: the household at a glance ================= -->
+  <section class="mode" data-mode="today" aria-label="Today" hidden>
+    <div class="top">
+      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p></div>
+      <div class="verdict" id="dVerdict"></div>
+      <div class="wx" id="dWx"></div>
     </div>
-    <div class="strip" id="eStrip"></div>
-    <div class="row" id="eChips"></div>
-    <p class="mode-foot" id="eFoot"></p>
+    <div class="heads" id="dHeads"></div>
+    <section class="card strip-card"><div class="card-head"><h2 class="label">The next 12 hours</h2><span class="aside" id="dCheap"></span></div><div class="strip" id="dStrip"></div></section>
+    <div class="grid3">
+      <section class="card"><h2 class="label" id="dTrainsH">Trains</h2><div id="dTrains"></div></section>
+      <section class="card"><h2 class="label">Today and tomorrow</h2><div id="dDay"></div></section>
+      <section class="card"><h2 class="label">Right now</h2><div id="dNow"></div></section>
+    </div>
+    <p class="foot" id="dFoot"></p>
   </section>
 
-  <!-- ================= HOME ================= -->
-  <section class="mode" data-mode="home" aria-label="Home" hidden>
-    <div class="home-top">
-      <div>
-        <div class="clock-xl" data-clock>--:--</div>
-        <p class="date-l" id="hDate"></p>
-        <p class="sun" id="hSun"></p>
-      </div>
-      <div class="wx-now" id="hNow"></div>
+  <!-- ================= ENERGY ================= -->
+  <section class="mode" data-mode="energy" aria-label="Energy" hidden>
+    <div class="top">
+      <div class="verdict big" id="eVerdict"></div>
+      <div class="price-now"><span class="label">Agile now</span><span class="price" id="ePrice">--</span><span class="sub" id="eNext"></span></div>
     </div>
-    <div class="hours" id="hHours"></div>
-    <div class="cols">
-      <section class="panel"><h2>Bins</h2><div id="hBins"></div></section>
-      <section class="panel"><h2>Coming up</h2><div id="hCal"></div></section>
+    <section class="card strip-card tall"><div class="card-head"><h2 class="label">Today and tomorrow</h2><span class="aside" id="eWhen"></span></div><div class="strip" id="eStrip"></div></section>
+    <div class="grid2">
+      <section class="card"><h2 class="label">Run it now or later?</h2><div id="eRun"></div></section>
+      <section class="card"><h2 class="label">Right now</h2><div id="eChips"></div></section>
     </div>
-    <p class="mode-foot" id="hFoot"></p>
+    <p class="foot" id="eFoot"></p>
   </section>
 
   <!-- ================= TRAVEL ================= -->
   <section class="mode" data-mode="travel" aria-label="Travel" hidden>
-    <div class="mode-head"><p class="eyebrow">Departures</p><span class="clock-sm mono" data-clock>--:--</span></div>
-    <div class="cols">
-      <section class="panel"><h2 id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
-      <section class="panel"><h2 id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
+    <div class="top slim"><h1 class="title">Travel</h1><span class="clock sm" data-clock>--:--</span></div>
+    <div class="grid2 travel">
+      <section class="card"><h2 class="label" id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
+      <section class="card"><h2 class="label" id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
     </div>
-    <p class="mode-foot" id="tFoot"></p>
+    <p class="foot" id="tFoot"></p>
   </section>
 
   <!-- ================= SCREENSAVER: a side window onto space ================= -->
@@ -122,50 +122,50 @@
 <!-- ================= SETTINGS ================= -->
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
   <form id="setForm" autocomplete="off">
-    <h2 id="sheetTitle">Display settings</h2>
-    <p class="help">These are kept on this device only. Use the arrows to move, Enter to choose and Back to close. Set things up on a phone, then send the setup link to the TV.</p>
+    <div class="sheet-head"><h2 id="sheetTitle">Settings</h2><p class="help">Kept on this screen. Arrows to move, Enter to choose, Back to close. It's easiest to set things up on your phone (Settings, then Screens) and send this screen a setup link.</p></div>
 
-    <h3>This screen</h3>
+    <section class="card"><h3 class="label">This screen</h3>
     <div class="fields">
       <div class="field"><label for="fMode">Opens on</label><select id="fMode"></select></div>
-      <div class="field"><label for="fRotate">Change mode every</label><select id="fRotate"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
-      <div class="field"><label for="fDetail">Screensaver detail</label><select id="fDetail"><option value="auto">Automatic: less on TVs and slow screens</option><option value="high">Full detail</option><option value="low">Lighter, for a slow TV</option></select></div>
+      <div class="field"><label for="fRotate">Change view every</label><select id="fRotate"><option value="0">Never</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option></select></div>
       <div class="field"><label for="fSaver">Screensaver after</label><select id="fSaver"><option value="0">Never</option><option value="5">5 idle minutes</option><option value="10">10 idle minutes</option><option value="15">15 idle minutes</option><option value="30">30 idle minutes</option><option value="60">An idle hour</option></select></div>
+      <div class="field"><label for="fDetail">Screensaver detail</label><select id="fDetail"><option value="auto">Automatic</option><option value="high">Full detail</option><option value="low">Lighter, for a slow TV</option></select></div>
     </div>
     <div class="fields">
       <div class="field"><label for="fNight">Night clock</label><select id="fNight"><option value="1">On</option><option value="0">Off</option></select></div>
       <div class="field"><label for="fNightFrom">Night from</label><select id="fNightFrom" data-times></select></div>
       <div class="field"><label for="fNightTo">Night until</label><select id="fNightTo" data-times></select></div>
       <div class="field"><label for="fReload">Fresh start each night at</label><select id="fReload" data-times></select></div>
-    </div>
+    </div></section>
 
-    <h3>Energy</h3>
+    <section class="card"><h3 class="label">Your phone as a remote</h3>
+    <p class="pair">Code <b class="code" id="pairCode">----</b></p>
+    <p class="help">On your phone, open Screen and enter this code. Then the phone can change what this screen shows. Only those requests pass through ntfy.sh, a free relay; nothing else does.</p>
+    <div class="actions"><button class="btn" type="button" id="newCode">New code</button></div></section>
+
+    <section class="card"><h3 class="label">Energy</h3>
+    <div class="fields"><div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div></div>
+    <p class="help" id="acctHelp"></p></section>
+
+    <section class="card"><h3 class="label">Bins</h3>
+    <p class="help">For each bin, one collection date you know and how often it comes. Bank holiday weeks move it a day later.</p>
+    <div id="binRows"></div></section>
+
+    <section class="card"><h3 class="label">Calendar</h3>
+    <div class="fields"><div class="field wide"><label for="fIcal">Secret iCal address</label><input id="fIcal" type="url" inputmode="url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div></div>
+    <p class="help">In Google Calendar: Settings, your calendar, then Secret address in iCal format. It stays on this screen. Google's address needs the home server helper.</p></section>
+
+    <section class="card"><h3 class="label">Travel</h3>
     <div class="fields">
-      <div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div>
-    </div>
-    <p class="help" id="acctHelp"></p>
-
-    <h3>Bins</h3>
-    <p class="help">For each bin, give one collection date you know and how often it comes. Bank holiday changes aren't included.</p>
-    <div id="binRows"></div>
-
-    <h3>Calendar</h3>
-    <div class="fields">
-      <div class="field" style="flex-basis:30rem"><label for="fIcal">Secret iCal address</label><input id="fIcal" type="url" inputmode="url" spellcheck="false" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div>
-    </div>
-    <p class="help">In Google Calendar: Settings → your calendar → Integrate calendar → Secret address in iCal format. Anyone with the address can read the calendar, so it stays on this device. Google's address needs the home server helper.</p>
-
-    <h3>Travel</h3>
-    <div class="fields">
-      <div class="field"><label for="fTrainFrom">Railway station code</label><input id="fTrainFrom" class="mono" maxlength="8" placeholder="SPT"></div>
-      <div class="field"><label for="fTrainTo">Only trains calling at</label><input id="fTrainTo" class="mono" maxlength="8" placeholder="e.g. MAN (optional)"></div>
-      <div class="field"><label for="fTrainWalk">Walk to the station (min)</label><select id="fTrainWalk" data-walk></select></div>
+      <div class="field"><label for="fTrainFrom">Station code</label><input id="fTrainFrom" class="mono" maxlength="8" placeholder="SPT"></div>
+      <div class="field"><label for="fTrainTo">Only trains calling at</label><input id="fTrainTo" class="mono" maxlength="8" placeholder="e.g. MAN"></div>
+      <div class="field"><label for="fTrainWalk">Walk to the station</label><select id="fTrainWalk" data-walk></select></div>
     </div>
     <div class="fields">
       <div class="field"><label for="fTramStop">Metrolink stop</label><input id="fTramStop" placeholder="e.g. East Didsbury"></div>
-      <div class="field"><label for="fTramWalk">Walk to the stop (min)</label><select id="fTramWalk" data-walk></select></div>
+      <div class="field"><label for="fTramWalk">Walk to the stop</label><select id="fTramWalk" data-walk></select></div>
     </div>
-    <p class="help" id="travelHelp"></p>
+    <p class="help" id="travelHelp"></p></section>
 
     <div class="actions">
       <button class="btn primary" type="submit">Save</button>

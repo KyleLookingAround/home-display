@@ -3,17 +3,22 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
-  import { nextCollections, BIN_COLOURS, relDay, weatherText, leaveBy } from '../../lib/household.js';
+  import { BIN_COLOURS, relDay, weatherText, leaveBy } from '../../lib/household.js';
+  import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
+  import Radar from '../charts/Radar.svelte';
   import { hhmm, startOfDay, addDays } from '../../lib/format.js';
   import { errorText } from '../../lib/net.js';
-  onMount(() => watchHouse());
+  onMount(() => watchHouse({ air: true, radar: true }));
 
   const w = $derived(app.weather);
   const wNow = $derived(w && w.now ? weatherText(w.now.code) : null);
   const hours = $derived(w ? w.hours.filter((h, i) => i % 2 === 0).slice(0, 6) : []);
 
   // Bins on the same day go together, and the next day's list says whether it's tonight they go out.
-  const bins = $derived(app.house ? nextCollections(app.bins, app.now) : null);
+  const bins = $derived(app.collections);
+  const soon = $derived(app.nowcast ? rainSoon(app.nowcast, app.now) : null);
+  const air = $derived(app.air);
+  const pollen = $derived(air ? [['grass', 'Grass'], ['tree', 'Tree']].map(([k, n]) => ({ n, l: pollenLabel(air.pollen[k], k) })).filter(x => x.l && x.l !== 'None') : []);
   const binDays = $derived.by(() => {
     if (!bins) return [];
     const out = [];
@@ -34,9 +39,18 @@
     {#if w && wNow}
       <div class="wx-now"><span class="wx-i" aria-hidden="true">{wNow.icon}</span><span class="figure">{Math.round(w.now.temp)}°</span>
         <span class="main-t"><span>{wNow.text}</span><span class="sub">Feels {Math.round(w.now.feels)}° · wind {Math.round(w.now.wind)} mph</span></span></div>
+      {#if soon}<p class="soon">{soon.text}{soon.heavy ? ', heavy at times' : ''}</p>{:else if app.nowcast}<p class="soon dry">Dry for the next few hours</p>{/if}
       <ol class="hours">
         {#each hours as h}<li><span class="t">{hhmm(h.t)}</span><span aria-hidden="true">{weatherText(h.code).icon}</span><span class="v">{Math.round(h.temp)}°</span><span class="r" class:wet={h.rain >= 40}>{h.rain == null ? '' : h.rain + '%'}</span></li>{/each}
       </ol>
+      {#if air}
+        <div class="stats air">
+          <div class="stat"><span class="v">{aqiLabel(air.aqi) || '—'}</span><span class="k">Air quality{air.aqi != null ? ' · ' + Math.round(air.aqi) : ''}</span></div>
+          <div class="stat"><span class="v">{uvLabel(air.uvMax) || '—'}</span><span class="k">UV today{air.uvMax ? ', up to ' + Math.round(air.uvMax) : ''}</span></div>
+          <div class="stat"><span class="v">{pollen.length ? pollen.map(x => x.l).join(', ') : 'Low'}</span><span class="k">{pollen.length ? pollen.map(x => x.n).join(' and ') + ' pollen' : 'Pollen'}</span></div>
+        </div>
+      {/if}
+      <details class="fold"><summary>Rain radar</summary><Radar radar={app.radar} size={280} /></details>
     {:else if app.weatherErr}<p class="note">The forecast didn't load: {errorText(app.weatherErr)[0]}</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
   </section>
@@ -47,11 +61,12 @@
       <ul class="rows">
         {#each binDays as d, i}
           <li><span class="main-t"><span>{relDay(d.date, app.now)}{#if i === 0 && d.days === 1}<span class="tag warn">Out tonight</span>{/if}</span>
-            <span class="sub">{d.bins.map(b => b.what || b.name).join(' · ')}</span></span>
+            <span class="sub">{d.bins.map(b => b.what || b.name).join(' · ')}</span>
+            {#if d.bins[0].moved}<span class="sub warn">A day later for {d.bins[0].moved}, probably</span>{:else if d.bins[0].check}<span class="sub warn">Christmas: check the council's dates</span>{/if}</span>
             <span class="dots">{#each d.bins as b}<i title={b.name} style="background:{BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>{/each}</span></li>
         {/each}
       </ul>
-      <p class="note">{app.council && app.bins.some(b => +b.every === 0) ? 'Dates from Stockport Council, checked each Saturday.' : 'Dates repeat from the last known collection. Bank holidays can move them.'}</p>
+      <p class="note">{app.council && app.bins.some(b => +b.every === 0) ? 'Dates from Stockport Council, checked each Saturday.' : 'Dates repeat from the last known collection, a day later in a bank holiday week. Check the council at Christmas.'}</p>
     {:else if bins}<p class="note">No bins set up. <a href="./settings.html#household">Add them in Settings</a>.</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
   </section>
@@ -101,6 +116,9 @@
   .hours .t,.hours .r{font:500 11px/1 var(--f-mono);color:var(--muted)}
   .hours .v{font:500 14px/1 var(--f-mono)}
   .hours .wet{color:var(--gas)}
+  .soon{margin-top:var(--s2);font-size:15px;color:var(--gas)} .soon.dry{color:var(--muted)}
+  .air{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--line)}
+  .air :global(.v){font-size:15px;font-family:var(--f-body);font-weight:600}
   .dots{display:flex;gap:4px;flex:none}
   .dots i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25)}
   .mono{font-family:var(--f-mono);font-weight:500}

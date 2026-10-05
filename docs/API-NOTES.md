@@ -160,3 +160,19 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
   - `RRULE` with `FREQ` DAILY, WEEKLY (with `BYDAY`), MONTHLY (`BYDAY` like `2TU`, or `BYMONTHDAY`) and YEARLY, plus `INTERVAL`, `COUNT` and `UNTIL`;
   - `EXDATE`, moved instances (`RECURRENCE-ID`) and cancelled events.
 - **Not handled:** rarer rules such as `BYSETPOS` and `BYWEEKNO`.
+
+## The outdoors (no key; all allow browser calls, checked 5 October 2026)
+
+- **Bank holidays:** `GET https://www.gov.uk/bank-holidays.json`. `england-and-wales.events[]` with `title` and `date` (`YYYY-MM-DD`). Fetched once a day.
+- **Rain every quarter hour:** Open-Meteo `GET /v1/forecast?…&minutely_15=precipitation,precipitation_probability&forecast_minutely_15=12&past_minutely_15=1`. Local times like `2026-10-05T17:45`; rain counts from 0.1 mm in a quarter hour (`rainSoon`).
+- **Rain radar:** RainViewer `GET https://api.rainviewer.com/public/weather-maps.json` gives `host` and `radar.past[]` frames (`time` in seconds, `path`). Tiles are `{host}{path}/256/{z}/{x}/{y}/2/1_1.png`; zoom 7 works, 8 returns an empty tile. The map underneath is CARTO's `dark_nolabels` (© OpenStreetMap contributors © CARTO).
+- **Air quality, UV and pollen:** `GET https://air-quality-api.open-meteo.com/v1/air-quality?…&current=european_aqi,uv_index,grass_pollen,birch_pollen,alder_pollen&hourly=uv_index&forecast_days=1`. Pollen in grains per cubic metre, from CAMS; it's near zero outside the season.
+- **Flood warnings:** Environment Agency `GET https://environment.data.gov.uk/flood-monitoring/id/floods?lat=…&long=…&dist=15`. `items[]` with `severityLevel` (1 severe warning, 2 warning, 3 alert, 4 no longer in force), `description`, `message`, `timeRaised`.
+- **Grid mix:** National Grid `GET https://api.carbonintensity.org.uk/regional/regionid/3` (North West). `data[0].data[0].generationmix[]` with `fuel` and `perc`.
+- **Not usable from a browser:** the Met Office's warnings feed (no `Access-Control-Allow-Origin`).
+
+## ntfy.sh (the phone as a remote)
+
+- `POST https://ntfy.sh/{topic}` with a body publishes it; `GET https://ntfy.sh/{topic}/sse` streams new messages as server-sent events, each `data:` a JSON object with `event: "message"` and the body in `message`. `?poll=1&since=all` reads what's cached (12 hours). No account; `Access-Control-Allow-Origin: *`.
+- Topics are `hse-screen-<code>`, the code eight letters from a screen's settings. Anonymous use is rate limited (a few hundred messages a day), far above a remote's needs: the screen only answers when asked or when its view changes.
+

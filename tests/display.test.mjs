@@ -9,22 +9,36 @@ import { execFileSync } from 'node:child_process';
 import { shared } from './shared.mjs';
 
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'household', 'voyage');
+const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
 const plain = v => JSON.parse(JSON.stringify(v));
 
 test('modes come from the link and wrap round with left and right', () => {
-  assert.equal(A.modeFromHash('#home', 'energy'), 'home');
+  assert.equal(A.modeFromHash('#today', 'energy'), 'today');
+  assert.equal(A.modeFromHash('#home', 'energy'), 'today', 'older links to Home open Today');
   assert.equal(A.modeFromHash('#TRAVEL', 'energy'), 'travel');
   assert.equal(A.modeFromHash('#nonsense', 'energy'), 'energy');
   assert.equal(A.modeFromHash('', 'night'), 'night');
-  assert.equal(A.stepMode('energy', -1), 'night');
-  assert.equal(A.stepMode('night', 1), 'energy');
-  assert.equal(A.stepMode('home', 1), 'travel');
+  assert.equal(A.stepMode('today', -1), 'night');
+  assert.equal(A.stepMode('night', 1), 'today');
+  assert.equal(A.stepMode('energy', 1), 'travel');
+  assert.equal(A.displaySettings({ mode: 'home' }).mode, 'today');
+});
+
+test('the price verdict says the same thing on the phone and the TV', () => {
+  const now = at('2026-10-05T17:10:00'), t0 = at('2026-10-05T17:00:00');
+  const rates = ps => ps.map((p, i) => ({ from: t0 + i * 1800e3, to: t0 + (i + 1) * 1800e3, p }));
+  assert.equal(A.priceVerdict(rates([30, 31, 32, 30, 12, 11, 10, 12, 28]), now).big, 'Wait if you can');
+  assert.match(A.priceVerdict(rates([30, 31, 32, 30, 12, 11, 10, 12, 28]), now).line, /^30\.0p now, 11\.3p from 19:00$/);
+  assert.equal(A.priceVerdict(rates([-2, -1, 5, 20]), now).big, 'Paid to use power');
+  assert.equal(A.priceVerdict(rates([9, 10, 30, 30]), now).line, '9.00p now, cheap until 18:00');
+  assert.equal(A.priceVerdict(rates([26, 26, 26, 26, 26]), now).big, 'Peak price');
+  assert.equal(A.priceVerdict([], now), null);
+  assert.deepEqual(plain([-1, 5, 20, 30, null].map(A.priceTone)), ['neg', 'cheap', 'normal', 'peak', 'muted']);
 });
 
 test('night window works across midnight', () => {
@@ -243,6 +257,65 @@ test('trains from the staff board: full date-times, and seconds on the estimate'
   assert.equal(r.list[0].delayed, true, 'no estimate on the staff board reads as delayed');
 });
 
+test('heads-ups: a train to leave for, bins tonight, rain on its way', () => {
+  const now = at('2026-10-05T17:30:00');
+  const train = (m, extra = {}) => Object.assign({ sched: now + m * 60e3, exp: now + m * 60e3, dest: 'London Euston', platform: '3', cancelled: false }, extra);
+  const bins = A.nextCollections([{ name: 'Green bin', colour: 'green', date: '2026-10-06', every: 1 }, { name: 'Black bin', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Blue bin', colour: 'blue', date: '2026-10-13', every: 4 }], now);
+  const hour = (h, rain) => ({ t: at(`2026-10-05T${h}:00:00`), rain });
+  const r = plain(A.headsUp({ trains: { list: [train(10, { cancelled: true }), train(20, { exp: now + 23 * 60e3 })] }, walk: 15, bins, weather: { hours: [hour(17, 10), hour(18, 30), hour(19, 70)] } }, now));
+  assert.deepEqual(r.map(x => x.kind), ['train', 'bins', 'rain']);
+  assert.equal(r[0].title, 'Leave in 8 min', 'the cancelled one is skipped, and the expected time counts');
+  assert.match(r[0].sub, /17:50 to London Euston, expected 17:53, platform 3/);
+  assert.equal(r[1].sub, 'Black bin and Green bin');
+  assert.equal(r[2].title, 'Rain likely from 19:00');
+  // nothing to say: the train is an hour off, bins are next week, it's raining already
+  assert.deepEqual(plain(A.headsUp({ trains: { list: [train(60)] }, walk: 15, bins: A.nextCollections([{ name: 'Blue', date: '2026-10-13', every: 4 }], now), weather: { hours: [hour(17, 80), hour(18, 90)] } }, now)), []);
+  // bins the evening before only from three o'clock, and that morning until ten
+  assert.equal(A.headsUp({ bins }, at('2026-10-05T12:00:00')).length, 0);
+  // the quarter-hour rain wins over the hourly chance; flood warnings come before it
+  const q = (m, mm) => ({ t: now + m * 60e3, mm });
+  const wet = plain(A.headsUp({ nowcast: [q(0, 0), q(15, 0), q(30, 0.6)], floods: [{ level: 2, title: 'Flood warning', area: 'River Mersey at Stockport' }], weather: { hours: [hour(17, 10), hour(18, 90)] } }, now));
+  assert.deepEqual(wet.map(x => x.title), ['Flood warning', 'Rain from 18:00']);
+  const morning = at('2026-10-06T07:00:00');
+  assert.equal(A.headsUp({ bins: A.nextCollections([{ name: 'Green bin', date: '2026-10-06', every: 1 }], morning) }, morning)[0].title, 'Bins go this morning');
+});
+
+test('bins move a day after a weekday bank holiday in their week, and Christmas says to check', () => {
+  const hols = A.parseBankHolidays({ 'england-and-wales': { events: [{ title: 'Spring bank holiday', date: '2027-05-31' }, { title: 'Christmas Day', date: '2026-12-25' }, { title: 'Boxing Day', date: '2026-12-28' }] } });
+  assert.deepEqual(plain(hols.map(h => h.date)), ['2026-12-25', '2026-12-28', '2027-05-31']);
+  const bins = [{ name: 'Green', date: '2027-05-20', every: 1 }];   // Thursdays
+  const wk = A.nextCollections(bins, at('2027-05-30T12:00:00'), hols)[0];
+  assert.equal(wk.date.getDay(), 5, 'the Thursday after a Monday bank holiday moves to Friday');
+  assert.equal(wk.moved, 'Spring bank holiday');
+  const fri = A.nextCollections(bins, at('2027-06-04T08:00:00'), hols)[0];
+  assert.equal(fri.days, 0, 'on the Friday, the moved collection is today, not next week');
+  assert.equal(A.nextCollections(bins, at('2027-06-05T08:00:00'), hols)[0].moved, undefined, 'the week after is back to normal');
+  assert.equal(A.nextCollections(bins, at('2027-05-30T12:00:00'))[0].date.getDay(), 4, 'without the holiday list nothing moves');
+  assert.equal(A.nextCollections([{ name: 'Black', date: '2026-12-17', every: 1 }], at('2026-12-21T12:00:00'), hols)[0].check, true, 'Christmas week: check the council');
+  assert.equal(A.nextCollections([{ name: 'Council', date: '2027-06-03', every: 0 }], at('2027-05-30T12:00:00'), hols)[0].moved, undefined, 'the council\'s own dates stay put');
+});
+
+test('rain in the next hours, air, pollen, floods and the grid mix', () => {
+  const now = at('2026-10-05T17:40:00');
+  const q = (h, m, mm) => ({ t: at(`2026-10-05T${h}:${m}:00`), mm });
+  assert.deepEqual(plain(A.rainSoon([q(17, 30, 0), q(17, 45, 0), q(18, '00', 0), q(18, 15, 0.4), q(18, 30, 1.2)], now)), { raining: false, starts: at('2026-10-05T18:15:00'), mins: 35, text: 'Rain from 18:15', heavy: true });
+  assert.equal(A.rainSoon([q(17, 30, 0.5), q(17, 45, 0.3), q(18, '00', 0)], now).text, 'Rain stops around 18:00');
+  assert.equal(A.rainSoon([q(17, 30, 0), q(17, 45, 0)], now), null);
+  assert.equal(A.parseNowcast({ minutely_15: { time: ['2026-10-05T17:45'], precipitation: [null], precipitation_probability: [20] } })[0].mm, 0);
+  const tile = A.tileOf(53.41, -2.16, 7);
+  assert.deepEqual([tile.x, tile.y], [63, 41]);
+  const air = A.parseAir({ current: { european_aqi: 24, uv_index: 2.4, grass_pollen: 35, birch_pollen: 0, alder_pollen: 3 }, hourly: { uv_index: [0, 1.5, 3.2, null] } });
+  assert.deepEqual(plain(air), { aqi: 24, uv: 2.4, uvMax: 3.2, pollen: { grass: 35, tree: 3 } });
+  assert.equal(A.aqiLabel(24), 'Fair'); assert.equal(A.uvLabel(3.2), 'Moderate'); assert.equal(A.pollenLabel(35, 'grass'), 'Moderate'); assert.equal(A.pollenLabel(0, 'tree'), 'None'); assert.equal(A.aqiLabel(null), null);
+  const floods = A.parseFloods({ items: [{ severityLevel: 4, description: 'Old' }, { severityLevel: 3, description: 'River Goyt at Marple', message: ' Levels rising. ', timeRaised: '2026-10-05T09:00:00' }, { severityLevel: 2, description: 'River Mersey at Stockport' }] });
+  assert.deepEqual(plain(floods.map(f => [f.title, f.area])), [['Flood warning', 'River Mersey at Stockport'], ['Flood alert', 'River Goyt at Marple']]);
+  assert.equal(floods[1].message, 'Levels rising.');
+  const mix = A.parseGridMix({ data: [{ data: [{ from: '2026-10-05T16:00Z', generationmix: [{ fuel: 'gas', perc: 6.5 }, { fuel: 'wind', perc: 55.4 }, { fuel: 'nuclear', perc: 27.6 }, { fuel: 'solar', perc: 2.3 }, { fuel: 'coal', perc: 0 }, { fuel: 'imports', perc: 8.2 }] }] }] });
+  assert.equal(mix.mix[0].name, 'Wind'); assert.equal(mix.renewable, 58); assert.equal(mix.lowCarbon, 85);
+  assert.equal(mix.mix.some(f => f.fuel === 'coal'), false);
+  assert.equal(A.parseGridMix({}), null);
+});
+
 test('household settings reach every screen, and a screen keeps only its own changes', () => {
   const house = { bins: [{ name: 'Black', date: '2026-10-08', every: 2 }], trainFrom: 'SPT', trainWalk: 12, ical: 'https://secret' };
   const s = A.mergeSettings(house, null);
@@ -320,7 +393,7 @@ test('the built display matches the source', () => {
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'voyage']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'voyage']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

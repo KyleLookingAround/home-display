@@ -64,6 +64,19 @@ function trains(){
     svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', { late: 6 }), svc(24, 'Buxton', '4'),
     svc(31, 'Hazel Grove', '2', { cancel: true }), svc(38, 'Sheffield', '3'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4') ] };
 }
+// The outdoors: bank holidays, rain every quarter hour (dry, then rain from 15:00), the radar, air and floods, the grid mix.
+const holidays = { 'england-and-wales': { division: 'england-and-wales', events: [{ title: 'Christmas Day', date: '2026-12-25' }, { title: 'Boxing Day', date: '2026-12-28' }] } };
+function nowcast(){
+  const t0 = Math.floor(+NOW / 900e3) * 900e3, time = [], precipitation = [];
+  for (let i = -1; i < 12; i++){ time.push(new Date(t0 + i * 900e3).toLocaleString('sv-SE', { timeZone: 'Europe/London' }).slice(0, 16).replace(' ', 'T')); precipitation.push(i >= 4 ? 0.8 : 0); }
+  return { minutely_15: { time, precipitation, precipitation_probability: precipitation.map(v => v ? 70 : 10) } };
+}
+const radar = { version: '2.0', host: 'https://tilecache.rainviewer.com', radar: { past: [0, 1, 2].map(i => ({ time: Math.floor(+NOW / 1000) - (2 - i) * 600, path: '/v2/radar/test' + i })), nowcast: [] } };
+const air = { current: { european_aqi: 18, uv_index: 1.2, grass_pollen: 0, birch_pollen: 0, alder_pollen: 0 }, hourly: { uv_index: [0, 1, 2.6, 1] } };
+const floods = { items: [{ severityLevel: 3, description: 'River Goyt at Marple Bridge', message: 'River levels are rising.', timeRaised: '2026-10-05T09:00:00' }] };
+const gridMix = { data: [{ regionid: 3, shortname: 'North West England', data: [{ from: '2026-10-05T13:00Z', to: '2026-10-05T13:30Z', generationmix: [{ fuel: 'wind', perc: 55.4 }, { fuel: 'nuclear', perc: 27.6 }, { fuel: 'imports', perc: 8.3 }, { fuel: 'gas', perc: 6.5 }, { fuel: 'solar', perc: 2.2 }] }] }] };
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+
 function huxley(){
   const hm = m => { const d = new Date(+NOW + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
   const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, destination: [{ locationName: dest, via: null }] }, extra || {});
@@ -144,8 +157,14 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   page.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
   await page.route(/^https:\/\/api\.octopus\.energy\//, r => { const j = octopus(r.request().url()); return j ? r.fulfill({ json: j }) : r.fulfill({ status: 404, json: {} }); });
-  await page.route(/^https:\/\/api\.carbonintensity\.org\.uk\//, r => r.fulfill({ json: carbon() }));
-  await page.route(/^https:\/\/api\.open-meteo\.com\//, r => r.fulfill({ json: weather() }));
+  await page.route(/^https:\/\/api\.carbonintensity\.org\.uk\//, r => r.fulfill({ json: /\/regional\/regionid\//.test(r.request().url()) ? gridMix : carbon() }));
+  await page.route(/^https:\/\/api\.open-meteo\.com\//, r => r.fulfill({ json: /minutely_15/.test(r.request().url()) ? nowcast() : weather() }));
+  await page.route(/^https:\/\/air-quality-api\.open-meteo\.com\//, r => r.fulfill({ json: air }));
+  await page.route(/^https:\/\/www\.gov\.uk\/bank-holidays\.json/, r => r.fulfill({ json: holidays }));
+  await page.route(/^https:\/\/environment\.data\.gov\.uk\//, r => r.fulfill({ json: floods }));
+  await page.route(/^https:\/\/api\.rainviewer\.com\//, r => r.fulfill({ json: radar }));
+  await page.route(/^https:\/\/(tilecache\.rainviewer\.com|[a-d]\.basemaps\.cartocdn\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  await page.route(/^https:\/\/(national-rail-api\.davwheat\.dev|ntfy\.sh)\//, r => r.fulfill({ status: 500, body: '' }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
   await page.route(/^https:\/\/huxley2\.azurewebsites\.net\//, r => r.fulfill({ json: huxley() }));
   if (clock) await page.clock.install({ time: at });
@@ -174,7 +193,7 @@ async function layout(page){
 }
 async function shot(page, name){ if (SHOTS) await page.screenshot({ path: join(SHOTS, name + '.png') }); }
 
-const MODES = ['energy', 'home', 'travel', 'screensaver', 'night'];
+const MODES = ['today', 'energy', 'travel', 'screensaver', 'night'];
 
 test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll', async () => {
   for (const withHelper of [true, false]) {
@@ -184,11 +203,11 @@ test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll
       await page.waitForTimeout(500);
       await page.evaluate(() => document.body.classList.remove('chrome-on'));
       assert.equal(await visibleMode(page), m);
+      await shot(page, `tv-${m}${withHelper ? '' : '-pages'}`);
       const l = await layout(page);
       assert.ok(l.sw <= l.iw, `${m}: scrolls sideways (${l.sw} > ${l.iw}): ${l.wide}`);
       assert.ok(l.sh <= l.ih, `${m}: taller than the screen (${l.sh} > ${l.ih})`);
       assert.deepEqual(l.small, [], `${m}: text under 24px at 1080p`);
-      await shot(page, `tv-${m}${withHelper ? '' : '-pages'}`);
     }
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
@@ -207,10 +226,20 @@ test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll
 });
 
 test('display: content on the TV is real data, labelled examples only where nothing is set up', async () => {
-  const { page, ctx } = await open('/display.html#energy');
-  await page.waitForTimeout(500);
-  const price = await page.textContent('#ePrice');
-  assert.match(price, /^\d+\.\dp$/, 'Agile price now');
+  const { page, ctx } = await open('/display.html#today');
+  await page.waitForTimeout(800);
+  assert.match(await page.textContent('#dVerdict'), /Wait if you can|Good time|price|Paid/, 'the same answer as the phone');
+  assert.match(await page.textContent('#dHeads'), /Leave in \d+ min/);
+  assert.match(await page.textContent('#dHeads'), /Flood alert/);
+  assert.match(await page.textContent('#dTrains'), /Manchester Piccadilly|London Euston/);
+  assert.match(await page.textContent('#dDay'), /Parents' evening/);
+  assert.match(await page.textContent('#dDay'), /Bins out tonight\s*General waste/);
+  assert.match(await page.textContent('#dNow'), /Grid carbon/);
+  assert.equal(await page.$$eval('#dStrip svg', s => s.length), 1, 'the next twelve hours are drawn');
+  await page.keyboard.press('2');
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent('#ePrice'), /^\d+\.\dp$/, 'Agile price now');
+  assert.match(await page.textContent('#eRun'), /Washing machine/);
   await page.keyboard.press('3');
   await page.waitForTimeout(300);
   const trains = await page.textContent('#tTrains');
@@ -219,12 +248,8 @@ test('display: content on the TV is real data, labelled examples only where noth
   assert.match(trains, /Cancelled/);
   assert.match(await page.textContent('#tTramTitle'), /East Didsbury/);
   assert.doesNotMatch(await page.textContent('#screen'), /Example/);
-  await page.keyboard.press('2');
-  await page.waitForTimeout(300);
-  assert.match(await page.textContent('#hCal'), /Parents' evening/);
-  assert.match(await page.textContent('#hBins'), /General waste\s*Tomorrow/);
   await ctx.close();
-  // GitHub Pages, no home server: trains still come straight from Huxley2; trams say what they need.
+  // GitHub Pages, no home server: trains still come straight from the public boards; trams say what they need.
   const pages = await open('/display.html#travel', { withHelper: false, settings: { tramStop: 'East Didsbury' } });
   await pages.page.waitForTimeout(500);
   assert.match(await pages.page.textContent('#tTrains'), /Manchester Piccadilly/);
@@ -260,9 +285,7 @@ test('display: Home Mini live draw and today\'s cost, without using up Octopus\'
   const chips = await page.textContent('#eChips');
   assert.match(chips, /Drawing now/);
   // 28 half hours of 0.25 kWh at the Agile fixture's prices, plus a 48p standing charge.
-  assert.match(chips, /7\.0 kWh/);
-  assert.match(chips, /Used today · £\d+\.\d\d with standing charge/);
-  assert.match(chips, /Your tariff now, per kWh/);
+  assert.match(chips, /Today so far\s*7\.0 kWh · £\d+\.\d\d/);
   const first = graphqlCalls;
   for (let i = 0; i < 60; i++) { await page.clock.fastForward('01:00'); await page.waitForTimeout(20); }
   await page.waitForTimeout(500);
@@ -299,10 +322,10 @@ test('display: every mode works on a phone without sideways scroll', async () =>
 });
 
 test('display: the remote control drives everything', async () => {
-  const { page, ctx } = await open('/display.html#energy');
+  const { page, ctx } = await open('/display.html#today');
   await page.keyboard.press('ArrowRight');
-  assert.equal(await visibleMode(page), 'home');
-  assert.equal(await page.evaluate(() => location.hash), '#home');
+  assert.equal(await visibleMode(page), 'energy');
+  assert.equal(await page.evaluate(() => location.hash), '#energy');
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
   assert.equal(await visibleMode(page), 'night');
@@ -357,7 +380,7 @@ test('display: night clock takes over in the evening and dims', async () => {
   assert.match(await page.textContent('.night-clock'), /^23:1\d$/);
   await shot(page, 'tv-night-auto');
   await page.keyboard.press('Enter');
-  assert.equal(await visibleMode(page), 'home');
+  assert.equal(await visibleMode(page), 'today', 'an old #home link opens Today');
   await ctx.close();
 });
 
@@ -374,7 +397,7 @@ test('display: a setup link copies settings to this device', async () => {
   await ctx.close();
 });
 
-const PAGES = [['index', 'Now'], ['money', 'Money'], ['usage', 'Usage'], ['home', 'Home'], ['settings', 'Settings']];
+const PAGES = [['index', 'Now'], ['money', 'Money'], ['usage', 'Usage'], ['home', 'Home'], ['screen', 'Screen'], ['settings', 'Settings']];
 test('dashboard: every page works on a phone, a tablet and a laptop, with example data labelled', async () => {
   if (!existsSync(join(DIST, 'index.html'))) throw new Error('build the dashboard first: npm run build');
   for (const [width, height] of [[390, 844], [768, 1024], [1280, 900]]) {
@@ -430,8 +453,9 @@ test('dashboard: the controls work', async () => {
   // Home: upgrades show an answer before anything is touched, and the comparison feeds the battery's tariffs
   await page.goto(`${base}/home.html`); await ready(page);
   assert.ok(await page.locator('#battery .stat .v', { hasText: '£' }).count() >= 2, 'the battery card shows a saving and a cost');
-  await page.click('#tariffs summary'); await page.click('text=Price every Octopus tariff');
-  await page.waitForSelector('#tariffs tr.best');
+  await page.click('#tariffs summary');
+  await page.waitForSelector('#tariffs tr.best');   // the comparison runs by itself, once a week
+  assert.match(await page.textContent('#tariffs .line'), /would be the cheapest|already the cheapest/);
   await page.click('#battery summary');
   assert.ok(await page.locator('#bTariff option').count() >= 3, 'the battery offers the compared tariffs');
   await page.fill('#bCap', '10'); await page.fill('#bCost', '2000');
@@ -458,6 +482,69 @@ test('dashboard: the controls work', async () => {
   const mine = await page.evaluate(() => JSON.parse(localStorage.getItem('hse.display')));
   assert.equal(mine.trainWalk, 9);
   assert.equal(mine.bins, undefined, 'the bins stay as household.json has them');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('dashboard: Now leads with what to act on soon', async () => {
+  const { page, ctx, errors } = await open('/index.html', { settings: SETTINGS, withHelper: false });
+  await page.waitForSelector('.heads');
+  assert.match(await page.textContent('.heads'), /Leave in 1[01] min/, 'the 14:27 to London Euston, expected 14:33, with a 12 minute walk');
+  assert.match(await page.textContent('.heads'), /London Euston, expected 14:33/);
+  assert.match(await page.textContent('.heads'), /Flood alert\s*River Goyt at Marple Bridge/);
+  assert.match(await page.textContent('.heads'), /Rain from 15:00/);
+  assert.match(await page.locator('.card', { hasText: 'Right now' }).textContent(), /55% wind/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+// ntfy.sh, faked: each stream delivers the given messages, and what's sent is kept.
+async function relay(page, deliver){
+  const sent = [];
+  await page.route(/^https:\/\/ntfy\.sh\//, async r => {
+    const req = r.request();
+    if (req.method() === 'POST'){ sent.push({ topic: new URL(req.url()).pathname.slice(1), msg: JSON.parse(req.postData() || '{}') }); return r.fulfill({ json: { event: 'message' } }); }
+    const body = deliver().map(m => 'data: ' + JSON.stringify({ event: 'message', message: JSON.stringify(m) }) + '\n\n').join('');
+    return r.fulfill({ status: 200, contentType: 'text/event-stream', headers: { 'Access-Control-Allow-Origin': '*' }, body: 'retry: 60000\n\n' + body });
+  });
+  return sent;
+}
+
+test('display: the phone can change what the TV shows', async () => {
+  const { page, ctx, errors } = await open('/display.html#today', { clock: false });
+  const sent = await relay(page, () => [{ from: 'phone', cmd: 'mode', mode: 'travel' }, { from: 'phone', cmd: 'mode', mode: 'nonsense' }, { from: 'someone', cmd: 'mode', mode: 'night' }]);
+  await page.reload();
+  await page.waitForFunction(() => { const s = [...document.querySelectorAll('.mode')].find(x => !x.hidden); return s && s.dataset.mode === 'travel'; }, null, { timeout: 8000 });
+  assert.match(await page.textContent('#toast'), /from your phone/);
+  const code = await page.evaluate(() => localStorage.getItem('hse.remote'));
+  assert.match(code, /^[A-Z2-9]{8}$/);
+  await page.waitForTimeout(500);
+  const state = sent.filter(s => s.msg.from === 'screen').pop();
+  assert.equal(state.topic, 'hse-screen-' + code.toLowerCase());
+  assert.equal(state.msg.state.shown, 'travel', 'the screen tells the phone what it shows');
+  await page.keyboard.press('s');
+  assert.equal((await page.textContent('#pairCode')).replace('-', ''), code, 'settings show the code to type on the phone');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('dashboard: the Screen page shows the wall display and drives the paired TV', async () => {
+  const { page, ctx, errors } = await open('/screen.html', { settings: SETTINGS, withHelper: false, clock: false });
+  const sent = await relay(page, () => [{ from: 'screen', state: { mode: 'today', shown: 'energy', at: Date.now() } }]);
+  await page.reload(); await ready(page);
+  await page.waitForSelector('.tv iframe');
+  assert.match(await page.getAttribute('.tv iframe', 'src'), /display\.html#today&embed=1/);
+  await page.fill('#pairCode', 'abcd efg'); await page.click('#pair button[type=submit]');
+  await page.waitForSelector('text=That isn\'t a code');
+  await page.fill('#pairCode', 'abcd-efgh'); await page.click('#pair button[type=submit]');
+  await page.waitForSelector('text=Showing Energy');
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.remoteTV')), 'ABCDEFGH');
+  for (let i = 0; i < 30 && !sent.some(s => s.msg.cmd === 'hello'); i++) await page.waitForTimeout(100);
+  assert.ok(sent.some(s => s.topic === 'hse-screen-abcdefgh' && s.msg.cmd === 'hello'), 'asks the TV what it shows');
+  await page.click('.modes >> text=Travel');
+  await page.waitForFunction(() => /#travel&embed=1/.test(document.querySelector('.tv iframe').src));
+  for (let i = 0; i < 30 && !sent.some(s => s.msg.cmd === 'mode'); i++) await page.waitForTimeout(100);
+  assert.ok(sent.some(s => s.msg.cmd === 'mode' && s.msg.mode === 'travel'), 'tells the TV to show Travel');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

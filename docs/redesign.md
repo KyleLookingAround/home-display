@@ -1,6 +1,6 @@
 # A full redesign of everything: the plan
 
-**Status:** the phone pages are built on the `redesign` branch and previewed at `/preview/` on the published site ([decision 0010](decisions/0010-redesign.md)); they go to `main` once Kyle is happy. Not yet built: carrying the account in a setup link encrypted with the site PIN, and the "Later, when wanted" steps. The wall display is unchanged.
+**Status:** built on the `redesign` branch and previewed at `/preview/` on the published site: the phone pages ([decision 0010](decisions/0010-redesign.md)) and the wall display with the phone as its remote ([decision 0011](decisions/0011-wall-display.md)). They go to `main` once Kyle is happy. Not yet built: carrying the account in a setup link encrypted with the site PIN, and the "Later, when wanted" steps.
 
 "Everything" means:
 - the dashboard;

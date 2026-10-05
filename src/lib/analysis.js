@@ -1,7 +1,7 @@
 /* Analysis: pure functions with no DOM. Example data, the period roll-up, patterns, projections, comparisons and simulators. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
-import { addDays, clamp, CO2_ELEC_FALLBACK, CO2_GAS, dayKey, DAYS_IN_MONTH, HOME, keyDate, kwh, median, MON, nz, slotOf, startOfDay, sum, TEMP_NORMALS } from './format.js';
+import { addDays, clamp, CO2_ELEC_FALLBACK, CO2_GAS, dayKey, DAYS_IN_MONTH, DOW, HOME, hhmm, keyDate, kwh, median, MON, nz, pence, slotOf, startOfDay, sum, TEMP_NORMALS } from './format.js';
 import { lookup, standingAt, unitPriceAt } from './octopus.js';
 
 export function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -329,6 +329,28 @@ export function cheapestWindow(rates, slots, now = Date.now()){
     if (!best || avg < best.avg) best = { avg, from: w[0].from, to: w[slots-1].to };
   }
   return best;
+}
+
+/** Price tone: below zero, cheap (under 15p), normal (under 25p) or peak. */
+export const priceTone = p => p == null ? 'muted' : p < 0 ? 'neg' : p < 15 ? 'cheap' : p < 25 ? 'normal' : 'peak';
+/**
+ * Is now a good time to use power? One word or two, and a line, from Agile's half hours (rates: { from, to, p }).
+ * Both the phone and the wall display say it the same way.
+ */
+export function priceVerdict(rates, now){
+  const all = (rates || []).filter(r => isFinite(r.to));
+  let i = -1;
+  for (let k = 0; k < all.length; k++) if (all[k].from <= now && now < all[k].to){ i = k; break; }
+  if (i < 0) return null;
+  const when = t => (dayKey(t) === dayKey(now) ? '' : DOW[new Date(t).getDay()] + ' ') + hhmm(t);
+  const cur = all[i], ahead = all.slice(i).filter(r => r.from < now + 12 * 3600e3);
+  const best = ahead.length >= 4 ? cheapestWindow(ahead, 4, now) : null;
+  const runUntil = test => { let j = i; while (j + 1 < all.length && test(all[j + 1].p)) j++; return all[j].to; };
+  const out = (tone, big, line) => ({ tone, big, line, p: cur.p, best });
+  if (cur.p < 0) return out('neg', 'Paid to use power', `${pence(cur.p)} now, below zero until ${when(runUntil(p => p < 0))}`);
+  if (cur.p < 15 || (best && cur.p <= best.avg * 1.1 && cur.p < 25)) return out('cheap', 'Good time', `${pence(cur.p)} now, cheap until ${when(runUntil(p => p < Math.max(15, cur.p * 1.1)))}`);
+  if (best && best.from > now && best.avg < cur.p * 0.8) return out(priceTone(cur.p), 'Wait if you can', `${pence(cur.p)} now, ${pence(best.avg)} from ${when(best.from)}`);
+  return out(priceTone(cur.p), cur.p >= 25 ? 'Peak price' : 'Normal price', `${pence(cur.p)} now, no cheaper spell in the next 12 hours`);
 }
 
 /* ---------- weekly log ---------- */

@@ -23,25 +23,30 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `browser.js`: `$`, `$$` and `store` (per-device `localStorage`, keys prefixed `hse.`).
     - `net.js`: `request`, `NET`, `detectProxy`, `errorText`.
     - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards).
-    - `carbon.js`, `weather.js`, `pvgis.js`: the other services.
-    - `analysis.js`: pure functions with no DOM. Example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
-    - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes and the night window, bins (`nextCollections`, `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, public Darwin boards for trains (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), Realtime Trains and TfGM parsing, `leaveBy`, `todayCost`, nightly reload and staleness.
+    - `carbon.js` (the forecast, history and `loadGridMix`: what the region's power is made of now), `weather.js`, `pvgis.js`: the other services.
+    - `outdoors.js`: bank holidays (GOV.UK), rain every quarter hour (`loadNowcast`, `rainSoon`), the rain radar (RainViewer over CARTO's map; `tileOf`), air quality, UV and pollen (Open-Meteo's air quality service; `aqiLabel`, `uvLabel`, `pollenLabel`) and Environment Agency flood warnings within 15 km.
+    - `remote.js`: the phone as a remote for a screen, through ntfy.sh. A screen makes an eight-letter code (`newRemoteCode`) and listens on `hse-screen-<code>`; a paired phone asks it to change view, wake or start afresh, and asks what it shows. `readRemote` lets through only those requests and the screen's answer.
+    - `analysis.js`: pure functions with no DOM. `priceVerdict` and `priceTone` (the answer to "use power now?", worded the same on the phone and the TV), example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
+    - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes (`MODES`; `MODE_ALIASES` sends old `#home` links to Today) and the night window, bins (`nextCollections(bins, now, holidays)` moves a repeat a day later in a bank holiday week, marked `moved`, and marks Christmas `check`; `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, public Darwin boards for trains (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), Realtime Trains and TfGM parsing, `leaveBy`, `headsUp`, `todayCost`, nightly reload and staleness.
     - `voyage.js`: the cockpit's logic, also used by the phone's Now page: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards`, `worldFor` with `moonPhase` and `issPass`, `voyageFor` (the next twelve hours) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost`.
-  - `pages/`: the dashboard's five pages, phone first ([decision 0010](docs/decisions/0010-redesign.md)): `index` (Now), `money`, `usage`, `home`, `settings`. Each is a list of islands. `patterns`, `prices` and `compare` only send old links to their new homes.
-  - `layouts/App.astro`: the head, starfield, the nav (a bottom bar on phones, a rail from 900px; links with `aria-current`), the header and the footer around every page. It sets `data-corners` from `hse.corners` before the page draws.
+  - `pages/`: the dashboard's pages, phone first ([decision 0010](docs/decisions/0010-redesign.md)): `index` (Now), `money`, `usage`, `home`, `screen` (the wall display from the phone), and `settings` (a gear in the header on a phone, the foot of the rail on a laptop). Each is a list of islands. `patterns`, `prices` and `compare` only send old links to their new homes.
+  - `layouts/App.astro`: the head, starfield, the nav (five tabs in a bottom bar on phones, a rail from 900px with Settings at its foot; links with `aria-current`), the header and the footer around every page. It sets `data-corners` from `hse.corners` before the page draws.
   - `components/`: one Svelte island per card, in a folder per page (`now/`, `money/`, `usage/`, `home/`, `settings/`), plus:
     - `Header.svelte`: the title, the status (`#status`: "Updated hh:mm", "Example data", "Updating…", "No signal", "Offline"), Refresh, and the negative price and Saving Session notifications.
     - `Notices.svelte`: the example-data banner (on Now) and errors.
+    - `now/HeadsUp.svelte`: leave for your train, bins out tonight, flood warnings, rain soon (`headsUp` in `household.js`), as on the TV.
+    - `screen/Screen.svelte`: a live picture of the wall display (`display.html#<view>&embed=1` in a scaled frame), pairing with a screen's code, and buttons that change what it shows.
     - `home/Upgrade.svelte`: the shape every upgrade shares: a year's saving, a rough cost, the payback, and the simulator folded under "Work it out".
-    - `charts/`: `Strip` (prices over time, cheapest hours, carbon band, markers), `Bars` (ghost of the period before, change marks), `HeatMap`, `ClockFace`, `Dial`, `Sparkline`, `Scatter`. Tap, point or arrow keys to read them.
+    - `charts/`: `Strip` (prices over time, cheapest hours, carbon band, markers), `Radar` (the rain radar, looping), `Bars` (ghost of the period before, change marks), `HeatMap`, `ClockFace`, `Dial`, `Sparkline`, `Scatter`. Tap, point or arrow keys to read them.
   - `state/`:
     - `app.svelte.js`: the one state object every island shares. Account data is `$state.raw`, replaced whole; `model` and `reg` are derived.
     - `session.js`: `boot()` once per page; `refresh`, `loadPrices`, `connect`, `forget`.
     - `cache.js`: IndexedDB, keeping account data across pages for half an hour and prices for ten minutes.
-    - `house.js`: the household on the phone: `houseSettings()` (household.json, then this device's changes), `saveHouse(form)` (keeps only what differs, in `hse.display`, as a screen does), weather, council bins, trains and the calendar each cached for its own time (`watchHouse`), and the Home Mini (`watchLive`: the draw each minute, today's rows each ten).
+    - `house.js`: the household on the phone: `houseSettings()` (household.json, then this device's changes), `saveHouse(form)` (keeps only what differs, in `hse.display`, as a screen does), weather, council bins and bank holidays, trains, the calendar, rain, the radar, air, floods and the grid mix, each cached for its own time (`watchHouse(ask)`: any card can ask, and the page runs one set of timers), and the Home Mini (`watchLive`: the draw each minute, today's rows each ten).
     - `usage.svelte.js`: the Usage page's comparison with the period before.
   - `styles/app.css`: the design tokens on `:root` (`--radius` changes with `data-corners="sharp"`) and the shared classes: cards, answers, stats, rows, folds, banners, forms, charts.
-  - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
+  - `display/head.html`, `display/body.html`: the display's CSS and markup, in the dashboard's look at ten-foot sizes (the same colours, cards, labels and price tones, and its corners setting): Today, Energy, Travel, the cockpit, Night, the toolbar and the settings sheet (with the remote's pairing code). `body.embed` (from `&embed=1`) is the picture on the phone's Screen page: no toolbar, no idle takeovers, no reloads, no remote.
+  - `display/board.js`: drawing helpers for Today, Energy and Travel, as strings: `stripSvg` (the price strip, sized in real pixels so its text stays sharp), heads-up chips (`headsHtml`), the grid mix (`mixHtml`) and the line icons.
   - `display/cockpit.js`: the screensaver, a side window onto space. It decides when and where things appear. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`; `readableAt` caps it for text). Layers, back to front:
     - `cSpace` canvas: the backdrop (sky, far and middle stars and both nebulae, baked together into one picture two screens wide and slid along), near stars, sun, comets, moon, aurora (painted small, stretched), planets, traffic, the house, wildlife, the ISS.
     - `cAhead` canvas, sharp at any tier: the road ahead (`drawAhead`), the next twelve hours along the window, now on the left, and the train's rail and platform. The price landscape, weather fronts, calendar beacons and the fuel dock, with canvas labels that stack rather than overlap ([decision 0007](docs/decisions/0007-time-is-distance.md)).
@@ -51,7 +56,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `TIERS` set canvas resolution, frames a second and how often the road ahead redraws. TVs start lower, any screen steps down when it can't keep up, and Settings or `detail=low|high` can fix it ([decision 0008](docs/decisions/0008-drawing-for-tvs.md)). Lower tiers add `body.lite`, which drops blurred shadows and looping animations. Don't add full-screen layers drawn every frame: bake slow things into the backdrop. Check with `BENCH=1 node --test --test-name-pattern="frame budget" tests/display.browser.mjs` (CPU slowed six times).
     - It shows a still frame under reduced motion.
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
-  - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure), mode switching, remote control and spatial navigation, screensaver motion, night mode and the settings sheet.
+  - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure; the outdoors and the grid mix too), the views (`renderToday`, `renderEnergy`, `renderTravel`, `renderNight`), mode switching, the TV remote and spatial navigation, the phone as a remote (`startRemote`, `tellRemote`), screensaver motion, night mode and the settings sheet.
   - `starfield.js`: the animated background, on both pages. It rests while the screensaver covers it.
 - `server.py`: optional stdlib-only home server helper.
   - It serves the folder (never dotfiles, `.py` or `.md`) and proxies a fixed allowlist of hosts under `/proxy/<name>/…`.
@@ -70,15 +75,16 @@ Kyle has given standing permission to develop, test and push to `main` without c
 
 ## Display modes
 
-Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Night. The mode comes from the link (`display.html#home`) or the screen's own setting. Extras after the mode preview the cockpit: `#screensaver&wx=rain&phase=night&price=-3&show=train,house`. `wx` is clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold; `phase` is dawn, day, dusk or night. The screensaver and night clock also take over automatically as overrides that don't change the link. Settings live in `localStorage` under `hse.display` on each device, and a setup link (`#setup=<base64 JSON>`) copies them between devices.
+Today, Energy, Travel, Screensaver (the cockpit, which new screens open on), Night ([decision 0011](docs/decisions/0011-wall-display.md)). Today is the household at a glance: clock, the price verdict, weather, heads-ups, the next twelve hours, trains, bins and the calendar, and what's live. Energy and Travel are the detail. The mode comes from the link (`display.html#today`; `#home` still works) or the screen's own setting, or a paired phone. Extras after the mode preview the cockpit: `#screensaver&wx=rain&phase=night&price=-3&show=train,house`. `wx` is clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold; `phase` is dawn, day, dusk or night. The screensaver and night clock also take over automatically as overrides that don't change the link. Settings live in `localStorage` under `hse.display` on each device, and a setup link (`#setup=<base64 JSON>`) copies them between devices.
 
 ## Dashboard pages
 
 Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md)).
-- **Now**: the verdict on the price now, the next twelve hours (price strip with cheapest hours, carbon, rain, your next event and train; today and tomorrow folded), right now (live draw, today so far, grid carbon), coming up (negative prices, tomorrow's prices, Saving Sessions), and run it now or later (three appliances, chosen in Settings).
+- **Now**: the verdict on the price now, heads-ups (leave for your train, bins out tonight, rain soon), the next twelve hours (price strip with cheapest hours, carbon, rain, your next event and train; today and tomorrow folded), right now (live draw, today so far, grid carbon), coming up (negative prices, tomorrow's prices, Saving Sessions), and run it now or later (three appliances, chosen in Settings).
 - **Money**: this month so far and on track for, the year ahead and the Direct Debit check, your tariff and the price cap, this week (with the log as text), rewards.
 - **Usage**: the period (7, 30, 90 days, against the period before), every day, your day as a clock face, every day as a heat map, heating against the weather, unusual days and half hours, carbon.
-- **Home**: weather, bins, today and tomorrow, trains; upgrades (tariffs, insulation and heating, the certificate, battery, solar); changes.
+- **Home**: weather (with rain soon, air, UV, pollen and the radar), bins, today and tomorrow, trains; upgrades (tariffs, insulation and heating, the certificate, battery, solar); changes.
+- **Screen**: the wall display's views in a live picture, pairing with a screen's code (`hse.remoteTV`), and buttons that change what the TV shows.
 - **Settings**: account (`#account`), notifications, household (`#household`), appliances (`#appliances`), screens (mode links and a setup link), data (CSV, clear the cache, the helper), look (corners), about.
 
 ## Conventions
@@ -95,11 +101,12 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
 
 ## Known gaps
 
+- The phone-to-TV remote goes through ntfy.sh, a free relay with no guarantee; without it the TV still works, and only the remote stops.
 - Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from free community Darwin boards (Huxley2 and a mirror) with no guarantee; three are tried in turn. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
 - The tariff comparison covers electricity only.
 - Realtime Trains' new API and TfGM's Metrolink fields are coded from the spec and community code, and haven't been tried with live keys yet.
-- Bin days are entered by hand. Bank holiday changes aren't known.
+- Bin days are entered by hand (and checked with the council weekly once its secret is set). Bank holiday weeks move a collection a day later, which is the usual pattern but not the council's word.
 
 ## Checking changes
 

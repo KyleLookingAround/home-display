@@ -2,6 +2,7 @@
 import App from '../layouts/App.astro';
 import Notices from '../components/Notices.svelte';
 import Verdict from '../components/now/Verdict.svelte';
+import HeadsUp from '../components/now/HeadsUp.svelte';
 import Ahead from '../components/now/Ahead.svelte';
 import RightNow from '../components/now/RightNow.svelte';
 import ComingUp from '../components/now/ComingUp.svelte';
@@ -10,6 +11,7 @@ import RunIt from '../components/now/RunIt.svelte';
 <App page="index" title="Now">
   <Notices client:load example />
   <Verdict client:load />
+  <HeadsUp client:load />
   <div class="cols">
     <div class="page span"><Ahead client:load /></div>
     <RightNow client:load />

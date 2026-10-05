@@ -3,6 +3,7 @@
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 import { addDays, hhmm, HOME, keyDate, nz, shortDate, startOfDay } from './format.js';
 import { ApiError, NET, request } from './net.js';
+import { rainSoon } from './outdoors.js';
 import { standingAt, unitPriceAt } from './octopus.js';
 
 export const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -16,14 +17,20 @@ export function relDay(t, now){
 
 /* ---------- display modes ---------- */
 export const MODES = [
-  { id: 'energy', label: 'Energy', key: '1' },
-  { id: 'home', label: 'Home', key: '2' },
+  { id: 'today', label: 'Today', key: '1' },
+  { id: 'energy', label: 'Energy', key: '2' },
   { id: 'travel', label: 'Travel', key: '3' },
   { id: 'screensaver', label: 'Screensaver', key: '4' },
   { id: 'night', label: 'Night', key: '5' }
 ];
-export const ROTATING = ['energy', 'home', 'travel'];
-export const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+export const ROTATING = ['today', 'energy', 'travel'];
+/** Older links and settings named the overview "home". */
+export const MODE_ALIASES = { home: 'today' };
+export const modeFromHash = (hash, fallback) => {
+  let id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase();
+  if (MODE_ALIASES[id]) id = MODE_ALIASES[id];
+  return MODES.some(m => m.id === id) ? id : fallback;
+};
 /** Extras after the mode in a link, such as #screensaver&wx=rain&phase=night&price=-2, for previewing the cockpit. */
 export function hashOptions(hash){
   const out = {};
@@ -47,21 +54,47 @@ export const DISPLAY_DEFAULTS = {
 export function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
   s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
+  if (MODE_ALIASES[s.mode]) s.mode = MODE_ALIASES[s.mode];
   return s;
 }
 
 /* ---------- bins ---------- */
 export const BIN_COLOURS = { black:'#2a2d3a', blue:'#2f7bff', brown:'#8a5a32', green:'#2fb36b', grey:'#8a90a8', purple:'#8f6bff', red:'#e5484d', yellow:'#ffd166' };
-/** Next collection of each bin, from one known collection date and a repeat in weeks. Bank holiday changes aren't known. */
-export function nextCollections(bins, now = Date.now()){
+/**
+ * Next collection of each bin, from one known collection date and a repeat in weeks. With bank holidays (from
+ * GOV.UK), a repeat that falls in a week with a weekday bank holiday on or before its day is moved a day later and
+ * marked `moved`, which is a likely guess, not the council's word; around Christmas and New Year it's marked `check`.
+ * Dates the council gave (every: 0) are kept as they are.
+ */
+export function nextCollections(bins, now = Date.now(), holidays){
   const today = +startOfDay(new Date(now));
+  const hol = (holidays || []).map(h => typeof h === 'string' ? { date: h, title: 'Bank holiday' } : h);
+  const shift = d => {
+    const dow = (d.getDay() + 6) % 7, monday = addDays(d, -dow);
+    for (let i = 0; i < hol.length; i++){
+      const h = keyDate(hol[i].date), hd = (h.getDay() + 6) % 7;
+      if (hd < 5 && +h >= +monday && +h <= +d) return { date: addDays(d, 1), moved: hol[i].title };
+    }
+    return { date: d, moved: null };
+  };
+  const xmas = d => (d.getMonth() === 11 && d.getDate() >= 24) || (d.getMonth() === 0 && d.getDate() <= 2);
   return bins.map(b => {
     // every: 0 is a single known date, as the council gives; it drops off once it has passed.
     const every = +b.every === 0 ? 0 : Math.max(1, Math.round(+b.every || 1)) * 7;
-    let d = keyDate(b.date);
+    let d = keyDate(b.date), moved = null;
     const gap = Math.round((today - +d) / 864e5);
     if (gap > 0){ if (!every) return null; d = addDays(d, Math.ceil(gap / every) * every); }
-    return { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
+    if (every && hol.length){
+      // last time's collection may have been moved to today or later
+      const prev = gap > 0 && Math.ceil(gap / every) > 0 ? shift(addDays(d, -every)) : null;
+      const next = shift(d);
+      const pick = prev && +prev.date >= today ? prev : next;
+      d = pick.date; moved = pick.moved;
+    }
+    const out = { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
+    if (moved) out.moved = moved;
+    if (every && xmas(d)) out.check = true;
+    return out;
   }).filter(Boolean).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
 /** The council's dates from bins.json (published each week by a GitHub Action), if they're recent; else null. */
@@ -306,6 +339,43 @@ export function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
+/* ---------- heads-ups: what to act on soon ---------- */
+/**
+ * The few things worth saying before anything else: a train to leave for, bins to put out, rain on its way.
+ * bins from nextCollections(), trains from parseHuxley() (or parseTrains), weather from parseWeather(); walk in minutes.
+ */
+export function headsUp(o, now){
+  const out = [], hour = new Date(now).getHours();
+  const trains = o.trains && o.trains.list ? o.trains.list : [], walk = +o.walk || 0;
+  for (let i = 0; i < trains.length; i++){
+    const tr = trains[i]; if (tr.cancelled) continue;
+    const l = leaveBy(tr.exp || tr.sched, walk, now);
+    if (l.mins < 0) continue;
+    if (l.mins <= 20) out.push({ kind: 'train', tone: l.cls, title: l.text, sub: hhmm(tr.sched) + ' to ' + tr.dest + (tr.exp && tr.exp !== tr.sched ? ', expected ' + hhmm(tr.exp) : '') + (tr.platform ? ', platform ' + tr.platform : '') });
+    break;
+  }
+  const bins = o.bins || [];
+  if (bins.length){
+    const first = bins[0], same = bins.filter(b => b.days === first.days), names = same.map(b => b.name).join(' and ');
+    const note = first.moved ? ', a day later for ' + first.moved + ' (probably)' : first.check ? ': check the council\'s Christmas dates' : '';
+    if (first.days === 1 && hour >= 15) out.push({ kind: 'bins', tone: 'warn', title: 'Bins out tonight', sub: names + note, colours: same.map(b => b.colour) });
+    else if (first.days === 0 && hour < 10) out.push({ kind: 'bins', tone: 'warn', title: 'Bins go this morning', sub: names + note, colours: same.map(b => b.colour) });
+  }
+  const floods = o.floods || [];
+  for (let i = 0; i < floods.length && i < 2; i++) out.push({ kind: 'flood', tone: floods[i].level <= 2 ? 'bad' : 'warn', title: floods[i].title, sub: floods[i].area });
+  const soon = o.nowcast ? rainSoon(o.nowcast, now) : null;
+  if (soon && (!soon.raining || soon.stops)) out.push({ kind: 'rain', tone: 'gas', title: soon.text, sub: soon.raining ? 'Dry after that for a while' : soon.heavy ? 'Heavy at times' : 'Light' });
+  else if (!o.nowcast){
+    const hours = o.weather && o.weather.hours ? o.weather.hours : [];
+    if (hours.length && nz(hours[0].rain, 0) < 50){
+      for (let i = 1; i < hours.length && hours[i].t < now + 3 * 3600e3; i++){
+        if (nz(hours[i].rain, 0) >= 60){ out.push({ kind: 'rain', tone: 'gas', title: 'Rain likely from ' + hhmm(hours[i].t), sub: hours[i].rain + '% chance' }); break; }
+      }
+    }
+  }
+  return out;
+}
+
 /* ---------- prices for the display ---------- */
 /** Cost of the Home Mini's half hours today on your tariff, with the standing charge. */
 export function todayCost(rows, eSets, now = Date.now()){

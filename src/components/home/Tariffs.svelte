@@ -3,13 +3,27 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { boot } from '../../state/session.js';
+  import { cacheGet, cacheSet } from '../../state/cache.js';
   import { errorText } from '../../lib/net.js';
   import { COMPARE, findProduct, loadProductRates } from '../../lib/octopus.js';
   import { compareTariffs } from '../../lib/analysis.js';
-  import { addDays, startOfDay, slotOf, gbp, gbp0 } from '../../lib/format.js';
+  import { addDays, startOfDay, slotOf, gbp, gbp0, shortDate } from '../../lib/format.js';
   import Upgrade from './Upgrade.svelte';
   onMount(boot);
-  let busy = $state(false), progress = $state(''), err = $state('');
+  let busy = $state(false), progress = $state(''), err = $state(''), checked = $state(0), tried = '';
+  const WEEK = 7 * 864e5;
+  const key = () => 'compare:' + (app.demo ? 'example' : app.account);
+  // Once the readings are here: last week's comparison if there is one, otherwise run it now, quietly.
+  $effect(() => {
+    const raw = app.raw;
+    if (!raw || !raw.elec.length || app.status === 'loading' || tried === key()) return;
+    tried = key();
+    (async () => {
+      const c = await cacheGet(key(), WEEK);
+      if (c && app.raw === raw){ app.compareOpts = c.value.opts; app.compare = c.value.result; checked = c.at; }
+      else run();
+    })();
+  });
 
   async function run(){
     if (busy || !app.raw) return;
@@ -35,6 +49,8 @@
       }
       app.compareOpts = opts;
       app.compare = compareTariffs(app.raw, opts);
+      checked = Date.now();
+      cacheSet(key(), { opts, result: app.compare });
     } catch (e){ err = errorText(e).join(' '); }
     busy = false; progress = '';
   }
@@ -42,7 +58,7 @@
   const c = $derived(app.compare), mine = $derived(c ? c.rows.find(r => r.id === 'current') : null);
   const best = $derived(c && mine ? c.rows[0] : null);
   const saving = $derived(best ? mine.year - best.year : a ? (a.yours - a.agile) * 365 / a.days : null);
-  const line = $derived(best ? (best.id === 'current' ? 'Your tariff is already the cheapest for how you use power.' : `${best.label} is the cheapest for how you use power.`)
+  const line = $derived(best ? (best.id === 'current' ? 'Your tariff is already the cheapest for how you use power.' : `${best.label} would be the cheapest for how you use power.`)
     : a ? (a.agile < a.yours ? `Agile would have cost less over the last ${a.days} days.` : `Agile would have cost more over the last ${a.days} days.`) : 'Your half hours priced on other tariffs.');
 </script>
 
@@ -61,6 +77,6 @@
         {/each}
       </tbody>
     </table></div>
-    <p class="note">{app.demo ? 'Example figures. ' : ''}From {c.days} days of your readings scaled to a year, with standing charges. Electricity only; who can switch is up to Octopus.</p>
+    <p class="note">{app.demo ? 'Example figures. ' : ''}From {c.days} days of your readings scaled to a year, with standing charges{checked ? `, checked ${shortDate(new Date(checked))}` : ''}. It's checked again each week. Electricity only; who can switch is up to Octopus.</p>
   {:else if app.raw && !app.raw.elec.length}<p class="note">Needs electricity readings to compare tariffs.</p>{/if}
 </Upgrade>

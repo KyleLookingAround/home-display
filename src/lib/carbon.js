@@ -25,3 +25,14 @@ export async function loadCarbonHistory(regionId, from, to){
   }
   return out.map(x => ({ from: x.from, to: x.to, p: x.v })).sort((a, b) => a.from - b.from);
 }
+
+/* ---------- what the region's power is made of right now ---------- */
+export async function loadGridMix(regionId){ return parseGridMix(await request(`https://api.carbonintensity.org.uk/regional/regionid/${regionId}`, { headers: { Accept: 'application/json' } })); }
+export const FUEL_NAMES = { wind: 'Wind', solar: 'Solar', hydro: 'Hydro', nuclear: 'Nuclear', biomass: 'Biomass', gas: 'Gas', coal: 'Coal', imports: 'Imports', other: 'Other' };
+export function parseGridMix(j){
+  const d = j && j.data && j.data[0], slot = d && d.data && d.data[0];
+  if (!slot || !slot.generationmix) return null;
+  const mix = slot.generationmix.filter(f => f.perc > 0).map(f => ({ fuel: f.fuel, name: FUEL_NAMES[f.fuel] || f.fuel, perc: f.perc })).sort((a, b) => b.perc - a.perc);
+  const share = list => Math.round(mix.filter(f => list.indexOf(f.fuel) >= 0).reduce((s, f) => s + f.perc, 0));
+  return { from: +new Date(slot.from), mix, renewable: share(['wind', 'solar', 'hydro']), lowCarbon: share(['wind', 'solar', 'hydro', 'nuclear', 'biomass']) };
+}

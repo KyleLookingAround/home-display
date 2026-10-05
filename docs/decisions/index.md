@@ -12,3 +12,4 @@
 | [0008](0008-drawing-for-tvs.md) | The screensaver within a TV's means: one baked backdrop, tiers of detail, sharp text on its own layer |
 | [0009](0009-astro-dashboard.md) | The dashboard in Astro and Svelte, five pages of islands sharing cached data; shared code as ES modules the display flattens |
 | [0010](0010-redesign.md) | The redesign: five plain pages (Now, Money, Usage, Home, Settings), phone first, each opening with its answer |
+| [0011](0011-wall-display.md) | The wall display redesigned (Today, Energy, Travel, the cockpit, Night) in the phone's look, the phone's Screen page, and the phone as a remote through ntfy.sh |
