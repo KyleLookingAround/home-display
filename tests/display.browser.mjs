@@ -617,6 +617,18 @@ test('dashboard: the pages open with no signal, once seen', async () => {
   await ctx.close();
 });
 
+test('dashboard: Home lists the trains you can still make with your walk', async () => {
+  const { page, ctx, errors } = await open('/home.html', { settings: { ...SETTINGS, trainWalk: 25 }, withHelper: false });
+  const card = page.locator('.card', { hasText: 'Trains from' });
+  await card.locator('.rows li').first().waitFor();
+  const text = await card.textContent();
+  assert.doesNotMatch(text, /Too late/, 'only trains you can make');
+  assert.match(text, /14:27 London Euston/, 'the 14:19 has gone; the next you can make leads');
+  assert.match(text, /1 sooner one leaves too soon to make/);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('dashboard: the account is fetched once, then each page reads it from the cache', async () => {
   const { page, ctx, errors } = await open('/index.html', { account: true });
   await page.waitForFunction(() => /Updated/.test(document.getElementById('status').textContent));

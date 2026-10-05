@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -316,6 +316,17 @@ test('trains from the staff board: full date-times, and seconds on the estimate'
   assert.deepEqual(r.list.map(d => d.dest), ['Buxton', 'Crewe']);
   assert.equal(r.list[1].exp - r.list[1].sched, 6 * 60e3);
   assert.equal(r.list[0].delayed, true, 'no estimate on the staff board reads as delayed');
+});
+
+test('trains you can still make with your walk come first; the rest are only counted', () => {
+  const now = at('2026-10-05T20:31:00'), d = (h, m, extra = {}) => Object.assign({ sched: at(`2026-10-05T${h}:${m}:00`), exp: at(`2026-10-05T${h}:${m}:00`), dest: 'Manchester Piccadilly' }, extra);
+  // a 25 minute walk at 20:31: the 20:33, 20:40 and 20:47 are gone; 20:53 is a run; 21:05 is fine
+  const list = [d('20', '33'), d('20', '19', { exp: at('2026-10-05T20:47:00') }), d('20', '40'), d('20', '53'), d('21', '05'), d('21', '12', { cancelled: true }), d('20', '10')];
+  const c = A.catchable(list, 25, now);
+  assert.deepEqual(Array.from(c.list, x => new Date(x.sched).getHours() * 100 + new Date(x.sched).getMinutes()), [2053, 2105, 2112]);
+  assert.equal(c.missed, 3, 'the one that has already left isn\'t counted');
+  assert.equal(A.leaveBy(c.list[0].sched, 25, now).text, 'Run for it');
+  assert.equal(A.catchable(null, 10, now).list.length, 0);
 });
 
 test('heads-ups: a train to leave for, bins tonight, rain on its way', () => {

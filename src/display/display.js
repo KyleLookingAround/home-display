@@ -188,9 +188,9 @@ function renderToday(){
   let tr = '';
   if (!s.trainFrom) tr = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
   else if (T){
-    const rows = T.list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 3);
+    const caught = catchable(T.list, s.trainWalk, now), rows = caught.list.slice(0, 3);
     tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, s.trainWalk, now), late = d.exp && d.exp - d.sched >= 60e3;
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</span></li>`; }).join('')}</ul>` : '<p class="empty">No trains in the next couple of hours.</p>';
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${s.trainWalk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -240,11 +240,13 @@ function renderTravel(){
   const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
   $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
   if (list){
-    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 7);
+    // the whole board, dimmed where it's too late to make it, starting just before the first you can
+    const all = list.filter(d => (d.exp || d.sched) > now - 30e3), first = all.indexOf(catchable(all, s.trainWalk, now).list[0]);
+    const rows = all.slice(Math.max(0, (first < 0 ? all.length : first) - 1)).slice(0, 7);
     html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
       const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
       const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Expected ${hhmm(d.exp)}</span>` : '<span class="muted">On time</span>';
-      return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
+      return `<tr${lv.text === 'Too late' && !d.cancelled ? ' class="gone"' : ''}><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}<br><span class="sub">${st}</span></td><td class="t opt">${esc(d.platform || '—')}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
     }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
     if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
   }

@@ -341,6 +341,19 @@ export function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
+/**
+ * The departures you can still make with your walk: "Leave in…", "Leave now" or "Run for it", not "Too late".
+ * Cancelled ones stay if you'd have made them, so you know. `missed` counts the ones left behind.
+ */
+export function catchable(list, walkMin, now){
+  const out = [];
+  let missed = 0;
+  (list || []).forEach(d => {
+    if ((d.exp || d.sched) <= now - 30e3) return;
+    if (leaveBy(d.exp || d.sched, nz(walkMin, 0), now).text === 'Too late') missed++; else out.push(d);
+  });
+  return { list: out, missed };
+}
 /* ---------- birthdays and countdowns ---------- */
 /**
  * Dates worth counting down to, soonest first: birthdays and anniversaries every year (dates: [{ name, date, kind }],
@@ -462,7 +475,7 @@ export function parseHuxley(j, now = Date.now()){
   return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
 }
 export async function loadTrainsLive(from, to){
-  const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/12`;
+  const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/20`;   // about an hour at Stockport, room for a long walk
   let err = null;
   for (let i = 0; i < TRAIN_BOARDS.length; i++){
     const k = (trainBoard + i) % TRAIN_BOARDS.length;

@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
-  import { BIN_COLOURS, relDay, weatherText, leaveBy } from '../../lib/household.js';
+  import { BIN_COLOURS, relDay, weatherText, leaveBy, catchable } from '../../lib/household.js';
   import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
   import Radar from '../charts/Radar.svelte';
   import { qrSvg, wifiCode } from '../../lib/qr.js';
@@ -38,7 +38,9 @@
   const events = $derived(app.events ? app.events.filter(e => e.end > app.now && e.start < +addDays(new Date(today), 2)) : null);
 
   const walk = $derived(app.house ? +app.house.trainWalk || 0 : 0);
-  const trains = $derived(app.trains && app.trains.list ? app.trains.list.filter(t => (t.exp || t.sched) > app.now - 60e3).slice(0, 4) : null);
+  // the next trains you can still make with your walk; the ones you can't are only counted
+  const caught = $derived(app.trains && app.trains.list ? catchable(app.trains.list, walk, app.now) : null);
+  const trains = $derived(caught ? caught.list.slice(0, 4) : null);
 </script>
 
 <div class="cols">
@@ -105,8 +107,8 @@
             <span class="side {t.cancelled ? 'bad' : l.cls}">{t.cancelled ? '—' : l.text}</span></li>
         {/each}
       </ul>
-      <p class="note">With a {walk} minute walk to the station.</p>
-    {:else if trains}<p class="note">No trains in the next couple of hours.</p>
+      <p class="note">With a {walk} minute walk to the station{caught.missed ? `. ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
+    {:else if trains}<p class="note">{caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>
     {:else if app.trainsErr}<p class="note">Departures didn't load: {errorText(app.trainsErr)[0]}</p>
     {:else if app.house && !app.house.trainFrom}<p class="note">Choose your station <a href="./settings.html#household">in Settings</a>.</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
