@@ -43,9 +43,9 @@ test('the price verdict says the same thing on the phone and the TV', () => {
 
 test('the account goes to the TV sealed with the PIN: the wrong PIN or code opens nothing', async () => {
   const R = await import('../src/lib/remote.js');
-  const acct = { account: 'A-1234ABCD', key: 'sk_live_abcdef123456', gasUnit: 'm3', pay: 'DIRECT_DEBIT' };
+  const acct = { account: 'A-1234ABCD', key: 'sk_test_abcdef123456', gasUnit: 'm3', pay: 'DIRECT_DEBIT' };
   const box = await R.sealAccount('ABCDEFGH', 'hashed-pin', acct);
-  assert.doesNotMatch(JSON.stringify(box), /1234ABCD|sk_live/, 'nothing readable in the box');
+  assert.doesNotMatch(JSON.stringify(box), /1234ABCD|sk_test/, 'nothing readable in the box');
   assert.deepEqual(await R.openAccount('ABCDEFGH', 'hashed-pin', box), acct);
   assert.equal(await R.openAccount('ABCDEFGH', 'another-pin', box), null);
   assert.equal(await R.openAccount('ABCDEFGJ', 'hashed-pin', box), null);

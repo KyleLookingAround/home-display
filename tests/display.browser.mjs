@@ -563,18 +563,18 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   // the phone, in its own browser, with its account and the same PIN remembered
   const phone = await open('/screen.html', { clock: false, settings: SETTINGS, withHelper: false });
   const phoneSent = await relay(phone.page, () => []);
-  await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_live_test123456'); } catch (e) {} }, [LOCK, code]);
+  await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test_test123456'); } catch (e) {} }, [LOCK, code]);
   await phone.page.reload(); await ready(phone.page);
   await phone.page.click('text=Send my account to the TV');
   for (let i = 0; i < 50 && !phoneSent.some(s => s.msg.cmd === 'account' && s.msg.box); i++) await phone.page.waitForTimeout(100);
   const sealed = phoneSent.filter(s => s.msg.cmd === 'account' && s.msg.box)[0];
   assert.ok(sealed, 'the phone sent it');
-  assert.doesNotMatch(JSON.stringify(sealed.msg), /TEST1234|sk_live/, 'the relay sees only the sealed box');
+  assert.doesNotMatch(JSON.stringify(sealed.msg), /TEST1234|sk_test/, 'the relay sees only the sealed box');
   // the relay hands it to the TV
   toTv = [sealed.msg];
   await tv.page.reload();
   await tv.page.waitForFunction(() => localStorage.getItem('hse.account') === 'A-TEST1234', null, { timeout: 10000 });
-  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.key')), 'sk_live_test123456');
+  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.key')), 'sk_test_test123456');
   for (let i = 0; i < 30 && !tvSent.some(s => s.msg.state && s.msg.state.account); i++) await tv.page.waitForTimeout(100);
   assert.ok(tvSent.some(s => s.msg.state && s.msg.state.account && /connected/.test(s.msg.state.note)), 'the TV says it has it');
   // a TV with a different PIN can't open it
