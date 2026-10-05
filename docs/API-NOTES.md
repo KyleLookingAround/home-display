@@ -115,7 +115,8 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
     - `cancelReason` and `delayReason`;
     - `destination[].locationName` and `via`.
 - **Times:** local, with no date. `boardTime()` puts them on the right day around midnight.
-- **Caution:** it's a free community service with no guarantee, and the mirror `national-rail-api.davwheat.dev` answers the same way. The display asks once a minute only while departures are on screen. If Huxley2 fails and a home server holds a Realtime Trains token, it uses that.
+- **Staff board:** `GET /staffdepartures/{CRS}/{rows}` (and `/to/`) has the same shape, but `std` and `etd` are full local date-times (`"2026-10-05T17:19:00"`, `"2026-10-05T17:46:25"`), and `etd` is null when there's no estimate. `boardTime()` reads both forms.
+- **Caution:** it's a free community service with no guarantee. On 5 October 2026 `/departures` returned 500 for every station while `/staffdepartures` still worked. `loadTrainsLive()` tries three boards in turn (`TRAIN_BOARDS`): Huxley2's `/departures`, the mirror `national-rail-api.davwheat.dev/departures` (same shape, also `Access-Control-Allow-Origin: *`), then Huxley2's `/staffdepartures`, each with ten seconds to answer, and starts with whichever answered last. If all fail and a home server holds a Realtime Trains token, it uses that. The display asks once a minute only while departures are on screen.
 
 ## Where the ISS is (display: screensaver, no server)
 

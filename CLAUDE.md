@@ -25,7 +25,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards).
     - `carbon.js`, `weather.js`, `pvgis.js`: the other services.
     - `analysis.js`: pure functions with no DOM. Example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
-    - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes and the night window, bins (`nextCollections`, `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, Huxley2, Realtime Trains and TfGM parsing, `leaveBy`, `todayCost`, nightly reload and staleness.
+    - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes and the night window, bins (`nextCollections`, `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, public Darwin boards for trains (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), Realtime Trains and TfGM parsing, `leaveBy`, `todayCost`, nightly reload and staleness.
     - `voyage.js`: the cockpit's logic, also used by the phone's Now page: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards`, `worldFor` with `moonPhase` and `issPass`, `voyageFor` (the next twelve hours) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost`.
   - `pages/`: the dashboard's five pages, phone first ([decision 0010](docs/decisions/0010-redesign.md)): `index` (Now), `money`, `usage`, `home`, `settings`. Each is a list of islands. `patterns`, `prices` and `compare` only send old links to their new homes.
   - `layouts/App.astro`: the head, starfield, the nav (a bottom bar on phones, a rail from 900px; links with `aria-current`), the header and the footer around every page. It sets `data-corners` from `hse.corners` before the page draws.
@@ -95,7 +95,7 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
 
 ## Known gaps
 
-- Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from Huxley2, a free community service with no guarantee. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
+- Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from free community Darwin boards (Huxley2 and a mirror) with no guarantee; three are tried in turn. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
 - The tariff comparison covers electricity only.
 - Realtime Trains' new API and TfGM's Metrolink fields are coded from the spec and community code, and haven't been tried with live keys yet.

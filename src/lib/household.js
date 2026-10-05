@@ -327,11 +327,15 @@ export function nextReload(now, at, jitterMin){
 /** Is a source's data too old to trust? Twice its refresh period, with a floor. */
 export const isStale = (src, every, now = Date.now()) => !src.at || now - src.at > Math.max(2*every, 5*60e3);
 
-/* ---------- trains without a server: Huxley2 (National Rail Darwin, no key, allows browser calls) ---------- */
+/* ---------- trains without a server: National Rail Darwin through public Huxley-style boards (no key, browser calls allowed) ---------- */
 export const HUXLEY = 'https://huxley2.azurewebsites.net';
+/** Boards to try, in turn: Huxley2, a second public service in the same shape, and Huxley2's staff board (fuller times). */
+export const TRAIN_BOARDS = [HUXLEY + '/departures', 'https://national-rail-api.davwheat.dev/departures', HUXLEY + '/staffdepartures'];
+let trainBoard = 0;   // the last board that answered, tried first next time
 /** "HH:MM" on the departure board as a time near now: just after midnight counts as tomorrow. */
 export function boardTime(hhmm, now, ref){
-  const m = /^(\d\d):(\d\d)$/.exec(String(hhmm || '').trim()); if (!m) return null;
+  // "17:19" on the public board; "2026-10-05T17:19:00" or "17:46:25" on the staff board
+  const m = /(?:^|T)(\d\d):(\d\d)(?::[\d.]+)?$/.exec(String(hhmm || '').trim()); if (!m) return null;
   const d = new Date(now); d.setHours(+m[1], +m[2], 0, 0);
   let t = +d;
   const base = ref || now;
@@ -343,16 +347,26 @@ export function parseHuxley(j, now = Date.now()){
   const list = ((j && j.trainServices) || []).map(s => {
     const sched = boardTime(s.std, now); if (sched == null) return null;
     const etd = String(s.etd || '').trim(), cancelled = !!s.isCancelled || /cancel/i.test(etd);
-    const exp = /^\d\d:\d\d$/.test(etd) ? boardTime(etd, now, sched) : etd === 'On time' ? sched : null;
+    const exp = etd === 'On time' ? sched : boardTime(etd, now, sched);
     return { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
              platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || '') };
   }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
   return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
 }
 export async function loadTrainsLive(from, to){
-  const path = `/departures/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/12`;
-  try { return parseHuxley(await request(HUXLEY + path, { headers: { Accept: 'application/json' } })); }
-  catch(e){ if (NET.proxy && NET.keys.rtt) return loadTrains(from, to); throw e; }
+  const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/12`;
+  let err = null;
+  for (let i = 0; i < TRAIN_BOARDS.length; i++){
+    const k = (trainBoard + i) % TRAIN_BOARDS.length;
+    try {
+      const j = await Promise.race([request(TRAIN_BOARDS[k] + path, { headers: { Accept: 'application/json' } }),
+        new Promise((_, no) => setTimeout(() => no(new ApiError('NETWORK')), 10000))]);
+      trainBoard = k;
+      return parseHuxley(j);
+    } catch(e){ err = e; }
+  }
+  if (NET.proxy && NET.keys.rtt) return loadTrains(from, to);
+  throw err;
 }
 
 /* ---------- household settings shared by every screen (household.json, editable on GitHub) ---------- */

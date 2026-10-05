@@ -4,6 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Finding:** Huxley2's public departure board returned errors for every station, so no trains showed anywhere. Its staff board and a second public service still worked.
+- **Update:** trains try three departure boards in turn (Huxley2, its mirror at `national-rail-api.davwheat.dev`, then Huxley2's staff board) and start with whichever answered last, so one going down no longer empties the Travel mode and the billboards.
 - **Update** (on the `redesign` branch, previewed at `/preview/`): the dashboard redesigned, phone first. Five plain pages, Now, Money, Usage, Home and Settings, each opening with its answer; the household's bins, trains, weather and calendar on the phone too; upgrades as cards with a saving, a cost and a payback; a new chart kit; rounded or sharp corners ([0010](decisions/0010-redesign.md)).
 - **Creation:** a notification when a Saving Session is announced, alongside the one for negative prices.
 - **Deprecation:** the Overview, Patterns, Prices and Compare pages (their links lead to the new pages), the bridge, the old panels and `dashboard.css`, and the EPC search (`src/lib/epc.js` and the helper's `/proxy/epc`).

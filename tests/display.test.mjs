@@ -231,6 +231,18 @@ test('trains from Huxley2: board times, delays, cancellations, just after midnig
   assert.deepEqual(plain(A.parseHuxley({})).list, []);
 });
 
+test('trains from the staff board: full date-times, and seconds on the estimate', () => {
+  const now = at('2026-10-05T23:50:00');
+  assert.equal(A.boardTime('2026-10-06T00:10:00', now), at('2026-10-06T00:10:00'));
+  assert.equal(A.boardTime('23:46:25', at('2026-10-05T23:40:00')), at('2026-10-05T23:46:00'));
+  const r = plain(A.parseHuxley({ locationName: 'Stockport', trainServices: [
+    { std: '2026-10-05T23:55:00', etd: '2026-10-06T00:01:12.5', platform: '3', isCancelled: false, destination: [{ locationName: 'Crewe' }] },
+    { std: '2026-10-05T23:58:00', etd: null, platform: '1', isCancelled: false, destination: [{ locationName: 'Buxton' }] } ] }, now));
+  assert.deepEqual(r.list.map(d => d.dest), ['Buxton', 'Crewe']);
+  assert.equal(r.list[1].exp - r.list[1].sched, 6 * 60e3);
+  assert.equal(r.list[0].delayed, true, 'no estimate on the staff board reads as delayed');
+});
+
 test('household settings reach every screen, and a screen keeps only its own changes', () => {
   const house = { bins: [{ name: 'Black', date: '2026-10-08', every: 2 }], trainFrom: 'SPT', trainWalk: 12, ical: 'https://secret' };
   const s = A.mergeSettings(house, null);
