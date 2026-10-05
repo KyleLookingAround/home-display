@@ -1187,8 +1187,9 @@ function toCSV(raw){
   }
   return lines.join('\n');
 }
-/* ===================== display sources: household data, pure parsing, the cockpit's logic ===================== */
-// Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
+/* The household's data: settings shared by every screen, modes, bins, weather, the calendar, trains and trams. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -1554,6 +1555,9 @@ function deviceChanges(form, household){
   Object.keys(form).forEach(k => { if (JSON.stringify(form[k]) !== JSON.stringify(base[k])) out[k] = form[k]; });
   return out;
 }
+/* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 
 /* ---------- the cockpit: what the weather and the power price do to the view ---------- */
 const WX_PRESETS = {
