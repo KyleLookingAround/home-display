@@ -7,4 +7,4 @@
 | [0003](0003-lock.md) | StatiCrypt with a remote-friendly PIN keypad for the published site |
 | [0004](0004-no-home-server.md) | Work without a home server: browser-direct sources, nothing faked |
 | [0005](0005-cockpit.md) | The view from the ship is the screen's resting state (revised: a side window) |
-| [0006](0006-council-bins.md) | Bin days from Stockport Council, through a daily GitHub Action |
+| [0006](0006-council-bins.md) | Bin days from the council's calendar, checked weekly with Stockport Council |

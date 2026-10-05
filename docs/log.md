@@ -4,7 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
-- **Creation:** bin days from Stockport Council. A daily GitHub Action reads the council's page for the address in the `STOCKPORT_UPRN` secret and publishes `bins.json` ([0006](decisions/0006-council-bins.md)).
+- **Creation:** bin days. The repeats from the council's printed calendar are in `household.json`. A weekly GitHub Action (Saturdays) reads the council's page for the address in the `STOCKPORT_UPRN` secret, publishes `bins.json`, and the display restarts each repeat from the council's latest date ([0006](decisions/0006-council-bins.md)).
 - **Update:** the screensaver looks out of a side window. Everything slides past with parallax, near things faster than far ones; billboards drift by at readable and distant depths; rain is swept backwards on the glass ([0005](decisions/0005-cockpit.md), revised).
 - **Finding:** Stockport Council's bin page only allows browser calls from stockport.gov.uk, and turns away requests that don't look like a browser.
 - **Creation:** the cockpit screensaver. Billboards in 3D, traffic at different depths, and weather on the glass and in the sky; the power price sets the engines. New screens open on it ([0005](decisions/0005-cockpit.md)).

@@ -1164,11 +1164,28 @@ function nextCollections(bins, now = Date.now()){
     return { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
   }).filter(Boolean).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
-/** The council's dates from bins.json (published each morning by a GitHub Action), if they're recent; else null. */
+/** The council's dates from bins.json (published each week by a GitHub Action), if they're recent; else null. */
 function councilBins(j, now = Date.now()){
-  if (!j || !Array.isArray(j.bins) || !j.bins.length || !(now - +new Date(j.fetched) < 4 * 864e5)) return null;
+  if (!j || !Array.isArray(j.bins) || !j.bins.length || !(now - +new Date(j.fetched) < 10 * 864e5)) return null;
   const bins = j.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)).map(b => ({ name: b.name, colour: b.colour, what: b.what || '', date: b.date, every: 0 }));
-  return bins.length && nextCollections(bins, now).length ? bins : null;
+  return bins.length ? bins : null;
+}
+/**
+ * Bins set by hand give the repeat (every week, every two, every four); the council's latest date for the same bin
+ * moves the repeat on, so a bank holiday change shows. Council bins with no repeat are shown once.
+ */
+function mergeBins(hand, council){
+  hand = hand || [];
+  if (!council || !council.length) return hand;
+  const key = b => String(b.colour || b.name || '').toLowerCase();
+  const used = new Set();
+  const out = hand.map(b => {
+    const c = council.filter(x => key(x) === key(b) || String(x.name).toLowerCase() === String(b.name).toLowerCase())[0];
+    if (!c) return b;
+    used.add(c);
+    return Object.assign({}, b, { date: c.date, what: b.what || c.what });
+  });
+  return out.concat(council.filter(c => !used.has(c)));
 }
 async function loadCouncilBins(){
   const r = await fetch('bins.json', { cache: 'no-cache' }).catch(() => null);
@@ -2036,8 +2053,8 @@ function tick(){
   if (++D.ticks % 30 === 0) render();
 }
 
-/** Bins from the council when the morning feed has them, otherwise the ones set by hand. */
-const binsNow = now => councilBins(SRC.council.data, now) || D.set.bins;
+/** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
+const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
 
 /* ---------- rendering ---------- */
 function render(){
@@ -2136,7 +2153,7 @@ function renderHome(){
     $('#hHours').innerHTML = '';
   }
   const council = !!councilBins(SRC.council.data, now), bins = nextCollections(binsNow(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add the STOCKPORT_UPRN secret for the council\'s dates (see the README), or add your bins in settings.</p>' : `<ul class="list">${bins.map(b => {
+  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins to household.json, or in settings.</p>' : `<ul class="list">${bins.map(b => {
     const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
     return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
   }).join('')}</ul>`;
@@ -2147,7 +2164,7 @@ function renderHome(){
   else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
   else note = 'Reading the calendar…';
   $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
-  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins from Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
+  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins checked with Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
 }
 
 function renderTravel(){

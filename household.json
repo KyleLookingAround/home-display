@@ -1,7 +1,36 @@
 {
-  "_about": "Settings every screen shares. Edit this file on GitHub and each screen picks it up at its next fresh start (03:30 by default). It's published with the site, so keep anything private out of it: the calendar address is set on each screen instead. Any screen can still override these in its own settings.",
+  "_about": "Settings every screen shares. Edit this file on GitHub and each screen picks it up at its next fresh start (03:30 by default). It's published with the site, so keep anything private out of it: no address, and the calendar address is set on each screen instead. Bins: one known collection date and how many weeks between collections; the weekly council check moves these on when Stockport changes a date. Any screen can still override these in its own settings.",
   "mode": "screensaver",
-  "bins": [],
+  "bins": [
+    {
+      "name": "Green bin",
+      "what": "Garden and food waste",
+      "colour": "green",
+      "date": "2026-10-09",
+      "every": 1
+    },
+    {
+      "name": "Black bin",
+      "what": "Non-recyclables",
+      "colour": "black",
+      "date": "2026-10-16",
+      "every": 2
+    },
+    {
+      "name": "Blue bin",
+      "what": "Paper, cardboard and cartons",
+      "colour": "blue",
+      "date": "2026-10-23",
+      "every": 4
+    },
+    {
+      "name": "Brown bin",
+      "what": "Plastic, glass, tins, cans and aerosols",
+      "colour": "brown",
+      "date": "2026-10-23",
+      "every": 4
+    }
+  ],
   "trainFrom": "SPT",
   "trainTo": "",
   "trainWalk": 15,

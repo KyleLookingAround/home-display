@@ -1,6 +1,6 @@
 // Fetch the next bin collections for one Stockport address and write them as JSON for the display.
 // Stockport Council has no API and its page only allows calls from stockport.gov.uk, so a browser can't read it;
-// this runs once a day in GitHub Actions instead. The address is a UPRN held in the STOCKPORT_UPRN secret,
+// this runs once a week in GitHub Actions instead. The address is a UPRN held in the STOCKPORT_UPRN secret,
 // so only the dates are published, never the address.
 //   STOCKPORT_UPRN=... node scripts/bins.mjs _site/bins.json
 import { writeFileSync } from 'node:fs';

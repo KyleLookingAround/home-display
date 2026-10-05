@@ -96,8 +96,8 @@ function tick(){
   if (++D.ticks % 30 === 0) render();
 }
 
-/** Bins from the council when the morning feed has them, otherwise the ones set by hand. */
-const binsNow = now => councilBins(SRC.council.data, now) || D.set.bins;
+/** Bins set by hand (or in household.json), moved on by the council's latest dates when the weekly feed has them. */
+const binsNow = now => mergeBins(D.set.bins, councilBins(SRC.council.data, now));
 
 /* ---------- rendering ---------- */
 function render(){
@@ -196,7 +196,7 @@ function renderHome(){
     $('#hHours').innerHTML = '';
   }
   const council = !!councilBins(SRC.council.data, now), bins = nextCollections(binsNow(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add the STOCKPORT_UPRN secret for the council\'s dates (see the README), or add your bins in settings.</p>' : `<ul class="list">${bins.map(b => {
+  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins to household.json, or in settings.</p>' : `<ul class="list">${bins.map(b => {
     const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
     return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
   }).join('')}</ul>`;
@@ -207,7 +207,7 @@ function renderHome(){
   else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
   else note = 'Reading the calendar…';
   $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
-  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins from Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
+  $('#hFoot').innerHTML = `<span>Weather from Open-Meteo${council ? ' · bins checked with Stockport Council' : ''}</span>` + foot(['weather', 'cal']);
 }
 
 function renderTravel(){

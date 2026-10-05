@@ -60,11 +60,28 @@ function nextCollections(bins, now = Date.now()){
     return { name: b.name, colour: b.colour || 'grey', what: b.what || '', date: d, days: Math.round((+d - today) / 864e5) };
   }).filter(Boolean).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
-/** The council's dates from bins.json (published each morning by a GitHub Action), if they're recent; else null. */
+/** The council's dates from bins.json (published each week by a GitHub Action), if they're recent; else null. */
 function councilBins(j, now = Date.now()){
-  if (!j || !Array.isArray(j.bins) || !j.bins.length || !(now - +new Date(j.fetched) < 4 * 864e5)) return null;
+  if (!j || !Array.isArray(j.bins) || !j.bins.length || !(now - +new Date(j.fetched) < 10 * 864e5)) return null;
   const bins = j.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)).map(b => ({ name: b.name, colour: b.colour, what: b.what || '', date: b.date, every: 0 }));
-  return bins.length && nextCollections(bins, now).length ? bins : null;
+  return bins.length ? bins : null;
+}
+/**
+ * Bins set by hand give the repeat (every week, every two, every four); the council's latest date for the same bin
+ * moves the repeat on, so a bank holiday change shows. Council bins with no repeat are shown once.
+ */
+function mergeBins(hand, council){
+  hand = hand || [];
+  if (!council || !council.length) return hand;
+  const key = b => String(b.colour || b.name || '').toLowerCase();
+  const used = new Set();
+  const out = hand.map(b => {
+    const c = council.filter(x => key(x) === key(b) || String(x.name).toLowerCase() === String(b.name).toLowerCase())[0];
+    if (!c) return b;
+    used.add(c);
+    return Object.assign({}, b, { date: c.date, what: b.what || c.what });
+  });
+  return out.concat(council.filter(c => !used.has(c)));
 }
 async function loadCouncilBins(){
   const r = await fetch('bins.json', { cache: 'no-cache' }).catch(() => null);

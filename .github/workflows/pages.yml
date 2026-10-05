@@ -6,9 +6,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-  # Every morning: fetch the next bin collections from Stockport Council and republish (see scripts/bins.mjs).
+  # Every Saturday morning, after Friday's collection: check the next bin dates with Stockport Council and republish.
   schedule:
-    - cron: '17 4 * * *'
+    - cron: '17 4 * * 6'
 
 permissions:
   contents: read

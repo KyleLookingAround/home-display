@@ -372,7 +372,9 @@ test('dashboard: no sideways scroll on a phone or a TV', async () => {
 });
 
 test('cockpit: every kind of weather and power price draws without errors', async () => {
-  const looks = ['', '&wx=clear&phase=day', '&wx=rain&phase=night', '&wx=snow', '&wx=fog', '&wx=thunder&phase=night', '&wx=wind&phase=dusk', '&wx=cold&phase=dawn', '&price=-3', '&price=34&wx=cloud'];
+  const all = ['', '&wx=clear&phase=day', '&wx=rain&phase=night', '&wx=snow', '&wx=fog', '&wx=thunder&phase=night', '&wx=wind&phase=dusk', '&wx=cold&phase=dawn', '&price=-3', '&price=34&wx=cloud'];
+  // LOOKS=rain,price=-3 picks a few, for quick screenshots.
+  const looks = process.env.LOOKS ? all.filter(l => process.env.LOOKS.split(',').some(k => l.includes(k))) : all;
   for (const [width, height] of [[1920, 1080], [390, 844]]) {
     const { page, ctx, errors } = await open('/display.html#screensaver', { width, height });
     for (const look of looks) {

@@ -40,22 +40,24 @@ On a phone or tablet, swipe left or right to change mode and tap to show the too
 
 ### Bins
 
-Bin days come from Stockport Council automatically, once you've told GitHub your address's property number.
+Your bins are in [`household.json`](household.json), taken from the council's printed calendar. Collection day is Friday:
+- **Green:** every week.
+- **Black:** every other week.
+- **Blue and brown:** together, every four weeks.
 
-1. On Stockport Council's website, look up your bin collection day.
-2. When it shows your bins, the page address ends in a long number, for example `myaccount.stockport.gov.uk/bin-collections/show/100011234567`. That number is your property reference (UPRN).
-3. In this repository on GitHub, go to Settings → Secrets and variables → Actions → New repository secret. Name it `STOCKPORT_UPRN` and paste the number.
-4. Run the "Check and publish" workflow once from the Actions tab, or wait for the next morning.
+Every screen works these out with no API at all. If the council sends a new calendar (from December, blue goes to every two weeks), change the dates and the weeks between collections there.
 
-How it works:
-- A GitHub Action reads your bin page every morning at about 05:17 and publishes the dates as `bins.json` with the site.
-- Your address stays a secret: only the dates are published.
-- The display shows the council's dates, colours and what goes in each bin, including bank holiday changes.
-- If the feed stops (GitHub pauses scheduled jobs in a repository with no commits for 60 days), screens fall back to any bins set by hand.
+**The weekly council check (optional).** Stockport Council has no API, but its bin page for your address lists each bin's next date. Every Saturday morning a GitHub Action reads it and publishes just the dates as `bins.json`. Each repeat then carries on from the council's latest date, so a bank holiday change shows up.
+
+To turn it on, add your property reference as a repository secret:
+1. Go to Settings → Secrets and variables → Actions → New repository secret.
+2. Name it `STOCKPORT_UPRN` and paste the number from the end of your bin collections page address, before the address part.
+
+Your address is never published: only the dates are. GitHub pauses scheduled jobs after 60 days without a commit; the repeats in `household.json` keep working regardless.
 
 ### Settings
 
-**Settings every screen shares** live in [`household.json`](household.json): your station, walk time, the mode screens open on, and bins by hand if you'd rather not use the council feed.
+**Settings every screen shares** live in [`household.json`](household.json): your bins, station, walk time and the mode screens open on.
 - Edit it on GitHub (open the file, press the pencil, commit). Screens pick it up at their next fresh start.
 - It's published with the site, so keep anything private out of it.
 
@@ -63,7 +65,7 @@ How it works:
 - choose the mode the screen opens on;
 - rotate between energy, home and travel;
 - set when the screensaver and night clock start;
-- add bins by hand (one known collection date and how often each comes), if you're not using the council feed;
+- change the bins for that screen (one known collection date and how often each comes);
 - add your calendar's secret iCal address;
 - pick your station and tram stop, and how long the walk is.
 

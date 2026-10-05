@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = ['src/core.js', 'src/analysis.js', 'src/display/sources.js'].map(read).join('\n');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
+const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -193,7 +193,15 @@ test('bins from Stockport Council: the saved page parses, and old or missing fee
   assert.deepEqual(plain(A.nextCollections(A.councilBins(feed, now), now)).map(b => [b.name, b.days]), [['Blue bin', 3], ['Brown bin', 3], ['Green bin', 3], ['Black bin', 10]]);
   // A single date drops off once it has passed: Thursday's three go, leaving the black bin.
   assert.deepEqual(plain(A.nextCollections(A.councilBins(feed, at('2026-10-09T03:00:00')), at('2026-10-09T03:00:00'))).map(b => b.name), ['Black bin']);
-  assert.equal(A.councilBins(feed, at('2026-10-12T09:00:00')), null, 'a feed more than four days old is ignored');
+  assert.equal(A.councilBins(feed, at('2026-10-16T09:00:00')), null, 'a feed more than ten days old is ignored');
+  // A weekly check: the hand-set repeat carries on from the council's latest date for each bin.
+  const hand = [{ name: 'Green bin', colour: 'green', date: '2026-10-09', every: 1 }, { name: 'Black bin', colour: 'black', date: '2026-10-02', every: 2 },
+                { name: 'Blue bin', colour: 'blue', date: '2026-10-23', every: 4 }];
+  const moved = { fetched: '2026-10-10T04:17:00Z', bins: [{ name: 'Green bin', colour: 'green', date: '2026-10-17' }, { name: 'Black bin', colour: 'black', date: '2026-10-17' }, { name: 'Food caddy', colour: 'grey', date: '2026-10-16' }] };
+  const later = at('2026-10-18T09:00:00');
+  const merged = plain(A.nextCollections(A.mergeBins(hand, A.councilBins(moved, later)), later));
+  assert.deepEqual(merged.map(b => [b.name, b.days]), [['Blue bin', 5], ['Green bin', 6], ['Black bin', 13]]);
+  assert.deepEqual(plain(A.mergeBins(hand, null)), hand);
   assert.equal(A.councilBins(null, now), null);
 });
 
