@@ -143,11 +143,19 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-transform:uppercase;letter-s
 /* screensaver: a side window onto space. Space and billboards outside, then close things, the glass, the frame and the cabin. */
 .mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a;--amb:126,146,255}
 body.cockpit #stars{opacity:0}
-#cSpace,#cNear,#cGlass,#cFrame{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+#cSpace,#cAhead,#cNear,#cGlass,#cFrame{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
 #cBoards{position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;overflow:hidden;perspective:1200px}
 #cNear{z-index:2}
+.cockpit #stars{display:none}
+#cNear.idle{display:none}
 #cShip{position:absolute;z-index:3;top:-2%;left:-2%;width:104%;height:104%;will-change:transform}
 #cFrame .rim{stroke:rgba(var(--amb),.75);filter:drop-shadow(0 0 6px rgba(var(--amb),.8))}
+/* lite: the TV's lighter touch, with no blurred shadows or looping effects for its browser to keep repainting */
+.lite #cFrame .rim,.lite .dial .needle path{filter:none}
+.lite .board .holo,.lite .board .holo::after,.lite .board .buoy::after,.lite .leds i,.lite .hud .lamp.bad{animation:none}
+.lite .board .holo::after{display:none}
+.lite .board .holo{box-shadow:0 0 0 1px rgba(var(--rgb),.25)}
+.lite .board .bb,.lite .strain .cpanel .bb,.lite .hud .v,.lite .hud .hclock{text-shadow:none}
 #cFrame .bolts{stroke:rgba(var(--amb),.3)}
 
 /* billboards: a hologram above a little beacon, projected up in a cone of light */

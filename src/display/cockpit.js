@@ -8,14 +8,15 @@
 // The weather sets the sky's colours and the glass; the power price sets the ship's speed; your data rides past on
 // billboards and the train. Written for older TV browsers too: no ?. or ?? here.
 const Cockpit = (() => {
-  let on = false, raf = 0, last = 0, frame = 0, W = 0, H = 0, dpr = 1, quality = 1, slowFrames = 0, staticTimer = 0, clock = 0;
+  let on = false, raf = 0, last = 0, frame = 0, W = 0, H = 0, dpr = 1, quality = 1, staticTimer = 0, clock = 0;
   let sctx = null, nctx = null, gctx = null;
-  let sky = skyFor(null), engine = engineFor(null), world = worldFor({}), cards = [], preview = {}, pal = null, palKey = '', skyGrad = null;
-  let nebulae = [], stars = [[], [], []], starSprites = {}, body = null, bodyN = (Math.random() * 4) | 0, moonX = 0, things = [], timers = {}, auroraSprite = null, auroraX = 0;
+  let sky = skyFor(null), engine = engineFor(null), world = worldFor({}), cards = [], preview = {}, pal = null, palKey = '';
+  let nebulae = [], stars = [[], [], []], back = null, backX = 0, backAt = -1e9, backDirty = true, starSprites = {}, moonCv = null, moonKey = '', body = null, bodyN = (Math.random() * 4) | 0, moonX = 0, things = [], timers = {}, auroraSprite = null, auroraX = 0;
   let flyby = null, motes = [], rocks = [], streaks = [], sparkles = [], rainOut = [], moteSprite = null, railK = 0;
   let drops = [], flakes = [], dropSprite = null, frostCache = null, fogCache = null, vignette = null, glassKey = '';
-  let rotI = 0, boards = [], nextNear = 0, nextFar = 0, laneI = 0, train = null;
+  let rotI = 0, boards = [], nextNear = 0, laneI = 0, train = null;
   let voyage = null, lights = [], rem = 16;
+  let actx = null, tier = 0, learnt = 0, adapt = true, detail = 'auto', aheadAt = -1e9, aheadDt = 0, intervals = [], auroraCv = null, auroraAt = -1e9, nearClear = false, glassDrawn = '';
   let bolt = null, nextBolt = 0, flash = 0, view = { x: 0, y: 0 }, issShown = -1e9;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[(Math.random() * a.length) | 0];
@@ -28,6 +29,18 @@ const Cockpit = (() => {
   /** Billboards and the train keep a readable pace whatever the engines do. */
   const readableAt = d => W / 13 * clamp(engine.speed, .7, 1.4) / d;
   const TINTS = ['233,236,255', '255,222,186', '182,212,255', '220,200,255'];
+  /*
+   * How hard to work. TV browsers draw canvases slowly, so they start lower, and any screen steps down a tier when it
+   * can't keep up. scale: canvas resolution; fps: frames a second; ahead: how often the road ahead (sharp text) redraws.
+   */
+  const TIERS = [{ scale: 1, fps: 60, ahead: 0 }, { scale: .75, fps: 30, ahead: 120 }, { scale: .5, fps: 30, ahead: 400 }, { scale: .4, fps: 20, ahead: 1000 }];
+  const TV = /SMART-?TV|SmartTV|Tizen|Web0S|webOS|NetCast|HbbTV|BRAVIA|Philips|NETTV|Saphi|Titan|VIDAA|Android ?TV|AFT[A-Z]|CrKey|Opera TV|TV Safari/i.test(navigator.userAgent || '');
+  function chooseTier(){
+    adapt = detail !== 'high' && detail !== 'low';
+    tier = detail === 'high' ? 0 : detail === 'low' ? 2 : Math.max(learnt, TV ? 2 : (navigator.hardwareConcurrency || 4) <= 2 ? 1 : 0);   // a step down is remembered until the page reloads
+    quality = tier === 0 ? 1 : .5;
+    document.body.classList.toggle('lite', tier > 0);
+  }
 
   /* ---------- colours: the time of day, then the weather and the engines on top ---------- */
   const PHASES = {
@@ -56,7 +69,7 @@ const Cockpit = (() => {
   function refreshPalette(force){
     const p = paletteFor(), key = JSON.stringify(p);
     if (!force && key === palKey) return;
-    palKey = key; pal = p; skyGrad = null;
+    palKey = key; pal = p; backDirty = true;
     nebulae.forEach(l => { if (l.ready) colourLayer(l); });
     const sec = el('cSec'); if (sec) sec.style.setProperty('--amb', `${pal.amb[0]},${pal.amb[1]},${pal.amb[2]}`);
   }
@@ -103,16 +116,7 @@ const Cockpit = (() => {
     }
     ctx.putImageData(img, 0, 0);
   }
-  function drawLayer(l, dt){
-    if (!l.ready) return;
-    l.alpha = Math.min(1, l.alpha + dt / 2500);
-    const w = l.fw * l.scale, h = l.fh * l.scale;
-    l.x = ((l.x + speedAt(l.depth) * dt / S) % w + w) % w;
-    const x = -l.x + view.x * 6 / l.depth, y = view.y * 6 / l.depth;
-    sctx.globalAlpha = l.alpha;
-    sctx.drawImage(l.canvas, x, y, w, h); sctx.drawImage(l.canvas, x + w, y, w, h);
-    sctx.globalAlpha = 1;
-  }
+
 
   /* ---------- stars: three depths of glowing points, the brightest with spikes ---------- */
   function makeStarSprites(){
@@ -138,6 +142,41 @@ const Cockpit = (() => {
     const L = STAR_LAYERS[layer];
     return { x, y: rnd(0, H), z: pick(L.size), tint: pick(TINTS), s: rnd(L.px[0], L.px[1]), a: rnd(.35, 1), ph: rnd(0, 6.3), tw: rnd(.6, 2.4) };
   }
+  /**
+   * The backdrop: the sky's colour, the far and middle stars and both nebulae, painted together now and then into one
+   * picture two screens wide. They're so far off that they creep by at a pixel or two a second, so their parallax was
+   * never visible, and blending five full-screen layers every frame was more than a TV could draw. Now it's one copy.
+   */
+  function starTile(layer, c, ox){
+    c.globalCompositeOperation = 'lighter';
+    stars[layer].forEach(s => {
+      c.globalAlpha = s.a * .86;
+      [s.x, s.x - W, s.x + W].forEach(x => { if (x > -s.s && x < W + s.s) c.drawImage(starSprites[s.tint + s.z], ox + x - s.s / 2, s.y - s.s / 2, s.s, s.s); });
+    });
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  }
+  function bakeBackdrop(){
+    const w2 = W * 2;
+    if (!back) back = document.createElement('canvas');
+    const bw = Math.round(w2 * dpr), bh = Math.round(H * dpr);
+    if (back.width !== bw || back.height !== bh){ back.width = bw; back.height = bh; }
+    const c = back.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, rgba(pal.top, 1)); g.addColorStop(1, rgba(pal.bottom, 1));
+    c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.fillStyle = g; c.fillRect(0, 0, w2, H);
+    const neb = l => { if (!l.ready) return; const w = l.fw * l.scale, h = l.fh * l.scale; c.globalAlpha = l.alpha; c.drawImage(l.canvas, -l.x, 0, w, h); c.drawImage(l.canvas, -l.x + w, 0, w, h); c.globalAlpha = 1; };
+    starTile(0, c, 0); starTile(0, c, W); neb(nebulae[0]);
+    starTile(1, c, 0); starTile(1, c, W); neb(nebulae[1]);
+    backDirty = false; backAt = clock;
+  }
+  function drawBackdrop(t, dt){
+    // the nebulae fade in once painted: re-bake a few times a second until they're there
+    const fading = nebulae.some(l => l.ready && l.alpha < 1);
+    nebulae.forEach(l => { if (l.ready) l.alpha = Math.min(1, l.alpha + dt / 2500); });
+    if (backDirty || (fading && clock - backAt > 250) || !back) bakeBackdrop();
+    backX = ((backX + speedAt(200) * dt / S) % (W * 2) + W * 2) % (W * 2);
+    sctx.drawImage(back, -backX, 0, W * 2, H); sctx.drawImage(back, W * 2 - backX, 0, W * 2, H);
+    if (tier === 0) drawSky(t);
+  }
   function drawStars(layer, dt, t){
     const L = STAR_LAYERS[layer], v = speedAt(L.d), warp = engine.mode === 'warp', streak = warp || engine.mode === 'fast';
     sctx.globalCompositeOperation = 'lighter';
@@ -156,8 +195,6 @@ const Cockpit = (() => {
 
   /* ---------- the sky behind it all: its colour, the sun or the moon, an aurora, lightning ---------- */
   function drawSky(t){
-    if (!skyGrad){ skyGrad = sctx.createLinearGradient(0, 0, 0, H); skyGrad.addColorStop(0, rgba(pal.top, 1)); skyGrad.addColorStop(1, rgba(pal.bottom, 1)); }
-    sctx.fillStyle = skyGrad; sctx.fillRect(0, 0, W, H);
     const glow = (x, y, r, col, a) => { const g = sctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, rgba(col, a)); g.addColorStop(1, rgba(col, 0)); sctx.fillStyle = g; sctx.fillRect(0, 0, W, H); };
     if (sky.phase === 'dawn') glow(W * .1, H * 1.1, H * 1.2, [255, 150, 100], .35);
     if (sky.phase === 'dusk') glow(W * .9, H * 1.1, H * 1.2, [255, 110, 90], .32);
@@ -187,14 +224,21 @@ const Cockpit = (() => {
       c.fillStyle = g; c.fillRect(0, 0, w, h);
     });
     auroraX += speedAt(70) * dt / S;
-    const step = quality === 1 ? 4 : 8;
-    sctx.globalCompositeOperation = 'lighter';
-    for (let x = 0; x < W; x += step){
-      const u = (x + auroraX) / W, n = vnoise(u * 4 + t / 9000, 3, 1e6, 41), n2 = vnoise(u * 9 - t / 6000, 5, 1e6, 43);
-      const top = H * (.05 + .1 * n), len = H * (.2 + .2 * n2);
-      sctx.globalAlpha = k * (.18 + .4 * n * (.4 + .6 * n2));
-      sctx.drawImage(auroraSprite, x - step, top, step * 3, len);
+    // painted at a quarter size a few times a second, then stretched over the sky in one go
+    const cw = Math.max(64, Math.round(W / 4)), ch = Math.max(48, Math.round(H / 4));
+    if (!auroraCv || auroraCv.width !== cw){ auroraCv = document.createElement('canvas'); auroraCv.width = cw; auroraCv.height = ch; auroraAt = -1e9; }
+    if (clock - auroraAt > (tier === 0 ? 100 : 500)){
+      auroraAt = clock;
+      const c = auroraCv.getContext('2d'), step = 2;
+      c.clearRect(0, 0, cw, ch); c.globalCompositeOperation = 'lighter';
+      for (let x = 0; x < cw; x += step){
+        const u = (x * 4 + auroraX) / W, n = vnoise(u * 4 + t / 9000, 3, 1e6, 41), n2 = vnoise(u * 9 - t / 6000, 5, 1e6, 43);
+        c.globalAlpha = .1 + .26 * n * (.4 + .6 * n2);
+        c.drawImage(auroraSprite, x - step, ch * (.05 + .1 * n), step * 3, ch * (.2 + .2 * n2));
+      }
     }
+    sctx.globalCompositeOperation = 'lighter'; sctx.globalAlpha = k * .85;
+    sctx.drawImage(auroraCv, 0, 0, W, H);
     sctx.globalAlpha = 1; sctx.globalCompositeOperation = 'source-over';
   }
   function drawLightning(t){
@@ -243,7 +287,12 @@ const Cockpit = (() => {
     if (sky.phase === 'day' && !/moon/.test(String(preview.show || ''))) return;
     if (!moonX) moonX = W * .53;
     moonX -= speedAt(160) * dt / S; if (moonX < -H * .2) moonX = W + H * .2;
-    drawMoon(sctx, moonX + view.x * .02, H * .17 + view.y * .02, H * .05, world.moon);
+    const r = H * .05, key = Math.round(world.moon.f * 200) + ':' + Math.round(r);
+    if (key !== moonKey){
+      moonKey = key; const n = Math.ceil(r * 7);
+      moonCv = sprite(n, n, c => drawMoon(c, n / 2, n / 2, r, world.moon));
+    }
+    sctx.drawImage(moonCv, moonX + view.x * .02 - moonCv.width / 2, H * .17 + view.y * .02 - moonCv.height / 2);
   }
 
   /* ---------- things going by: traffic, your house, wildlife, the ISS, comets ---------- */
@@ -333,10 +382,13 @@ const Cockpit = (() => {
 
   /* ---------- close by: huge things sweeping past, dust, debris, rain and ice outside ---------- */
   function startFlyby(want){
-    const kind = want || pick(['truss', 'rock', 'cruiser']), d = rnd(.55, .75);
+    const kind = want || pick(['rock', 'cruiser', 'rock']), d = rnd(.55, .75);
     flyby = { kind, d, x: W + 50, y: H * rnd(.18, .6), len: kind === 'truss' ? W * 1.3 : kind === 'cruiser' ? W * .9 : H * .4, a: rnd(0, 6) };
   }
   function drawNear(t, dt){
+    const busy = flyby || tier === 0 || engine.mode === 'warp' || sky.snow > 0 || sky.cold > .6 || sky.rain > 0 || sky.wind > 0;
+    if (!busy){ if (!nearClear){ nctx.clearRect(0, 0, W, H); nearClear = true; el('cNear').className = 'idle'; } return; }   // hidden, it costs nothing to show
+    if (nearClear){ nearClear = false; el('cNear').className = ''; }
     nctx.clearRect(0, 0, W, H);
     const c = nctx, amb = pal.amb;
     if (flyby){
@@ -350,7 +402,8 @@ const Cockpit = (() => {
         c.restore(); }
     }
     // dust right by the glass, soft and out of focus
-    while (motes.length < Math.round(10 * quality)) motes.push({ x: rnd(0, W * 1.5), y: rnd(0, H * .8), d: rnd(.3, .6), s: rnd(10, 34) });
+    if (tier > 0) motes = [];
+    while (tier === 0 && motes.length < 10) motes.push({ x: rnd(0, W * 1.5), y: rnd(0, H * .8), d: rnd(.3, .6), s: rnd(10, 34) });
     c.globalCompositeOperation = 'lighter';
     motes.forEach(m => { m.x -= speedAt(m.d) * dt / S; if (m.x < -60) Object.assign(m, { x: W + rnd(30, W * .8), y: rnd(0, H * .8) }); c.globalAlpha = .18; c.drawImage(moteSprite, m.x - m.s / 2, m.y - m.s / 2, m.s, m.s); });
     // warp: light streaking past
@@ -467,12 +520,13 @@ const Cockpit = (() => {
     queued.forEach(q => {
       const r = measureLabel(c, q.x, q.y, q.lines, q.align), y0 = r.y;
       r.x = clamp(r.x, W * .07, Math.max(W * .07, W * .93 - r.w));   // keep it inside the window
-      for (let n = 0; n < 8; n++){
-        const hit = placed.filter(p => r.x < p.x + p.w + 6 && p.x < r.x + r.w + 6 && r.y < p.y + p.h + 6 && p.y < r.y + r.h + 6)[0];
-        if (!hit) break;
-        r.y = hit.y - r.h - 8;
+      const hitAt = () => placed.filter(p => r.x < p.x + p.w + 6 && p.x < r.x + r.w + 6 && r.y < p.y + p.h + 6 && p.y < r.y + r.h + 6)[0];
+      for (let n = 0, hit; n < 8 && (hit = hitAt()); n++) r.y = hit.y - r.h - 8;
+      if (r.y < H * .33){                                              // never up among the billboards: try below instead
+        r.y = y0;
+        for (let n = 0, hit; n < 8 && (hit = hitAt()); n++) r.y = hit.y + hit.h + 8;
+        if (r.y + r.h > H * .74 || hitAt()) return;
       }
-      if (r.y < H * .33) return;   // never up among the billboards
       if (y0 - r.y > rem){ c.strokeStyle = `rgba(${q.rgb.join(',')},.4)`; c.lineWidth = 1.5; c.beginPath(); c.moveTo(r.x + rem, r.y + r.h); c.lineTo(r.x + rem, y0 + r.h); c.stroke(); }
       drawLabel(c, r, q.lines, q.rgb); placed.push(r);
     });
@@ -501,7 +555,7 @@ const Cockpit = (() => {
   const until = ms => { const m = Math.max(0, Math.round(ms / 60e3)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
   function drawAhead(t, dt){
     if (!voyage) return;
-    const g = aheadGeom(), c = sctx;
+    const g = aheadGeom(), c = actx;
     queued = [];
     voyage.fronts.forEach((f, i) => drawFront(g, f, i, t));
     const frontLabels = queued; queued = [];
@@ -524,7 +578,7 @@ const Cockpit = (() => {
     const land = c.createLinearGradient(0, g.yb - H * .17, 0, g.yb);
     land.addColorStop(0, `rgba(${pal.deep.map(v => Math.round(v * .45 + 14)).join(',')},.96)`); land.addColorStop(1, 'rgba(5,6,16,.99)');
     c.fillStyle = land; c.fill(); c.clip();
-    if (!lights.length) for (let i = 0; i < 70; i++) lights.push({ x: rnd(0, W), y: rnd(0, 1), b: rnd(.25, 1), w: Math.random() < .2 });
+    if (!lights.length && tier === 0) for (let i = 0; i < 70; i++) lights.push({ x: rnd(0, W), y: rnd(0, 1), b: rnd(.25, 1), w: Math.random() < .2 });
     const sp = speedAt(9) * dt / S;
     c.globalCompositeOperation = 'lighter';
     lights.forEach(l => {
@@ -558,7 +612,7 @@ const Cockpit = (() => {
   /** The fuel dock hangs over the cheapest two hours; when they come, it has arrived. */
   function drawTheDock(g, hOf, t){
     const d = voyage.dock; if (!d) return;
-    const c = sctx, xa = Math.max(g.xOf(d.from), g.x0), xb = Math.max(g.xOf(d.to), xa + rem * 2), lit = d.now ? 1 : 0;
+    const c = actx, xa = Math.max(g.xOf(d.from), g.x0), xb = Math.max(g.xOf(d.to), xa + rem * 2), lit = d.now ? 1 : 0;
     const beat = .5 + .5 * Math.sin(t / 900);
     c.save(); c.globalCompositeOperation = 'lighter';                                       // the valley glows
     const v = c.createLinearGradient(0, g.yb - H * .3, 0, g.yb);
@@ -575,7 +629,7 @@ const Cockpit = (() => {
   }
   /** A calendar event: a beacon standing on the landscape at its time. */
   function drawWaypoint(g, w, hOf, R, t){
-    const c = sctx, x = g.xOf(w.t); if (x > W * .9) return;
+    const c = actx, x = g.xOf(w.t); if (x > W * .9) return;
     const r = R.filter(q => q.from <= w.t && w.t < q.to)[0], base = r ? hOf(r.p) : g.yb - H * .03, top = g.yb - H * .27;
     c.strokeStyle = 'rgba(184,146,255,.6)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, base); c.lineTo(x, top); c.stroke();
     const k = .6 + .4 * Math.sin(t / 500);
@@ -585,7 +639,7 @@ const Cockpit = (() => {
   }
   /** Rain, snow or thunder on its way: a cloud bank standing over the hours it's due. */
   function drawFront(g, f, i, t){
-    const c = sctx, xa = Math.max(g.xOf(f.from), W * .05), xb = Math.min(g.xOf(f.to), W * .95);
+    const c = actx, xa = Math.max(g.xOf(f.from), W * .05), xb = Math.min(g.xOf(f.to), W * .95);
     if (xb <= xa) return;
     const top = H * .47, base = H * .6, n = Math.max(3, Math.round((xb - xa) / (H * .05)));
     const storm = f.kind === 'thunder', snow = f.kind === 'snow';
@@ -614,7 +668,7 @@ const Cockpit = (() => {
 
   /* ---------- billboards: holographic beacons for what you need to catch ---------- */
   // Bands, top to bottom: billboards in the sky (to .38), what's coming up (.4 to .6), then the landscape and the train.
-  const NEAR = [{ y: .26, d: 1 }, { y: .26, d: 1.05 }], FAR = [{ y: .15, d: 2.4 }, { y: .2, d: 2.7 }], NARROW = [{ y: .21, d: 1 }, { y: .3, d: 1.05 }];
+  const NEAR = [{ y: .26, d: 1 }, { y: .26, d: 1.05 }], NARROW = [{ y: .21, d: 1 }, { y: .3, d: 1.05 }];
   function boardHtml(card){
     return `<span class="bh">${esc(card.head)}</span><span class="bb">${esc(card.big)}</span>${card.sub ? `<span class="bs">${esc(card.sub)}</span>` : ''}`;
   }
@@ -639,7 +693,7 @@ const Cockpit = (() => {
       if (!still()) b.x -= readableAt(d) * dt / S;
       if (b.x < -b.w * s / 2 - 60){ b.el.parentNode && b.el.parentNode.removeChild(b.el); boards.splice(i, 1); continue; }
       const y = H * b.lane.y + Math.sin(t / 2100 + b.seed) * 7 * s + view.y / d;
-      const ry = still() ? 0 : clamp((b.x - W / 2) / (W / 2), -1, 1) * -14 * s, rz = Math.sin(t / 3300 + b.seed) * 1.2;
+      const ry = still() ? 0 : clamp((b.x - W / 2) / (W / 2), -1, 1) * -8 * s, rz = Math.sin(t / 3300 + b.seed) * 1.2;
       b.el.style.transform = `translate(${(b.x - b.w / 2).toFixed(1)}px,${(y - b.h / 2).toFixed(1)}px) scale(${s.toFixed(3)}) rotateY(${ry.toFixed(2)}deg) rotate(${rz.toFixed(2)}deg)`;
       const far = clamp((d - 1.2) / 1.5, 0, 1);
       b.el.style.filter = far > 0 ? `${quality === 1 ? `blur(${(far * 1.8).toFixed(2)}px) ` : ''}brightness(${(1 - far * .35).toFixed(2)}) saturate(${(1 - far * .4).toFixed(2)})` : '';
@@ -648,7 +702,6 @@ const Cockpit = (() => {
     if (still()) return;
     const lanes = narrow() ? NARROW : NEAR;
     if (clock >= nextNear){ spawnBoard(lanes[laneI++ % lanes.length]); nextNear = clock + (narrow() ? 11e3 : 9e3); }
-    if (!narrow() && clock >= nextFar){ spawnBoard(pick(FAR)); nextFar = clock + rnd(10e3, 16e3); }
   }
 
   /* ---------- the space train: one fact a carriage; and, when it's time to leave, your own train ---------- */
@@ -713,13 +766,13 @@ const Cockpit = (() => {
     const pk = platformK();
     if (pk > 0){
       const x0 = Math.max(train.stopX - rem * 2, W * .04), x1 = Math.min(train.stopX + train.w / train.d + rem * 2, W * .96);
-      sctx.save(); sctx.globalAlpha = pk; drawPlatform(sctx, x0, x1, y + 4, train.h / train.d, voyage && voyage.train ? voyage.train.station : '', rem, clock); sctx.restore();
+      actx.save(); actx.globalAlpha = pk; drawPlatform(actx, x0, x1, y + 4, train.h / train.d, voyage && voyage.train ? voyage.train.station : '', rem, clock); actx.restore();
     }
-    const g = sctx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(79,214,255,0)'); g.addColorStop(.5, `rgba(79,214,255,${.5 * railK})`); g.addColorStop(1, 'rgba(79,214,255,0)');
-    sctx.fillStyle = g; sctx.fillRect(0, y, W, 2);
-    sctx.globalCompositeOperation = 'lighter'; sctx.fillStyle = `rgba(150,230,255,${.6 * railK})`;
-    for (let x = ((-clock * readableAt(1.3) / S) % 140 + 140) % 140; x < W; x += 140){ sctx.beginPath(); sctx.arc(x, y + 1, 2.2, 0, 7); sctx.fill(); }
-    sctx.globalCompositeOperation = 'source-over';
+    const g = actx.createLinearGradient(0, 0, W, 0); g.addColorStop(0, 'rgba(79,214,255,0)'); g.addColorStop(.5, `rgba(79,214,255,${.5 * railK})`); g.addColorStop(1, 'rgba(79,214,255,0)');
+    actx.fillStyle = g; actx.fillRect(0, y, W, 2);
+    actx.globalCompositeOperation = 'lighter'; actx.fillStyle = `rgba(150,230,255,${.6 * railK})`;
+    if (tier === 0) for (let x = ((-clock * readableAt(1.3) / S) % 140 + 140) % 140; x < W; x += 140){ actx.beginPath(); actx.arc(x, y + 1, 2.2, 0, 7); actx.fill(); }
+    actx.globalCompositeOperation = 'source-over';
   }
 
   /* ---------- the ship ---------- */
@@ -731,38 +784,57 @@ const Cockpit = (() => {
 
   /* ---------- sizes and the loop ---------- */
   function resize(){
-    W = innerWidth; H = innerHeight; dpr = Math.min(quality === 1 ? 1.5 : 1, window.devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    const sharp = Math.min(tier === 0 ? 1.5 : 1, window.devicePixelRatio || 1);
+    dpr = sharp * TIERS[tier].scale;
     [el('cSpace'), el('cNear'), el('cGlass')].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
-    sctx = el('cSpace').getContext('2d'); nctx = el('cNear').getContext('2d'); gctx = el('cGlass').getContext('2d');
-    [sctx, nctx, gctx].forEach(c => c.setTransform(dpr, 0, 0, dpr, 0, 0));
-    makeStarSprites(); glassKey = ''; skyGrad = null; refreshPalette(true); lights = [];
+    const ca = el('cAhead'); ca.width = Math.round(W * sharp); ca.height = Math.round(H * sharp);   // text stays sharp at any tier
+    sctx = el('cSpace').getContext('2d'); nctx = el('cNear').getContext('2d'); gctx = el('cGlass').getContext('2d'); actx = ca.getContext('2d');
+    [sctx, nctx, gctx].forEach(c => c.setTransform(dpr, 0, 0, dpr, 0, 0)); actx.setTransform(sharp, 0, 0, sharp, 0, 0);
+    aheadAt = -1e9; auroraCv = null; glassDrawn = ''; nearClear = false; intervals = [];
+    makeStarSprites(); glassKey = ''; refreshPalette(true); lights = [];
     rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     stars = STAR_LAYERS.map((L, i) => { const n = Math.round(W * H / L.per * (quality === 1 ? 1 : .55)), a = []; for (let k = 0; k < n; k++) a.push(newStar(i, rnd(0, W))); return a; });
     nebulae = [makeLayer(quality === 1 ? 5 : 7, 3, 420, { warp: 2.2, band: .3, lo: .32, hi: .9, dust: 1, gain: .95 }),
                makeLayer(quality === 1 ? 4 : 6, 8, 140, { warp: 3.4, band: .22, lo: .5, hi: .95, dust: 0, gain: .7 })];
-    body = null; moonX = 0;
+    body = null; moonX = 0; backDirty = true; moonKey = '';
   }
   function loop(t){
     if (!on) return;
-    const dt = Math.min(80, t - (last || t)); last = t; frame++; clock += dt;
-    if (dt > 34) slowFrames++; else if (slowFrames > 0) slowFrames -= .25;
-    if (slowFrames > 90 && quality > .5){ quality = .5; slowFrames = 0; resize(); }
+    raf = requestAnimationFrame(loop);
+    const T = TIERS[tier];
+    if (last && t - last < 1000 / T.fps - 4) return;                // a frame cap, so a slow screen isn't asked for more
+    const gap = last ? t - last : 16, dt = Math.min(80, gap); last = t; frame++; clock += dt;
+    const growing = nebulae.some(l => !l.ready);
     nebulae.forEach(l => { if (!l.ready) growLayer(l, quality === 1 ? 10 : 6); });
     render(t, dt);
-    raf = requestAnimationFrame(loop);
+    // Keeping up? Judge over a few seconds once the nebulae are painted; step down a tier if not.
+    if (adapt && !growing){
+      intervals.push(gap);
+      if (intervals.reduce((a, b) => a + b, 0) >= 3000){
+        const avg = intervals.reduce((a, b) => a + b, 0) / intervals.length; intervals = [];
+        if (avg > 1000 / T.fps * 1.4 && tier < TIERS.length - 1){ tier++; learnt = tier; quality = .5; document.body.classList.add('lite'); resize(); }
+      }
+    }
   }
   function render(t, dt){
     sway(t); schedule();
-    drawSky(t); drawStars(0, dt, t); drawLayer(nebulae[0], dt); drawSun(); drawComets(t, dt); drawTheMoon(dt); drawStars(1, dt, t); drawAurora(t, dt);
-    drawLayer(nebulae[1], dt); drawLightning(t); drawBody(dt); drawStars(2, dt, t); drawAhead(t, dt); drawThings(t, dt); drawRail(dt); drawHaze();
+    drawBackdrop(t, dt); drawSun(); drawComets(t, dt); drawTheMoon(dt); drawAurora(t, dt); drawLightning(t); drawBody(dt); drawStars(2, dt, t); drawThings(t, dt); drawHaze();
+    aheadDt += dt;
+    if (clock - aheadAt >= TIERS[tier].ahead || dt === 0){ aheadAt = clock; actx.clearRect(0, 0, W, H); drawAhead(t, aheadDt); drawRail(aheadDt); aheadDt = 0; }
     placeBoards(t, dt); moveTrain(dt); drawNear(t, dt);
-    if (quality === 1 || frame % 2 === 0) drawGlass(quality === 1 ? dt : dt * 2);
+    // the glass only needs drawing while something on it moves, or when it changes
+    const frost = Math.max(sky.cold, sky.snow * .8), gk = [W, H, sky.fog, frost].join();
+    if (sky.rain > 0 || sky.snow > 0 || drops.length || flakes.length || gk !== glassDrawn){
+      glassDrawn = gk;
+      if (tier === 0 || frame % 2 === 0) drawGlass(tier === 0 ? dt : dt * 2);
+    }
   }
   /** Reduced motion: a still scene, redrawn every 30 seconds with new billboards. */
   function drawStill(){
     nebulae.forEach(l => { while (!l.ready) growLayer(l, 200); l.alpha = 1; });
     boards.forEach(b => b.el.parentNode && b.el.parentNode.removeChild(b.el)); boards = [];
-    (narrow() ? [[NARROW[0], W / 2]] : [[NEAR[0], W * .3], [NEAR[1], W * .7], [FAR[0], W * .55]]).forEach(p => spawnBoard(p[0], p[1]));
+    (narrow() ? [[NARROW[0], W / 2]] : [[NEAR[0], W * .3], [NEAR[1], W * .72]]).forEach(p => spawnBoard(p[0], p[1]));
     const t = performance.now(); render(t, 0);
   }
   function previewTrain(){
@@ -772,8 +844,8 @@ const Cockpit = (() => {
   /** A scene already under way: a billboard or two in view, so it never opens on empty space. */
   function setTheScene(){
     if (narrow()) spawnBoard(NARROW[0], W * .6);
-    else { spawnBoard(NEAR[0], W * .46); spawnBoard(FAR[1], W * .85); laneI = 1; }
-    nextNear = clock + 5e3; nextFar = clock + 8e3;
+    else { spawnBoard(NEAR[0], W * .46); laneI = 1; }
+    nextNear = clock + 5e3;
     const show = String(preview.show || '');
     ['house', 'whales', 'jellies', 'birds', 'iss', 'comet', 'traffic'].forEach(k => { if (show.indexOf(k) >= 0) spawn(k, true); });
     if (show.indexOf('train') >= 0 && !train) previewTrain();
@@ -803,7 +875,7 @@ const Cockpit = (() => {
     start(){
       if (on) return; on = true; document.body.classList.add('cockpit');
       clock = 0; timers = {}; things = []; issShown = -1e9; train = null; flyby = null; railK = 0;
-      resize(); last = 0; nextBolt = performance.now() + 2500;
+      chooseTier(); resize(); last = 0; nextBolt = performance.now() + 2500;
       setTheScene();
       if (still()){ drawStill(); staticTimer = setInterval(drawStill, 30000); }
       else raf = requestAnimationFrame(loop);
@@ -818,6 +890,7 @@ const Cockpit = (() => {
     /** New data: the billboards, the sky, the engines, the world outside and the dashboard. */
     update(info){
       sky = info.sky; engine = info.engine; world = info.world; cards = info.cards; voyage = info.voyage || null;
+      if (info.detail && info.detail !== detail){ detail = info.detail; if (on){ chooseTier(); resize(); } }
       setInstruments(info.instruments);
       if (train && train.mine && voyage && voyage.train){ const cs = myTrainCards(); [].forEach.call(train.el.querySelectorAll('.cpanel'), (p, i) => { const h = cs[i] && boardHtml(cs[i]); if (h && p.innerHTML !== h) p.innerHTML = h; }); }
       const next = info.preview || {}, changed = String(next.show || '') !== String(preview.show || '');

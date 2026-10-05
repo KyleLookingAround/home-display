@@ -13,6 +13,8 @@
     stars = Array.from({length:n}, () => { const z = Math.random(); return { x:Math.random()*W, y:Math.random()*H, z, r:.35 + z*z*1.5, a:.35 + z*.6, tw:Math.random()*Math.PI*2, ts:.5 + Math.random()*1.6, c:tints[(Math.random()*tints.length)|0] }; });
   }
   function draw(t){
+    // the screensaver covers the whole screen: rest until it's gone
+    if (document.body.classList.contains('cockpit')){ last = 0; setTimeout(() => requestAnimationFrame(draw), 500); return; }
     const dt = Math.min(64, t - last || 16); last = t;
     ctx.clearRect(0,0,W,H);
     for (const s of stars){

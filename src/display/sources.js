@@ -36,7 +36,7 @@ function inWindow(now, from, to){
 }
 
 const DISPLAY_DEFAULTS = {
-  mode: 'screensaver', rotate: 0, saver: 10, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
+  mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '',
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
 };

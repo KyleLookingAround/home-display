@@ -132,7 +132,7 @@ after(async () => { await browser.close(); server.close(); });
 const SETTINGS = { trainFrom: 'SPT', trainWalk: 12, tramStop: 'East Didsbury', tramWalk: 8, ical: 'https://calendar.google.com/calendar/ical/x%40group.calendar.google.com/private-0/basic.ics',
   bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Paper and card', colour: 'blue', date: '2026-10-13', every: 2 }, { name: 'Garden waste', colour: 'brown', date: '2026-10-08', every: 2 }] };
 
-async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false } = {}){
+async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true } = {}){
   helper = withHelper;
   const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: 'block' });
   const page = await ctx.newPage();
@@ -145,7 +145,7 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   await page.route(/^https:\/\/api\.open-meteo\.com\//, r => r.fulfill({ json: weather() }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
   await page.route(/^https:\/\/huxley2\.azurewebsites\.net\//, r => r.fulfill({ json: huxley() }));
-  await page.clock.install({ time: at });
+  if (clock) await page.clock.install({ time: at });
   if (settings) await page.addInitScript(s => { try { localStorage.setItem('hse.display', s); } catch (e) {} }, JSON.stringify(settings));
   if (account) await page.addInitScript(() => { try { localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test'); } catch (e) {} });
   await page.goto(base + path);
@@ -413,14 +413,39 @@ test('cockpit shows your train and the instruments', async () => {
   await ctx.close();
 });
 
+// BENCH=1: frames a second and where the time goes, with the CPU slowed down like a TV's (BENCH_CPU, default 6).
+test('cockpit frame budget', { skip: !process.env.BENCH }, async () => {
+  const rate = +(process.env.BENCH_CPU || 6), look = process.env.BENCH_LOOK || 'phase=night';
+  const { page, ctx } = await open('/display.html#screensaver&' + look, { account: true, clock: false });
+  const cdp = await ctx.newCDPSession(page);
+  await page.waitForTimeout(3000);                                  // let the nebulae finish growing
+  if (process.env.BENCH_EVAL) await page.evaluate(process.env.BENCH_EVAL);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate });
+  await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start');
+  const fps = await page.evaluate(() => new Promise(done => {
+    let n = 0, worst = 0, last = performance.now(); const t0 = last;
+    const tick = t => { n++; worst = Math.max(worst, t - last); last = t; if (t - t0 < 6000) requestAnimationFrame(tick); else done({ fps: n / ((t - t0) / 1000), worst: Math.round(worst) }); };
+    requestAnimationFrame(tick);
+  }));
+  const { profile } = await cdp.send('Profiler.stop');
+
+  const self = {}, dt = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
+  profile.nodes.forEach(n => { const k = (n.callFrame.functionName || '(anon)') + ':' + n.callFrame.lineNumber; self[k] = (self[k] || 0) + (n.hitCount || 0) * dt; });
+  const total = Object.values(self).reduce((a, b) => a + b, 0);
+  console.log(`cpu x${rate} ${look}: ${fps.fps.toFixed(1)} fps, worst frame ${fps.worst} ms`);
+  Object.entries(self).sort((a, b) => b[1] - a[1]).slice(0, 25).forEach(([k, v]) => console.log(`${(v / total * 100).toFixed(1).padStart(5)}%  ${k}`));
+  await ctx.close();
+});
+
 // GALLERY=1 SHOTS=1: one screenshot per scene, for looking at the window by eye (skipped otherwise).
 test('cockpit gallery', { skip: !process.env.GALLERY }, async () => {
   const looks = (process.env.GALLERY_LOOKS || [
     'phase=night&show=train', 'wx=clear&phase=day&show=house', 'phase=dusk&show=whales', 'wx=rain&phase=night&show=jellies',
     'wx=snow&show=birds', 'price=-3&phase=night&show=aurora,comet', 'wx=thunder&phase=night&show=iss,moon', 'wx=fog&show=flyby', 'phase=dawn&wx=cold&show=house'
   ].join('|')).split('|');
-  for (const [width, height] of [[1920, 1080], [390, 844]]) {
-    if (width < 1000 && !process.env.GALLERY_PHONE) continue;
+  const sizes = process.env.GALLERY_SIZES ? process.env.GALLERY_SIZES.split(',').map(s => s.split('x').map(Number)) : [[1920, 1080], [390, 844]];
+  for (const [width, height] of sizes) {
+    if (width < 500 && !process.env.GALLERY_PHONE) continue;
     for (const look of looks) {
       const { page, ctx, errors } = await open('/display.html#screensaver&' + look, { width, height, account: true });
       // a few whole days already seen, so the fuel gauge has a usual day to measure against

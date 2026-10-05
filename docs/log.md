@@ -4,6 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Update:** the screensaver draws within a TV's means. The far sky is baked into one backdrop, the aurora is painted small and stretched, and screens step down through tiers of detail when they can't keep up (TVs start lower; Settings has "Screensaver detail"). It's about six times faster on a slow screen. Far billboards and the steel truss are gone, and billboards turn less ([0008](decisions/0008-drawing-for-tvs.md)).
+- **Finding:** on a TV-speed CPU, over 80% of each frame went on the browser painting five full-screen layers that barely moved, an aurora of 480 strips, and a starfield hidden behind the screensaver.
 - **Creation:** the road ahead. The next twelve hours are laid along the window: a landscape whose height is the Agile price, cloud banks over the hours rain is due, calendar events as beacons, and a fuel dock over the cheapest two hours. When it's nearly time to leave, the Express becomes your train and stops at the platform. The cabin has dials for live draw, today's cost against a usual day, and grid carbon ([0007](decisions/0007-time-is-distance.md)).
 - **Update:** the screensaver redrawn as a voyage: painted nebulae, lit planets with rings, the Harold Street Express (a space train with one fact on each carriage), the house on an asteroid lit by live power use, the aurora when the grid is clean, a comet in the bins' colours on bin night, the real moon phase and the real ISS overhead, and space wildlife. Billboards now carry only what you need to catch ([0005](decisions/0005-cockpit.md), second revision).
 - **Creation:** the ISS's position from wheretheiss.at, once a minute while the screensaver shows and every ten minutes otherwise.

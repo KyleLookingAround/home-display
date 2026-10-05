@@ -286,7 +286,7 @@ function cockpitInfo(now){
   const ahead = shownAhead(voyage);
   return {
     sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null), world: Object.assign(worldFor(x, now), { iss }), preview: D.preview,
-    voyage, instruments: instrumentsFor(x, now, usual),
+    voyage, instruments: instrumentsFor(x, now, usual), detail: D.preview.detail || D.set.detail,
     cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };
@@ -389,7 +389,7 @@ function buildSheet(){
 }
 function fillSheet(){
   const s = D.set, setv = (id, v) => { const el = $('#' + id); if (el) el.value = String(v); };
-  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fNight', s.night ? 1 : 0);
+  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0);
   const near = t => { const p = String(t).split(':'); const m = Math.round(((+p[0] || 0)*60 + (+p[1] || 0)) / 30) * 30 % 1440; return `${pad2(Math.floor(m/60))}:${pad2(m % 60)}`; };
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
   [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date); setv('bE' + i, b.every || 2); });
@@ -402,7 +402,7 @@ function fillSheet(){
 function readSheet(){
   const v = id => $('#' + id).value.trim();
   const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: v('bD' + i), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
-  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
+  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
     bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
 }
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }

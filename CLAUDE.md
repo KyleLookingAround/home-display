@@ -25,12 +25,13 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `dom.js`: the dashboard's state, rendering, the generic SVG `barChart` and event wiring.
   - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
   - `display/cockpit.js`: the screensaver, a side window onto space. It decides when and where things appear. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`; `readableAt` caps it for text). Layers, back to front:
-    - `cSpace` canvas: sky, painted nebulae (grown a few rows a frame), stars, sun, comets, moon, aurora, planets, traffic, the house, wildlife, the ISS, the train's rail.
-    - The road ahead (`drawAhead`): the next twelve hours along the window, now on the left. The price landscape, weather fronts, calendar beacons and the fuel dock, with canvas labels that stack rather than overlap ([decision 0007](docs/decisions/0007-time-is-distance.md)).
+    - `cSpace` canvas: the backdrop (sky, far and middle stars and both nebulae, baked together into one picture two screens wide and slid along), near stars, sun, comets, moon, aurora (painted small, stretched), planets, traffic, the house, wildlife, the ISS.
+    - `cAhead` canvas, sharp at any tier: the road ahead (`drawAhead`), the next twelve hours along the window, now on the left, and the train's rail and platform. The price landscape, weather fronts, calendar beacons and the fuel dock, with canvas labels that stack rather than overlap ([decision 0007](docs/decisions/0007-time-is-distance.md)).
     - `cBoards`: DOM billboards and the space train, in 3D. Your own train stops at a platform when it's time to leave.
     - `cNear` canvas: huge things sweeping past, dust, warp streaks, debris, rain outside.
     - `cShip`: the glass (rain, snow, frost, fog), the frame and the dashboard, with its dials.
-    - It slows itself down on weak hardware, and shows a still frame under reduced motion.
+    - `TIERS` set canvas resolution, frames a second and how often the road ahead redraws. TVs start lower, any screen steps down when it can't keep up, and Settings or `detail=low|high` can fix it ([decision 0008](docs/decisions/0008-drawing-for-tvs.md)). Lower tiers add `body.lite`, which drops blurred shadows and looping animations. Don't add full-screen layers drawn every frame: bake slow things into the backdrop. Check with `BENCH=1 node --test --test-name-pattern="frame budget" tests/display.browser.mjs` (CPU slowed six times).
+    - It shows a still frame under reduced motion.
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
   - `display/sources.js`: the display's household data, mostly pure.
     - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`, `voyageFor` (the road ahead) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost` (the cabin's dials).
@@ -40,7 +41,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - Realtime Trains and TfGM parsing, leave-by countdowns, today's cost.
     - Nightly reload and staleness.
   - `display/display.js`: the display's data scheduler (`SRC`: each source has its own refresh period and backs off on failure), mode switching, remote control and spatial navigation, screensaver motion, night mode and the settings sheet.
-  - `starfield.js`: the animated background, on both pages.
+  - `starfield.js`: the animated background, on both pages. It rests while the screensaver covers it.
 - `server.py`: optional stdlib-only home server helper.
   - It serves the folder (never dotfiles, `.py` or `.md`) and proxies a fixed allowlist of hosts under `/proxy/<name>/…`.
   - It holds the train and tram keys from `.env` or the environment: `RTT_TOKEN` or `RTT_REFRESH_TOKEN`, and `TFGM_KEY`. `GET /proxy/status` says which are set.

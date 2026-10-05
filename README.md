@@ -40,6 +40,7 @@ To see the cockpit in any weather, add it to the link. For example, `display.htm
 - `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;
 - `phase`: dawn, day, dusk or night;
 - `price`: any Agile price in pence;
+- `detail`: `low` or `high`, to try the screensaver's lighter or full detail;
 - `show`: bring things into view straight away, such as `show=train,house,aurora,comet`. Also `whales`, `jellies`, `birds`, `iss`, `moon`, `traffic` and `flyby`, and with real data, `mytrain` (your train at the platform), `dock` (cheap power now) and `front` (rain on the way).
 
 | On a TV remote or keyboard | What it does |
@@ -79,6 +80,7 @@ Your address is never published: only the dates are. GitHub pauses scheduled job
 - choose the mode the screen opens on;
 - rotate between energy, home and travel;
 - set when the screensaver and night clock start;
+- choose the screensaver's detail: automatic (lighter on TVs and on any screen that can't keep up), full, or lighter for a slow TV;
 - change the bins for that screen (one known collection date and how often each comes);
 - add your calendar's secret iCal address;
 - pick your station and tram stop, and how long the walk is.
