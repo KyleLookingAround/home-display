@@ -19,9 +19,10 @@
 | Now's twelve-hour strip | **Energy, plus markers** | The price curve and carbon, with small markers for rain, the next event and the next train. |
 | Card corners | **Show both** | The mock-ups show sharp (3–4px) and rounded (14px) side by side; Kyle picks. |
 | Appliances first in "Run it now or later?" | **No preference** | Default: washing machine, dishwasher, tumble dryer (the long, movable loads). Changeable in Settings › Appliances. |
+| Anything to drop? | **The EPC search** | The rating is known: E. The certificate stays as a note; nothing else is dropped. |
 | The TV | **Working; leave it for now** | The display stays as it is while the phone pages are redesigned. Rebuilding its modes waits until it's wanted. |
 
-Still open: see [the question](#questions-still-open) at the end.
+Nothing is open now.
 
 ## Where things stand
 
@@ -95,7 +96,8 @@ Principles for every screen:
 | Compare | Solar simulator | **Home › Upgrades › Solar** |
 | Home | Change log | **Home › Changes** (still marked on the Usage chart) |
 | Home | Insulation and heating plan | **Home › Upgrades › Insulation** |
-| Home | EPC ratings, notes, search | **Home › Upgrades › Certificate** |
+| Home | EPC ratings and notes | **Home › Upgrades › Certificate**: E now, with the potential rating and the recommendations |
+| Home | EPC search | **Dropped.** Kyle knows the rating (E), and the search only worked through the home server helper. `src/lib/epc.js` and the helper's EPC route go too. |
 | Home | CSV export, helper notes, install tips | **Settings › Data** |
 
 ### The display today
@@ -173,7 +175,7 @@ Each page opens on its answer; everything below it scrolls. Sections marked *(fo
    - battery;
    - solar;
    - insulation;
-   - certificate (EPC).
+   - certificate (EPC): the rating, E, with its potential and the recommendations noted, and which upgrades would move it up.
 
    Each card shows three numbers: a year's saving, the cost, the payback. The cards are worked out from sensible defaults, so they show an answer before any form is touched.
 3. **Changes:** the change log, with each entry's before and after.
@@ -290,4 +292,4 @@ Later, when wanted:
 
 ## Questions still open
 
-1. **Anything to drop?** For example the EPC search, or a simulator you'd never use. Less to redesign means a sharper result. If nothing, everything moves across as the table says.
+None. The plan is ready for step 1, the mock-ups, when Kyle says so.
