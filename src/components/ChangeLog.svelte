@@ -4,7 +4,7 @@
   import { app, keep } from '../state/app.svelte.js';
   import { boot } from '../state/session.js';
   import { addDays, dayKey, keyDate, longDate, startOfDay } from '../lib/format.js';
-  onMount(() => { date = dayKey(Date.now()); boot(); });
+  onMount(() => { if (!date) date = dayKey(Date.now()); boot(); });   // a date typed before the page was ready stays
   let date = $state(''), text = $state('');
   function avgDaily(rows, from, to){
     const s = +from, e = +to, days = new Set(); let t = 0;

@@ -2,6 +2,8 @@ name: Check and publish
 
 # Every push and pull request is checked. Pushes to main are also published to GitHub Pages,
 # locked with the SITE_PASSWORD secret when it's set (see README, "Publishing").
+# The redesign branch, while it exists, is published alongside at /preview/: a push to it, once checked,
+# asks for a fresh run on main, which builds both (only main may deploy to Pages).
 on:
   push:
   pull_request:
@@ -41,15 +43,41 @@ jobs:
         env:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         run: lock/publish.sh _site
+      - name: Preview the redesign branch at /preview/
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
+        run: |
+          if git ls-remote --exit-code --heads origin redesign >/dev/null; then
+            git fetch --depth 1 origin redesign
+            git worktree add /tmp/redesign FETCH_HEAD
+            (cd /tmp/redesign && npm ci --no-audit --no-fund && lock/publish.sh /tmp/redesign-site)
+            mkdir -p _site/preview && cp -R /tmp/redesign-site/. _site/preview/
+            echo "The redesign branch is previewed at /preview/."
+          fi
       - name: Next bin collections from Stockport Council
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           STOCKPORT_UPRN: ${{ secrets.STOCKPORT_UPRN }}
-        run: node scripts/bins.mjs _site/bins.json
+        run: |
+          node scripts/bins.mjs _site/bins.json
+          if [ -d _site/preview ] && [ -f _site/bins.json ]; then cp _site/bins.json _site/preview/; fi
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         with:
           path: _site
+
+  preview:
+    name: Ask main to republish with the redesign preview
+    if: github.event_name == 'push' && github.ref == 'refs/heads/redesign'
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
   deploy:
     name: Publish to GitHub Pages

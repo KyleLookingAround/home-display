@@ -379,9 +379,12 @@ test('dashboard: every page works on a phone and a TV, with example data labelle
   }
 });
 
+// Astro islands start once their scripts load: wait for every one before touching its controls.
+const ready = page => page.waitForFunction(() => document.querySelectorAll('astro-island').length > 0 && !document.querySelector('astro-island[ssr]'));
+
 test('dashboard: the controls work', async () => {
   const { page, ctx, errors } = await open('/index.html', { settings: null, withHelper: false });
-  await page.waitForFunction(() => /Example data/.test(document.getElementById('status').textContent));
+  await page.waitForFunction(() => /Example data/.test(document.getElementById('status').textContent)); await ready(page);
   // the period and the units
   await page.click('[aria-label="Period"] >> text=7 days');
   await page.waitForFunction(() => document.querySelectorAll('.chart svg')[0] && document.querySelectorAll('.chart svg')[0].querySelectorAll('.hit').length === 7);
@@ -390,18 +393,18 @@ test('dashboard: the controls work', async () => {
   await page.locator('.chart').first().focus(); await page.keyboard.press('ArrowLeft');
   assert.match(await page.textContent('.readline'), /—/, 'arrow keys read another day');
   // the period is kept for the next page
-  await page.goto(`${base}/patterns.html`);
+  await page.goto(`${base}/patterns.html`); await ready(page);
   await page.waitForFunction(() => document.querySelector('[aria-label="Period"] [aria-pressed="true"]'));
   assert.equal(await page.textContent('[aria-label="Period"] [aria-pressed="true"]'), '7 days');
   // the change log, shown on the daily chart
-  await page.goto(`${base}/home.html`);
+  await page.goto(`${base}/home.html`); await ready(page);
   await page.fill('#clDate', '2026-10-01'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('text=Add to log');
   await page.waitForSelector('text=Loft insulation topped up');
   await page.check('#m-loft'); await page.waitForSelector('text=could cut heating');
   await page.goto(`${base}/index.html`);
   await page.waitForFunction(() => document.querySelector('.chart .mark'));
   // the comparison feeds the battery's tariffs
-  await page.goto(`${base}/compare.html`);
+  await page.goto(`${base}/compare.html`); await ready(page);
   await page.click('text=Run comparison');
   await page.waitForSelector('text=Cheapest');
   assert.ok(await page.locator('#bTariff option').count() >= 3, 'the battery offers the compared tariffs');
@@ -413,7 +416,7 @@ test('dashboard: the controls work', async () => {
   await page.click('text=Connect account'); await page.waitForSelector('#acct');
   await page.click('.settings >> text=Close'); assert.equal(await page.locator('#acct').count(), 0);
   // Prices: the region, and an activity's kWh
-  await page.goto(`${base}/prices.html`);
+  await page.goto(`${base}/prices.html`); await ready(page);
   await page.waitForSelector('#region');
   await page.locator('td input.kwh').first().fill('3'); await page.locator('td input.kwh').first().dispatchEvent('change');
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.acts') || '{}')[Object.keys(JSON.parse(localStorage.getItem('hse.acts') || '{}'))[0]]), 3);
