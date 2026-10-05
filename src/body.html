@@ -1,0 +1,280 @@
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <p class="eyebrow" id="acctLabel">Mission control · not connected</p>
+      <h1>Harold Street Energy</h1>
+    </div>
+    <div class="actions">
+      <span id="status" class="pill demo">Example data</span>
+      <button class="btn" id="wallBtn" type="button">Wall display</button>
+      <button class="btn" id="refreshBtn" type="button">Refresh</button>
+      <button class="btn primary" id="settingsBtn" type="button">Connect account</button>
+    </div>
+  </header>
+
+  <section class="panel settings" id="settings" hidden aria-labelledby="settingsTitle">
+    <h2 id="settingsTitle">Connect your Octopus account</h2>
+    <form id="settingsForm" class="grid" autocomplete="off">
+      <div class="field"><label for="acct">Account number</label><input id="acct" class="mono" placeholder="A-1234ABCD" required></div>
+      <div class="field"><label for="apikey">API key</label><input id="apikey" class="mono" type="password" placeholder="sk_live_…" required></div>
+      <div class="field"><label for="gasunit">Gas meter reports in</label>
+        <select id="gasunit"><option value="m3">Cubic metres (newer SMETS2 smart meter)</option><option value="kwh">kWh (older SMETS1 smart meter)</option></select></div>
+      <div class="field"><label for="paymethod">How you pay</label>
+        <select id="paymethod"><option value="DIRECT_DEBIT">Direct Debit</option><option value="NON_DIRECT_DEBIT">Prepay / on receipt of bill</option></select></div>
+      <label class="check" for="remember"><input id="remember" type="checkbox" checked> Remember on this device</label>
+      <div class="form-actions">
+        <button class="btn primary" type="submit">Save and load</button>
+        <button class="btn" type="button" id="forgetBtn">Forget my details</button>
+        <button class="btn" type="button" id="closeSettings">Close</button>
+      </div>
+      <p class="help">Find both in your Octopus online account under Personal details → API access (<a href="https://octopus.energy/dashboard/new/accounts/personal-details/api-access" target="_blank" rel="noopener">open it</a>). The key stays in this browser and only goes to Octopus, directly or through your own home server helper.</p>
+    </form>
+  </section>
+
+  <div id="notice" class="notice" hidden></div>
+  <div id="alert" class="notice alert" hidden></div>
+
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="patterns" aria-selected="false">Patterns</button>
+    <button role="tab" data-tab="prices" aria-selected="false">Prices</button>
+    <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    <button role="tab" data-tab="home" aria-selected="false">Home</button>
+  </nav>
+
+  <!-- ================= OVERVIEW ================= -->
+  <section class="tabpanel" data-panel="overview" role="tabpanel">
+    <div class="grid2" id="tariffs"></div>
+
+    <div class="periodbar">
+      <div class="seg" role="group" aria-label="Period">
+        <button type="button" data-days="7" aria-pressed="false">7 days</button>
+        <button type="button" data-days="30" aria-pressed="true">30 days</button>
+        <button type="button" data-days="90" aria-pressed="false">90 days</button>
+      </div>
+      <p class="muted mono small" id="rangeLabel"></p>
+    </div>
+    <div class="totals" id="totals"></div>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><p class="panel-eyebrow">Telemetry · per day</p><h2>Daily use</h2><p class="muted small">Tap a day for the breakdown. Purple lines are changes from your log on the Home tab.</p></div>
+        <div class="seg" role="group" aria-label="Show"><button type="button" data-unit="gbp" aria-pressed="true">£</button><button type="button" data-unit="kwh" aria-pressed="false">kWh</button></div>
+      </div>
+      <div class="legend"><span><i style="background:var(--elec)"></i>Electricity</span><span><i style="background:var(--gas)"></i>Gas</span></div>
+      <div class="chart" id="dailyChart" tabindex="0"></div>
+      <p class="readline" id="dailyRead"></p>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <p class="panel-eyebrow">Navigation · this month</p><h2>Bill tracker</h2>
+        <div id="monthOut"></div>
+        <div class="inputs">
+          <div class="field"><label for="ddAmount">Your monthly Direct Debit (£)</label><input id="ddAmount" type="number" min="0" step="1" inputmode="decimal" placeholder="e.g. 120"></div>
+        </div>
+        <div id="ddOut" class="prose"></div>
+      </section>
+      <section class="panel">
+        <p class="panel-eyebrow">Countdown · Ofgem price cap</p><h2>Next price change</h2>
+        <div id="capOut"></div>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="panel">
+        <p class="panel-eyebrow">Rewards · Octoplus</p><h2>Saving Sessions and points</h2>
+        <div id="rewardsOut"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head"><div><p class="panel-eyebrow">Captain's log · weekly</p><h2>Mission log</h2></div><button class="btn small" id="copyLog" type="button">Copy</button></div>
+        <div id="logOut"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= PATTERNS ================= -->
+  <section class="tabpanel" data-panel="patterns" role="tabpanel" hidden>
+    <section class="panel">
+      <p class="panel-eyebrow">Orbit · electricity, 24 hours</p><h2>When you use electricity</h2>
+      <p class="muted small">Average kWh in each half hour across the selected period.</p>
+      <div class="legend"><span><i style="background:var(--band-cheap);outline:1px solid var(--good)"></i>Typical cheap overnight window 00:30–05:30</span><span><i style="background:var(--band-peak);outline:1px solid var(--bad)"></i>Peak 16:00–19:00</span></div>
+      <div class="chart" id="profChart" tabindex="0"></div>
+      <p class="readline" id="profRead"></p>
+      <div class="chips" id="insights"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Orbit · gas, 24 hours</p><h2>Boiler schedule check</h2>
+      <p class="muted small">Average gas in each half hour. Heating and hot water show up as blocks.</p>
+      <div class="chart" id="gasChart" tabindex="0"></div>
+      <p class="readline" id="gasRead"></p>
+      <div id="heatingOut" class="prose"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Anomaly scan</p><h2>Spike detective</h2>
+      <div id="spikesOut" class="grid2"></div>
+    </section>
+
+    <div class="grid2">
+      <section class="panel">
+        <p class="panel-eyebrow">Emissions · selected period</p><h2>Carbon footprint</h2>
+        <div id="co2Out"></div>
+      </section>
+      <section class="panel">
+        <p class="panel-eyebrow">Atmosphere · Stockport</p><h2>Gas and the weather</h2>
+        <div class="chart" id="weatherChart" style="min-height:220px"></div>
+        <div id="weatherOut" class="prose"></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- ================= PRICES ================= -->
+  <section class="tabpanel" data-panel="prices" role="tabpanel" hidden>
+    <section class="panel">
+      <p class="panel-eyebrow">Live feed · Octopus Home Mini</p><h2>Right now</h2>
+      <div id="liveOut"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><p class="panel-eyebrow">Market feed · half-hourly</p><h2>Agile prices</h2><p class="muted small" id="agileSub"></p></div>
+        <label class="check" for="region">Region <select id="region" class="inline"></select></label>
+      </div>
+      <div class="legend"><span><i style="background:var(--neg)"></i>Below 0p</span><span><i style="background:var(--good)"></i>Under 15p</span><span><i style="background:var(--warn)"></i>15–25p</span><span><i style="background:var(--bad)"></i>25p and over</span></div>
+      <div class="chart" id="agileChart" tabindex="0"></div>
+      <p class="readline" id="agileRead"></p>
+      <div class="chips" id="agileChips"></div>
+      <div class="actions"><button class="btn small" id="notifyBtn" type="button">Notify me about negative prices</button><span class="muted small" id="notifyState"></span></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Grid scan · next 48 hours</p><h2>How green is the grid</h2>
+      <p class="muted small">Forecast carbon intensity for your region in grams of CO₂ per kWh, from National Grid.</p>
+      <div class="legend"><span><i style="background:var(--neg)"></i>Very low</span><span><i style="background:var(--good)"></i>Low</span><span><i style="background:var(--warn)"></i>Moderate</span><span><i style="background:var(--bad)"></i>High</span></div>
+      <div class="chart" id="ciChart" tabindex="0"></div>
+      <p class="readline" id="ciRead"></p>
+      <div class="chips" id="ciChips"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Launch window</p><h2>Best time to run</h2>
+      <div class="inputs"><div class="field"><label for="bestSel">Appliance</label><select id="bestSel"></select></div></div>
+      <div id="bestOut" class="chips"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Unit costs</p><h2>What things cost</h2>
+      <p class="muted small">Edit the kWh to match your appliances. Your changes are remembered on this device.</p>
+      <div class="tbl-wrap"><table id="actTable"></table></div>
+    </section>
+  </section>
+
+  <!-- ================= COMPARE ================= -->
+  <section class="tabpanel" data-panel="compare" role="tabpanel" hidden>
+    <section class="panel">
+      <div class="panel-head">
+        <div><p class="panel-eyebrow">Trajectory analysis</p><h2>Tariff comparison</h2><p class="muted small">Your real half-hourly electricity, priced on each Octopus tariff for your region. Gas isn't included.</p></div>
+        <button class="btn primary small" id="cmpBtn" type="button">Run comparison</button>
+      </div>
+      <div id="cmpOut"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Power cell simulation</p><h2>Home battery</h2>
+      <p class="muted small">Replays your readings: the battery charges in cheap half hours and covers your use later in the same day. One cycle a day, so treat it as an estimate.</p>
+      <div class="inputs">
+        <div class="field"><label for="bCap">Usable capacity (kWh)</label><input id="bCap" type="number" min="1" step="0.5" value="5"></div>
+        <div class="field"><label for="bPow">Power (kW)</label><input id="bPow" type="number" min="0.5" step="0.5" value="3"></div>
+        <div class="field"><label for="bEff">Round-trip efficiency (%)</label><input id="bEff" type="number" min="50" max="100" step="1" value="90"></div>
+        <div class="field"><label for="bCost">Installed cost (£)</label><input id="bCost" type="number" min="0" step="100" value="4000"></div>
+        <div class="field"><label for="bTariff">Tariff</label><select id="bTariff"></select></div>
+      </div>
+      <div id="bOut"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Solar array simulation</p><h2>Solar panels</h2>
+      <p class="muted small" id="solarSrc">Uses your average day of electricity use and typical sunshine for Stockport.</p>
+      <div class="inputs">
+        <div class="field"><label for="sSouth">South-facing panels</label><input id="sSouth" type="number" min="0" step="1" value="4"></div>
+        <div class="field"><label for="sNorth">North-facing panels</label><input id="sNorth" type="number" min="0" step="1" value="4"></div>
+        <div class="field"><label for="sWatt">Watts per panel</label><input id="sWatt" type="number" min="100" step="5" value="430"></div>
+        <div class="field"><label for="sAngle">Roof pitch (°)</label><input id="sAngle" type="number" min="0" max="70" step="1" value="35"></div>
+        <div class="field"><label for="sBatt">Battery (kWh, 0 for none)</label><input id="sBatt" type="number" min="0" step="0.5" value="0"></div>
+        <div class="field"><label for="sCost">Installed cost (£)</label><input id="sCost" type="number" min="0" step="100" value="6000"></div>
+        <div class="field"><label for="sExport">Export rate</label><select id="sExport"></select></div>
+      </div>
+      <div class="chart" id="solarChart"></div>
+      <p class="readline" id="solarRead"></p>
+      <div id="sOut"></div>
+    </section>
+  </section>
+
+  <!-- ================= HOME ================= -->
+  <section class="tabpanel" data-panel="home" role="tabpanel" hidden>
+    <section class="panel">
+      <p class="panel-eyebrow">Ship's log · changes</p><h2>Change log</h2>
+      <p class="muted small">Note what you change at home. Each entry appears on the daily chart, with average use for two weeks before and after.</p>
+      <form id="clForm" class="grid">
+        <div class="field"><label for="clDate">Date</label><input id="clDate" type="date" required></div>
+        <div class="field" style="grid-column:span 2"><label for="clText">What changed</label><input id="clText" placeholder="e.g. Boiler flow temperature down to 55°C" required></div>
+        <div class="form-actions"><button class="btn primary small" type="submit">Add to log</button></div>
+      </form>
+      <div id="clOut"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Hull integrity</p><h2>Insulation and heating plan</h2>
+      <p class="muted small">Based on how your gas use rises as it gets colder. The savings per measure are rough rules of thumb, so check them against your EPC.</p>
+      <div class="measures" id="measures"></div>
+      <div id="planOut" class="prose"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Certification</p><h2>Energy Performance Certificate</h2>
+      <div class="inputs">
+        <div class="field"><label for="epcCur">Current rating</label><select id="epcCur"></select></div>
+        <div class="field"><label for="epcPot">Potential rating</label><select id="epcPot"></select></div>
+      </div>
+      <div class="field"><label for="epcNotes">Recommended improvements from your certificate</label><textarea id="epcNotes" placeholder="Paste or type the recommendations here"></textarea></div>
+      <div id="epcBadge"></div>
+      <p class="muted small">Look up your certificate on <a href="https://find-energy-certificate.service.gov.uk/find-a-certificate/search-by-postcode" target="_blank" rel="noopener">find-energy-certificate.service.gov.uk</a>. With the home server helper running, you can also search the government's data service here.</p>
+      <form id="epcForm" class="grid">
+        <div class="field"><label for="epcPostcode">Postcode</label><input id="epcPostcode" class="mono" placeholder="SK1 …"></div>
+        <div class="field"><label for="epcToken">EPC data service token</label><input id="epcToken" class="mono" type="password" placeholder="From your EPC data account"></div>
+        <div class="form-actions"><button class="btn small" type="submit">Search certificates</button></div>
+      </form>
+      <div id="epcOut"></div>
+    </section>
+
+    <section class="panel">
+      <p class="panel-eyebrow">Systems</p><h2>Data and setup</h2>
+      <div id="srvOut" class="prose"></div>
+      <div class="actions"><button class="btn small" id="csvBtn" type="button">Download readings (CSV)</button></div>
+      <div class="prose small muted">
+        <p><b>Put it on your phone.</b> Open the page from your home server, then use Share → Add to Home Screen on iPhone, or the menu → Install app / Add to home screen in Chrome on Android.</p>
+        <p><b>Wall display.</b> The Wall display button gives a full-screen view for an old tablet or a spare screen. It refreshes itself every minute.</p>
+      </div>
+    </section>
+  </section>
+
+  <footer>
+    <p>All prices include VAT. Gas in cubic metres is converted to kWh with a volume correction of 1.02264 and a calorific value of 39.5 MJ/m³, so gas figures are close estimates. Smart meter readings arrive a day behind, so charts cover full days up to yesterday.</p>
+    <p>Simulations, projections and savings are estimates to help you decide what to look into. They aren't financial advice or quotes.</p>
+  </footer>
+</div>
+
+<div class="wall" id="wall" hidden>
+  <div class="wall-top"><span class="eyebrow">Harold Street · live</span><span class="wall-clock" id="wallClock">--:--</span><div class="wall-actions"><button class="btn" id="wallFs" type="button">Full screen</button><button class="btn" id="wallClose" type="button">Close</button></div></div>
+  <div class="wall-main">
+    <span class="wall-sub" id="wallLabel">Agile price now</span>
+    <span class="wall-price" id="wallPrice">--</span>
+    <span class="wall-sub" id="wallNext"></span>
+  </div>
+  <div class="wall-row" id="wallRow"></div>
+</div>
