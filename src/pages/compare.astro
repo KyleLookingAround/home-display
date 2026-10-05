@@ -1,0 +1,11 @@
+---
+import Dashboard from '../layouts/Dashboard.astro';
+import TariffCompare from '../components/TariffCompare.svelte';
+import Battery from '../components/Battery.svelte';
+import Solar from '../components/Solar.svelte';
+---
+<Dashboard page="compare" title="Compare">
+  <TariffCompare client:load />
+  <Battery client:load />
+  <Solar client:load />
+</Dashboard>

@@ -4,6 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Update:** the dashboard moved to Astro and Svelte (roadmap item 2). Its five tabs are pages of small islands sharing one state, and the account's data is cached in the browser, so moving between pages doesn't fetch it again. The data code became ES modules in `src/lib/`, which the display's build flattens as before ([0009](decisions/0009-astro-dashboard.md)).
+- **Deprecation:** `index.html` as a committed single file, and `src/core.js`, `src/analysis.js`, `src/dom.js`, `src/head.html` and `src/body.html`. Their code lives on in `src/lib/`, `src/components/`, `src/pages/` and `src/styles/`.
 - **Update:** the screensaver draws within a TV's means. The far sky is baked into one backdrop, the aurora is painted small and stretched, and screens step down through tiers of detail when they can't keep up (TVs start lower; Settings has "Screensaver detail"). It's about six times faster on a slow screen. Far billboards and the steel truss are gone, and billboards turn less ([0008](decisions/0008-drawing-for-tvs.md)).
 - **Finding:** on a TV-speed CPU, over 80% of each frame went on the browser painting five full-screen layers that barely moved, an aurora of 480 strips, and a starfield hidden behind the screensaver.
 - **Creation:** the road ahead. The next twelve hours are laid along the window: a landscape whose height is the Agile price, cloud banks over the hours rain is due, calendar events as beacons, and a fuel dock over the cheapest two hours. When it's nearly time to leave, the Express becomes your train and stops at the platform. The cabin has dials for live draw, today's cost against a usual day, and grid carbon ([0007](decisions/0007-time-is-distance.md)).

@@ -1,0 +1,15 @@
+---
+import Dashboard from '../layouts/Dashboard.astro';
+import Live from '../components/Live.svelte';
+import Agile from '../components/Agile.svelte';
+import GridCarbon from '../components/GridCarbon.svelte';
+import BestTime from '../components/BestTime.svelte';
+import Activities from '../components/Activities.svelte';
+---
+<Dashboard page="prices" title="Prices">
+  <Live client:load />
+  <Agile client:load />
+  <GridCarbon client:load />
+  <BestTime client:load />
+  <Activities client:load />
+</Dashboard>

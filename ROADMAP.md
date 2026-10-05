@@ -74,14 +74,17 @@ On a TV, typing a password with a remote is painful. Options:
 
 **Chosen:** StatiCrypt, with a numeric PIN on an on-screen keypad and "Remember this screen" (see `lock/`). The repository is public, so the lock hides the published site, not the code. A short PIN keeps visitors out but could be guessed offline by someone determined, which is acceptable because no secrets are in the pages. QR pairing isn't built. Cloudflare Access remains the upgrade if the site ever shows anything private.
 
-## 2. Move the dashboard to Astro
+## 2. Move the dashboard to Astro (built, October 2026)
 
-Rebuild the five tabs as Astro pages with small interactive islands. Svelte suits the charts and forms.
+The five tabs are Astro pages made of small Svelte islands ([decision 0009](docs/decisions/0009-astro-dashboard.md)).
+- `analysis.js` moved across as-is into `src/lib/`. `core.js` split into one module per service there.
+- The display's build flattens those modules, so the display is still one file for TV browsers.
+- The design tokens are a global stylesheet, `src/styles/dashboard.css`.
+- The islands share one state object. The account's data is cached in the browser, so moving between pages doesn't fetch it again.
 
-- `src/analysis.js` is already pure and can move across as-is into `src/lib/`, with tests.
-- `src/display/sources.js` is pure in the same way, apart from its loaders, and has its own tests.
-- `src/core.js` splits into one module per service.
-- The design tokens in `head.html` become a global stylesheet.
+Still to do here:
+- **More islands:** the panels still mirror the old tabs one for one. Now they're components, they can grow on their own. For example, a period chooser on any chart, or a comparison that remembers its last run.
+- `src/display/sources.js` is pure apart from its loaders and could become modules too. It isn't urgent: the display builds fine as it is.
 
 ## 3. A small backend
 

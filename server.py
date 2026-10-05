@@ -19,6 +19,9 @@ network: don't forward its port on your router.
     python3 server.py              # http://<this machine>:8787
     python3 server.py --port 9000  # pick another port
 
+The dashboard is built by Astro into dist/ (npm run build, once, on any machine). The helper serves it from
+there, and everything else (the display, household.json, the icons) from this folder.
+
 Needs Python 3.8 or newer and nothing else.
 """
 import argparse
@@ -33,6 +36,7 @@ import urllib.parse
 import urllib.request
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+DIST = os.path.join(ROOT, "dist")
 
 ROUTES = {
     "octopus": "https://api.octopus.energy",
@@ -106,6 +110,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=ROOT, **kwargs)
+
+    def translate_path(self, path):
+        # The built dashboard first (dist/), then this folder.
+        built = super().translate_path(path).replace(ROOT, DIST, 1)
+        return built if os.path.isfile(built) or os.path.isfile(os.path.join(built, "index.html")) else super().translate_path(path)
 
     extensions_map = {
         **http.server.SimpleHTTPRequestHandler.extensions_map,
@@ -220,6 +229,8 @@ def main():
     print(f"  On this machine:  http://localhost:{a.port}")
     print(f"  On your network:  http://{local_ip()}:{a.port}")
     print(f"  Display:          http://{local_ip()}:{a.port}/display.html")
+    if not os.path.isfile(os.path.join(DIST, "index.html")):
+        print("  The dashboard isn't built yet: run npm run build here, or copy a built dist/ folder in.")
     print(f"  Trains: {'token set' if keys['rtt'] else 'no RTT_TOKEN'}  ·  Trams: {'key set' if keys['tfgm'] else 'no TFGM_KEY'}")
     print("Press Ctrl+C to stop.")
     try:

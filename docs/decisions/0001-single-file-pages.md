@@ -1,6 +1,6 @@
 # 0001: Single-file pages, no bundler
 
-**Status:** accepted, October 2026
+**Status:** accepted, October 2026. The display still works this way. The dashboard moved to Astro: see [0009](0009-astro-dashboard.md).
 
 **Context.** The dashboard began as one HTML file that opens straight from disk. The household display has to run on old TV browsers, a wall tablet and phones, published on GitHub Pages and optionally served by `server.py`.
 

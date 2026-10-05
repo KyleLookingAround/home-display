@@ -1,0 +1,13 @@
+---
+import Dashboard from '../layouts/Dashboard.astro';
+import ChangeLog from '../components/ChangeLog.svelte';
+import InsulationPlan from '../components/InsulationPlan.svelte';
+import Certificate from '../components/Certificate.svelte';
+import DataSetup from '../components/DataSetup.svelte';
+---
+<Dashboard page="home" title="Home">
+  <ChangeLog client:load />
+  <InsulationPlan client:load />
+  <Certificate client:load />
+  <DataSetup client:load />
+</Dashboard>

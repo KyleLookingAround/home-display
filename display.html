@@ -453,7 +453,10 @@ body.night #stars{opacity:.12}
 <script>
 (() => {
 "use strict";
-/* ===================== core: constants, helpers, network, data loading ===================== */
+/* Constants, dates and formatting, shared by the dashboard and the display. Money is in pence; rates are p/kWh including VAT. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+
 const REGIONS = {A:'Eastern England',B:'East Midlands',C:'London',D:'Merseyside & North Wales',E:'West Midlands',F:'North East England',G:'North West England',H:'Southern England',J:'South East England',K:'South Wales',L:'South West England',M:'Yorkshire',N:'South Scotland',P:'North Scotland'};
 // Octopus region letter -> Carbon Intensity API region id
 const CI_REGION = {A:10,B:9,C:13,D:6,E:8,F:4,G:3,H:12,J:14,K:7,L:11,M:5,N:2,P:1};
@@ -495,6 +498,12 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Nullish default, written out: shared code also runs on TV browsers older than Chromium 80.
 const nz = (v, d) => v == null ? d : v;
 
+function niceStep(x){ if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x/p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+function niceScale(min, max, n = 4){ if (!(max > min)) max = min + 1; const step = niceStep((max-min)/n); return { lo: Math.floor(min/step)*step, hi: Math.ceil(max/step)*step, step }; }
+/* Browser helpers: element lookups, and per-device storage (keys prefixed hse.). */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+
 const $ = sel => document.querySelector(sel);
 const $$ = sel => [...document.querySelectorAll(sel)];
 /* Per-device storage. The dashboard and the display share it, so a key entered on one works on the other. */
@@ -505,14 +514,13 @@ const store = {
   getJ(k, d){ try { const v = localStorage.getItem('hse.' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
   setJ(k, v){ try { localStorage.setItem('hse.' + k, JSON.stringify(v)); } catch(e){} }
 };
-
-function niceStep(x){ if (!(x > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(x))); const n = x/p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
-function niceScale(min, max, n = 4){ if (!(max > min)) max = min + 1; const step = niceStep((max-min)/n); return { lo: Math.floor(min/step)*step, hi: Math.ceil(max/step)*step, step }; }
+/* The network layer: requests, the home server helper, and errors in plain words. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 
 /* ---------- network ---------- */
 class ApiError extends Error { constructor(code, msg){ super(msg || code); this.code = code; } }
 const NET = { proxy: false, creds: null, token: null, tokenAt: 0, keys: {} };
-const OCTO = 'https://api.octopus.energy';
 
 async function request(url, opts = {}){
   let res;
@@ -524,6 +532,31 @@ async function request(url, opts = {}){
   if (!res.ok) throw new ApiError('HTTP', `The service returned an error (${res.status}).`);
   return res.json();
 }
+async function detectProxy(){
+  if (location.protocol === 'file:') return false;
+  try { const r = await fetch('./proxy/ping', { cache: 'no-store' }); NET.proxy = r.ok && (await r.text()).trim() === 'ok'; }
+  catch(e){ NET.proxy = false; }
+  if (NET.proxy){
+    // Which service keys the helper holds (trains, trams). Older helpers don't answer this.
+    try { const r = await fetch('./proxy/status', { cache: 'no-store' }); if (r.ok) NET.keys = (await r.json()).keys || {}; } catch(e){}
+  }
+  return NET.proxy;
+}
+
+function errorText(e){
+  switch (e && e.code){
+    case 'NETWORK': return ['No signal.', NET.proxy ? 'The home server helper couldn\'t reach the service. Check its internet connection.' : 'Your browser couldn\'t reach the service. If this keeps happening, run the page through the home server helper (see the Home tab).'];
+    case 'AUTH': return ['Access was refused.', 'Check your Octopus API key. It starts with sk_live_ and the whole key is needed.'];
+    case 'NOTFOUND': return ['Not found.', 'Check your account number. It looks like A-1234ABCD.'];
+    case 'NOPROXY': return ['Needs the home server helper.', 'This service doesn\'t allow browsers to call it directly. Run server.py on your home server and open the page from there.'];
+    default: return ['Something went wrong.', (e && e.message) || ''];
+  }
+}
+/* Octopus Energy: REST (tariffs, consumption, products) and GraphQL (Home Mini, Saving Sessions, Octoplus). */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+
+const OCTO = 'https://api.octopus.energy';
 const octoUrl = path => {
   if (path.startsWith('http')) path = path.replace(/^http:/, 'https:').replace(OCTO, '');
   return (NET.proxy ? './proxy/octopus' : OCTO) + path;
@@ -537,16 +570,6 @@ async function octoAll(path, auth = false, maxPages = 8){
   let out = [], next = path, n = 0;
   while (next && n < maxPages){ const j = await octoGet(next, auth); out = out.concat(j.results || []); next = j.next; n++; }
   return out;
-}
-async function detectProxy(){
-  if (location.protocol === 'file:') return false;
-  try { const r = await fetch('./proxy/ping', { cache: 'no-store' }); NET.proxy = r.ok && (await r.text()).trim() === 'ok'; }
-  catch(e){ NET.proxy = false; }
-  if (NET.proxy){
-    // Which service keys the helper holds (trains, trams). Older helpers don't answer this.
-    try { const r = await fetch('./proxy/status', { cache: 'no-store' }); if (r.ok) NET.keys = (await r.json()).keys || {}; } catch(e){}
-  }
-  return NET.proxy;
 }
 
 /* ---------- rates ---------- */
@@ -761,6 +784,9 @@ async function loadRewards(){
   } catch(e){}
   return out;
 }
+/* National Grid's carbon intensity: the regional forecast and history. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 
 /* ---------- other services ---------- */
 async function loadCarbonForecast(regionId){
@@ -783,34 +809,10 @@ async function loadCarbonHistory(regionId, from, to){
   }
   return out.map(x => ({ from: x.from, to: x.to, p: x.v })).sort((a, b) => a.from - b.from);
 }
-async function loadWeather(){
-  const j = await request(`https://api.open-meteo.com/v1/forecast?latitude=${HOME.lat}&longitude=${HOME.lon}&daily=temperature_2m_mean&past_days=92&forecast_days=7&timezone=Europe%2FLondon`);
-  const map = new Map(), today = dayKey(Date.now());
-  ((j.daily && j.daily.time) || []).forEach((k, i) => { const v = j.daily.temperature_2m_mean[i]; if (v != null) map.set(k, { t: v, forecast: k >= today }); });
-  return map;
-}
-async function loadPVGIS(kwp, aspect, angle){
-  if (!NET.proxy) throw new ApiError('NOPROXY');
-  const j = await request(`./proxy/pvgis/v5_3/PVcalc?lat=${HOME.lat}&lon=${HOME.lon}&peakpower=${kwp}&loss=14&angle=${angle}&aspect=${aspect}&outputformat=json`);
-  const m = j.outputs && j.outputs.monthly && j.outputs.monthly.fixed;
-  if (!m || m.length !== 12) throw new ApiError('HTTP', 'PVGIS returned an unexpected answer.');
-  return m.map(x => x.E_m / kwp);
-}
-async function searchEPC(postcode, token){
-  if (!NET.proxy) throw new ApiError('NOPROXY');
-  return request(`./proxy/epc/domestic/search?postcode=${encodeURIComponent(postcode)}`, { headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } });
-}
+/* Analysis: pure functions with no DOM. Example data, the period roll-up, patterns, projections, comparisons and simulators. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
 
-function errorText(e){
-  switch (e && e.code){
-    case 'NETWORK': return ['No signal.', NET.proxy ? 'The home server helper couldn\'t reach the service. Check its internet connection.' : 'Your browser couldn\'t reach the service. If this keeps happening, run the page through the home server helper (see the Home tab).'];
-    case 'AUTH': return ['Access was refused.', 'Check your Octopus API key. It starts with sk_live_ and the whole key is needed.'];
-    case 'NOTFOUND': return ['Not found.', 'Check your account number. It looks like A-1234ABCD.'];
-    case 'NOPROXY': return ['Needs the home server helper.', 'This service doesn\'t allow browsers to call it directly. Run server.py on your home server and open the page from there.'];
-    default: return ['Something went wrong.', (e && e.message) || ''];
-  }
-}
-/* ===================== analysis: pure functions, no DOM ===================== */
 function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
 function makeDemo(){

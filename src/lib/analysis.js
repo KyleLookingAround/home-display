@@ -1,7 +1,12 @@
-/* ===================== analysis: pure functions, no DOM ===================== */
-function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+/* Analysis: pure functions with no DOM. Example data, the period roll-up, patterns, projections, comparisons and simulators. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+import { addDays, clamp, CO2_ELEC_FALLBACK, CO2_GAS, dayKey, DAYS_IN_MONTH, HOME, keyDate, kwh, median, MON, nz, slotOf, startOfDay, sum, TEMP_NORMALS } from './format.js';
+import { lookup, standingAt, unitPriceAt } from './octopus.js';
 
-function makeDemo(){
+export function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+export function makeDemo(){
   const rnd = mulberry32(19);
   const end = startOfDay(new Date()), from = addDays(end, -90);
   const elec = [], gas = [], agile = [], carbon = [];
@@ -49,7 +54,7 @@ function makeDemo(){
 }
 
 /* ---------- main roll-up for the selected period ---------- */
-function buildModel(raw, days){
+export function buildModel(raw, days){
   const end = startOfDay(new Date()), start = addDays(end, -days);
   const s = +start, e = +end;
   const list = [], idx = new Map();
@@ -115,7 +120,7 @@ function buildModel(raw, days){
 }
 
 /* ---------- patterns ---------- */
-function findSpikes(ehh){
+export function findSpikes(ehh){
   if (ehh.length < 48*5) return [];
   const bySlot = Array.from({length:48}, () => []);
   for (const x of ehh) bySlot[slotOf(x.t)].push(x.v);
@@ -124,7 +129,7 @@ function findSpikes(ehh){
     .filter(x => x.v > 3*x.base && x.v - x.base > 0.35)
     .sort((a, b) => (b.v - b.base) - (a.v - a.base)).slice(0, 8);
 }
-function oddDays(list){
+export function oddDays(list){
   const e = list.filter(d => d.eHas), g = list.filter(d => d.gHas);
   const me = median(e.map(d => d.e)), mg = median(g.map(d => d.g));
   const out = [];
@@ -132,7 +137,7 @@ function oddDays(list){
   for (const d of g) if (mg > 1 && d.g > mg*1.5) out.push({ date: d.date, fuel:'Gas', v: d.g, ratio: d.g/mg });
   return out.sort((a, b) => b.ratio - a.ratio).slice(0, 6);
 }
-function heatingWindows(gasProfile, ghh){
+export function heatingWindows(gasProfile, ghh){
   const max = Math.max(...gasProfile);
   if (!(max > 0.05)) return null;
   const on = gasProfile.map(v => v > max*0.3);
@@ -145,7 +150,7 @@ function heatingWindows(gasProfile, ghh){
 }
 
 /* ---------- weather and gas ---------- */
-function gasRegression(raw){
+export function gasRegression(raw){
   if (!raw.weather) return null;
   const byDay = new Map();
   for (const x of raw.gas) byDay.set(dayKey(x.t), (byDay.get(dayKey(x.t)) || 0) + x.v);
@@ -160,13 +165,13 @@ function gasRegression(raw){
   return { pts, a, b: Math.max(0, b), r2: sst > 0 ? 1 - ssr/sst : 0 };
 }
 /** Typical-year gas use from the regression: base (hot water, cooking) + heating × degree days. */
-function annualGas(reg, heatScale = 1){
+export function annualGas(reg, heatScale = 1){
   if (!reg || reg.a == null) return null;
   let base = 0, heat = 0;
   for (let m = 0; m < 12; m++){ const dm = DAYS_IN_MONTH(m); base += reg.a*dm; heat += reg.b * Math.max(0, 15.5 - TEMP_NORMALS[m]) * dm * heatScale; }
   return { base, heat, total: base + heat };
 }
-const MEASURES = [
+export const MEASURES = [
   { id:'loft',    label:'Top up loft insulation to 270mm', cut:.10 },
   { id:'cavity',  label:'Cavity wall insulation', cut:.20 },
   { id:'draught', label:'Draught-proof doors, windows and floors', cut:.07 },
@@ -175,7 +180,7 @@ const MEASURES = [
   { id:'flow',    label:'Lower boiler flow temperature to 55°C', cut:.05 },
   { id:'trv',     label:'Smart radiator valves, heat rooms only when used', cut:.06 }
 ];
-function insulationPlan(reg, chosen, gasRate){
+export function insulationPlan(reg, chosen, gasRate){
   const yr = annualGas(reg); if (!yr) return null;
   const keep = chosen.reduce((k, id) => { const m = MEASURES.find(x => x.id === id); return m ? k*(1-m.cut) : k; }, 1);
   const saved = yr.heat * (1 - keep);
@@ -183,7 +188,7 @@ function insulationPlan(reg, chosen, gasRate){
 }
 
 /* ---------- money ---------- */
-function monthProjection(raw){
+export function monthProjection(raw){
   const today = startOfDay(new Date()), first = new Date(today.getFullYear(), today.getMonth(), 1);
   const dim = DAYS_IN_MONTH(today.getMonth());
   const m = buildModelRange(raw, first, today);
@@ -192,7 +197,7 @@ function monthProjection(raw){
   const remaining = dim - (today.getDate() - 1);
   return { soFar: m.ec + m.gc, daysSoFar: today.getDate() - 1, remaining, projected: m.ec + m.gc + avg*remaining, avgDay: avg, month: MON[today.getMonth()] };
 }
-function buildModelRange(raw, from, to){
+export function buildModelRange(raw, from, to){
   const s = +from, e = +to; let ec = 0, gc = 0; const ed = new Set(), gd = new Set();
   for (const x of raw.elec) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.eSets, x.t); if (p != null) ec += x.v*p; ed.add(dayKey(x.t)); }
   for (const x of raw.gas) if (x.t >= s && x.t < e){ const p = unitPriceAt(raw.gSets, x.t); if (p != null) gc += x.v*p; gd.add(dayKey(x.t)); }
@@ -200,7 +205,7 @@ function buildModelRange(raw, from, to){
   for (const k of gd) gc += nz(standingAt(raw.gSets, +keyDate(k) + 432e5), 0);
   return { ec, gc, nE: ed.size, nG: gd.size };
 }
-function annualProjection(raw, reg){
+export function annualProjection(raw, reg){
   const now = Date.now(), end = startOfDay(new Date());
   const r30 = buildModelRange(raw, addDays(end, -30), end);
   const eRate = unitPriceAt(raw.eSets, now), gRate = unitPriceAt(raw.gSets, now);
@@ -216,7 +221,7 @@ function annualProjection(raw, reg){
   }
   return { elecP, gasP, total: elecP + gasP, gasMethod, eUse, gasUse: yr ? yr.total : null };
 }
-function nextCapChange(now = new Date()){
+export function nextCapChange(now = new Date()){
   const y = now.getFullYear();
   const cands = [0,3,6,9].map(m => new Date(y, m, 1)).concat([new Date(y+1, 0, 1)]).filter(d => d > now);
   const next = cands[0];
@@ -225,7 +230,7 @@ function nextCapChange(now = new Date()){
 }
 
 /* ---------- comparisons and simulations ---------- */
-function compareTariffs(raw, options, days = 90){
+export function compareTariffs(raw, options, days = 90){
   const end = +startOfDay(new Date()), start = +addDays(end, -days);
   const rows = raw.elec.filter(x => x.t >= start && x.t < end);
   if (!rows.length) return null;
@@ -254,7 +259,7 @@ function compareTariffs(raw, options, days = 90){
 }
 
 /** One charge-discharge cycle a day: buy cheap slots, cover dearer later demand. Estimate only. */
-function simulateBattery(raw, priceAt, cap, powerKw, eff, days = 90){
+export function simulateBattery(raw, priceAt, cap, powerKw, eff, days = 90){
   const end = +startOfDay(new Date()), start = +addDays(end, -days);
   const byDay = new Map();
   for (const x of raw.elec){ if (x.t < start || x.t >= end) continue; const p = priceAt(x.t); if (p == null) continue; const k = dayKey(x.t); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push({ t: x.t, d: x.v, p }); }
@@ -283,7 +288,7 @@ function simulateBattery(raw, priceAt, cap, powerKw, eff, days = 90){
 }
 
 /** Share of a day's sunshine falling in each half hour, for a mid-month day. */
-function solarShape(month){
+export function solarShape(month){
   const n = Math.round(30.4*month + 15), lat = HOME.lat * Math.PI/180;
   const dec = 23.44*Math.PI/180 * Math.sin(2*Math.PI*(284+n)/365);
   const w0 = Math.acos(clamp(-Math.tan(lat)*Math.tan(dec), -1, 1));
@@ -294,7 +299,7 @@ function solarShape(month){
   const s = sum(w) || 1;
   return w.map(v => v/s);
 }
-function simulateSolar({ profile, monthlyKwh, importP, exportP, batteryKwh = 0, eff = 0.9 }){
+export function simulateSolar({ profile, monthlyKwh, importP, exportP, batteryKwh = 0, eff = 0.9 }){
   let gen = 0, self = 0, fromBatt = 0, exp = 0;
   const months = [];
   for (let m = 0; m < 12; m++){
@@ -312,7 +317,7 @@ function simulateSolar({ profile, monthlyKwh, importP, exportP, batteryKwh = 0, 
   return { gen, self, fromBatt, exp, savedP, useShare: gen ? (self+fromBatt)/gen : 0, months };
 }
 
-function cheapestWindow(rates, slots, now = Date.now()){
+export function cheapestWindow(rates, slots, now = Date.now()){
   const fut = rates.filter(r => r.to > now && r.from >= now - 1800e3);
   let best = null;
   for (let i = 0; i + slots - 1 < fut.length; i++){
@@ -325,7 +330,7 @@ function cheapestWindow(rates, slots, now = Date.now()){
 }
 
 /* ---------- weekly log ---------- */
-function weekLog(raw){
+export function weekLog(raw){
   const end = startOfDay(new Date());
   const wk = (a, b) => {
     const s = +addDays(end, a), e = +addDays(end, b);
@@ -346,7 +351,7 @@ function weekLog(raw){
 }
 
 /* ---------- activities ---------- */
-const ACTIVITIES = [
+export const ACTIVITIES = [
   { id:'kettle', label:'Kettle, full boil', fuel:'e', kwh:0.11 },
   { id:'wash', label:'Washing machine, 40°C load', fuel:'e', kwh:0.8, hours:2 },
   { id:'dish', label:'Dishwasher, eco cycle', fuel:'e', kwh:0.9, hours:3 },
@@ -362,7 +367,7 @@ const ACTIVITIES = [
   { id:'heat', label:'Central heating, 1 hour', fuel:'g', kwh:4.0 }
 ];
 
-function toCSV(raw){
+export function toCSV(raw){
   const g = new Map(raw.gas.map(x => [x.t, x.v]));
   const times = [...new Set([...raw.elec.map(x=>x.t), ...raw.gas.map(x=>x.t)])].sort((a,b)=>a-b);
   const e = new Map(raw.elec.map(x => [x.t, x.v]));

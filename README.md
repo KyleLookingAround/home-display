@@ -2,7 +2,7 @@
 
 A home energy dashboard for your Octopus account, and a household display for the wall tablet, phones and the TV.
 
-- **Dashboard** (`index.html`): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
+- **Dashboard** (`index.html` and four more pages: Patterns, Prices, Compare, Home): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house. Your account's data is kept in the browser for half an hour, so moving between pages is quick; Refresh fetches it again.
 - **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
   - **Screensaver: the voyage.** You're sitting in a ship's cabin, looking out of a side window as space goes by. It's what a screen shows when nobody's using it.
     - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, nebulae, planets and traffic give it depth.
@@ -111,8 +111,8 @@ These need a small server: the backend in `ROADMAP.md` item 3, or `server.py` on
 
 ## Running the helper on a home server (optional)
 
-1. Copy this whole folder to the server.
-2. Run `python3 server.py` (Python 3.8+, nothing to install).
+1. Copy this whole folder to the server, with the dashboard built: run `npm install` and `npm run build` there (Node 22.12 or newer), or build it elsewhere and copy the `dist/` folder in.
+2. Run `python3 server.py` (Python 3.8+, nothing else to install).
 3. Open the address it prints, such as `http://192.168.1.20:8787`, or `http://192.168.1.20:8787/display.html` for the display, on any device at home.
 4. On your phone, use Add to Home Screen to install either one like an app.
 
@@ -163,7 +163,7 @@ Then run `sudo systemctl enable --now harold-energy`.
 
 ## Publishing
 
-Every push to `main` is checked (`npm run ci`) and published to GitHub Pages by `.github/workflows/pages.yml`. Only the two pages, `household.json`, the manifests and the icons are published, not the source or the helper.
+Every push to `main` is checked (`npm run ci`) and published to GitHub Pages by `.github/workflows/pages.yml`. Only the dashboard's pages and their scripts, the display, `household.json`, the manifests and the icons are published, not the source or the helper.
 
 **The lock.** Add a repository secret called `SITE_PASSWORD` (Settings → Secrets and variables → Actions). It can be a numeric PIN. From the next push, the published pages are encrypted with StatiCrypt. They open with an on-screen keypad you can drive with the TV remote's arrows, and "Remember this screen" means each device asks only once. Without the secret the site is published unlocked, and the workflow says so.
 
@@ -191,14 +191,15 @@ If one of these shows an error, the rest keeps working.
 
 | Path | What it is |
 |---|---|
-| `index.html`, `display.html` | The dashboard and the display. Built from `src/`; don't edit them directly. |
-| `src/` | Dashboard source: styles, markup, data code, analysis, interface, starfield. |
+| `display.html` | The display, built from `src/`; don't edit it directly. It opens straight from disk. |
+| `src/lib/` | The data code both use: Octopus, the grid, the weather, PVGIS, EPC, and the analysis. |
+| `src/pages/`, `src/components/`, `src/layouts/`, `src/state/`, `src/styles/` | The dashboard: Astro pages made of Svelte panels, their shared state and cache, and its look. |
 | `src/display/` | Display source: styles, markup, household data sources, the cockpit, modes and remote control. |
-| `build.py` | `python3 build.py` rebuilds both pages from `src/`. |
+| `build.py`, `astro.config.mjs` | `npm run build` builds the display (`build.py`) and the dashboard (Astro, into `dist/`). `npm run dev` serves the dashboard while you work on it. |
 | `server.py` | Home server helper. |
 | `lock/` | The lock screen template and `publish.sh`, which builds the folder Pages publishes. |
 | `household.json` | Settings every screen shares. |
-| `package.json` | `npm test`, `npm run test:browser`, `npm run shots` (screenshots in `tests/screens/`) and `npm run ci` (everything CI runs). |
+| `package.json` | `npm run build`, `npm run dev`, `npm test`, `npm run test:browser`, `npm run shots` (screenshots in `tests/screens/`) and `npm run ci` (everything CI runs). |
 | `tests/` | `*.test.mjs` check the maths and the display's logic. `*.browser.mjs` check phone and TV layouts, the remote, the cockpit and the lock. |
 | `.github/workflows/` | Checks every push; publishes `main` to GitHub Pages. |
 | `CLAUDE.md` | Brief for a Claude Code session. |

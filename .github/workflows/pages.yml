@@ -30,9 +30,12 @@ jobs:
         run: |
           npm ci --no-audit --no-fund
           if [ "${{ github.event_name }}" != "schedule" ]; then npx playwright install --with-deps chromium; fi
-      - name: Everything a contributor runs (npm run ci)
+      - name: Everything a contributor runs (npm run ci, which builds the display and the dashboard)
         if: github.event_name != 'schedule'
         run: npm run ci
+      - name: Build (the Saturday bin run skips the checks)
+        if: github.event_name == 'schedule'
+        run: npm run build
       - name: Build the published folder
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:

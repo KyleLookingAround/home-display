@@ -1,0 +1,51 @@
+/*
+ * The dashboard's shared state. Every island on a page imports this one object, so they all see the same account
+ * data, prices and choices. Big data (readings, rates) is held raw, not deeply reactive, and replaced whole when it
+ * changes; the period roll-up and the gas regression follow from it.
+ */
+import { buildModel, gasRegression } from '../lib/analysis.js';
+import { store } from '../lib/browser.js';
+import { unitPriceAt } from '../lib/octopus.js';
+
+class App {
+  raw = $state.raw(null);                     // account data, or example data when no account is connected
+  status = $state('loading');                 // loading | live | demo | err
+  checkedAt = $state(0);                      // when the account data was fetched
+  notice = $state.raw(null);                  // { kind: 'warn' | 'err', title, body }
+  account = $state(null);                     // the connected account number
+  proxy = $state(false);                      // running through the home server helper
+
+  days = $state(+store.get('days') || 30);    // the period: 7, 30 or 90 days
+  unit = $state('gbp');                       // the daily chart in £ or kWh
+  region = $state(store.get('region') || 'G');
+  gasUnit = $state(store.get('gasUnit') || 'm3');
+  pay = $state(store.get('pay') || 'DIRECT_DEBIT');
+
+  agileToday = $state.raw(null); agileErr = $state.raw(null);
+  carbonFc = $state.raw(null); carbonErr = $state.raw(null);
+  rewards = $state.raw(null);
+  now = $state(Date.now());                   // ticks each minute, so "now" moves on a page left open
+
+  compare = $state.raw(null);                 // the tariff comparison, once run
+  compareOpts = $state.raw(null);             // the tariffs it priced, which the battery simulator offers too
+
+  changelog = $state(store.getJ('changelog', []));
+  acts = $state(store.getJ('acts', {}));
+  measures = $state(store.getJ('measures', []));
+  epc = $state(store.getJ('epc', { cur: '', pot: '', notes: '' }));
+
+  model = $derived(this.raw ? buildModel(this.raw, this.days) : null);
+  reg = $derived(this.raw ? gasRegression(this.raw) : null);
+
+  get demo(){ return !this.raw || !!this.raw.demo; }
+  get eRateNow(){ return this.raw ? unitPriceAt(this.raw.eSets, Date.now()) : null; }
+  get gRateNow(){ return this.raw ? unitPriceAt(this.raw.gSets, Date.now()) : null; }
+}
+
+export const app = new App();
+
+/** Keeps one of the household's own lists or choices on this device. */
+export function keep(key){
+  const v = $state.snapshot(app[key]);
+  if (typeof v === 'object') store.setJ(key, v); else store.set(key, String(v));
+}

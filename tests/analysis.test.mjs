@@ -1,10 +1,10 @@
 // Runs the pure analysis code on example data. Usage: node --test tests/*.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { shared } from './shared.mjs';
 
-const src = ['core.js', 'analysis.js'].map(f => readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8')).join('\n');
+const src = shared('format', 'browser', 'net', 'octopus', 'analysis');
 const ctx = vm.createContext({ console, btoa, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
 vm.runInContext(src + '\n;globalThis.__api = { makeDemo, buildModel, gasRegression, annualGas, compareTariffs, simulateBattery, simulateSolar, solarShape, cheapestWindow, lookup, unitPriceAt, nextCapChange, weekLog, toCSV, SOLAR_SOUTH, sum };', ctx);
 const A = ctx.__api;

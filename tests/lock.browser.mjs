@@ -23,7 +23,7 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
   const server = http.createServer((req, res) => {
     const file = normalize(join(dir, new URL(req.url, 'http://x').pathname));
     if (!file.startsWith(dir) || !existsSync(file)) { res.writeHead(404); return res.end(); }
-    res.writeHead(200, { 'Content-Type': extname(file) === '.html' ? 'text/html' : 'application/octet-stream' }); res.end(readFileSync(file));
+    res.writeHead(200, { 'Content-Type': ({ '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' })[extname(file)] || 'application/octet-stream' }); res.end(readFileSync(file));
   });
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -31,6 +31,7 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
   const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await ctx.newPage();
   await page.route(/^https:\/\//, r => r.abort());
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
   try {
     await page.goto(base + '/display.html#home');
     await page.waitForSelector('#staticrypt-password', { state: 'visible' });
@@ -48,6 +49,10 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
     assert.match(await page.evaluate(() => location.hash), /#home/);
     await page.goto(base + '/index.html');
     await page.waitForSelector('.tabs', { timeout: 10000 });     // no PIN asked again
+    await page.waitForFunction(() => /Example data/.test((document.getElementById('status') || {}).textContent || ''), null, { timeout: 10000 });   // its islands run once unlocked
+    await page.goto(base + '/prices.html');
+    await page.waitForSelector('.tabs [aria-current="page"]', { timeout: 10000 });
+    assert.deepEqual(errors, []);
   } finally {
     await browser.close(); server.close();
   }

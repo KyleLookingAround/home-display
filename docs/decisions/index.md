@@ -10,3 +10,4 @@
 | [0006](0006-council-bins.md) | Bin days from the council's calendar, checked weekly with Stockport Council |
 | [0007](0007-time-is-distance.md) | In the window, time is distance: the road ahead, the fuel dock, your train; dials for now |
 | [0008](0008-drawing-for-tvs.md) | The screensaver within a TV's means: one baked backdrop, tiers of detail, sharp text on its own layer |
+| [0009](0009-astro-dashboard.md) | The dashboard in Astro and Svelte, five pages of islands sharing cached data; shared code as ES modules the display flattens |

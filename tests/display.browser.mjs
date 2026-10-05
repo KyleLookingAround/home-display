@@ -100,8 +100,9 @@ function octopus(u){
 }
 
 /* ---------- a tiny server: the repo's files plus a pretend home server helper ---------- */
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.json': 'application/json' };
-let helper = true, graphqlCalls = 0;
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.json': 'application/json' };
+const DIST = join(ROOT, 'dist');            // the dashboard, built by Astro (npm run build); everything else from the repo
+let helper = true, graphqlCalls = 0, accountCalls = 0;
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x'), send = (code, body, type) => { res.writeHead(code, { 'Content-Type': type || 'application/json' }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
   if (url.pathname.startsWith('/proxy/')){
@@ -112,12 +113,14 @@ const server = http.createServer((req, res) => {
     if (url.pathname === '/proxy/tfgm/odata/Metrolinks') return send(200, trams);
     if (url.pathname.startsWith('/proxy/gcal/calendar/ical/')) return send(200, ics, 'text/calendar');
     if (url.pathname.startsWith('/proxy/octopus/v1/graphql')){ let b = ''; req.on('data', c => { b += c; }); req.on('end', () => { graphqlCalls++; send(200, graphql(b)); }); return; }
-    if (url.pathname.startsWith('/proxy/octopus/')){ const j = octopus(req.url); return j ? send(200, j) : send(404, {}); }
+    if (url.pathname.startsWith('/proxy/octopus/')){ if (url.pathname.includes('/v1/accounts/')) accountCalls++; const j = octopus(req.url); return j ? send(200, j) : send(404, {}); }
     if (url.pathname.startsWith('/proxy/meteo/')) return send(200, weather());
     if (url.pathname.startsWith('/proxy/carbon/')) return send(200, carbon());
     return send(404, { error: 'unknown service' });
   }
-  const file = normalize(join(ROOT, url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname)));
+  const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).slice(1);
+  let file = normalize(join(DIST, rel));
+  if (!file.startsWith(DIST) || !existsSync(file)) file = normalize(join(ROOT, rel));
   if (!file.startsWith(ROOT) || !existsSync(file)) return send(404, 'missing', 'text/plain');
   res.writeHead(200, { 'Content-Type': TYPES[extname(file)] || 'application/octet-stream' }); res.end(readFileSync(file));
 });
@@ -355,20 +358,87 @@ test('display: a setup link copies settings to this device', async () => {
   await ctx.close();
 });
 
-test('dashboard: no sideways scroll on a phone or a TV', async () => {
+const PAGES = [['index', 'Overview'], ['patterns', 'Patterns'], ['prices', 'Prices'], ['compare', 'Compare'], ['home', 'Home']];
+test('dashboard: every page works on a phone and a TV, with example data labelled', async () => {
+  if (!existsSync(join(DIST, 'index.html'))) throw new Error('build the dashboard first: npm run build');
   for (const [width, height] of [[390, 844], [1920, 1080]]) {
-    const { page, ctx, errors } = await open('/index.html', { width, height, settings: null });
-    for (const tab of ['overview', 'patterns', 'prices', 'compare', 'home']) {
-      await page.click(`.tabs [data-tab="${tab}"]`);
-      await page.waitForTimeout(200);
+    const { page, ctx, errors } = await open('/index.html', { width, height, settings: null, withHelper: false });
+    for (const [id, label] of PAGES) {
+      if (id !== 'index') await page.goto(`${base}/${id}.html`);
+      await page.waitForFunction(() => /Example data/.test((document.getElementById('status') || {}).textContent || ''));
+      await page.waitForTimeout(300);
+      assert.equal(await page.textContent('.tabs [aria-current="page"]'), label);
       const l = await layout(page);
-      assert.ok(l.sw <= l.iw, `${tab} at ${width}: scrolls sideways`);
+      assert.ok(l.sw <= l.iw, `${id} at ${width}: scrolls sideways (${l.wide})`);
+      if (id === 'index') assert.ok(await page.locator('.tag.warn', { hasText: 'Example' }).count() > 0, 'example figures are labelled');
+      await shot(page, `dashboard-${width}-${id}`);
     }
     assert.equal(await page.getAttribute('#wallBtn', 'href'), 'display.html#energy');
     assert.deepEqual(errors, []);
-    await shot(page, `dashboard-${width}`);
     await ctx.close();
   }
+});
+
+test('dashboard: the controls work', async () => {
+  const { page, ctx, errors } = await open('/index.html', { settings: null, withHelper: false });
+  await page.waitForFunction(() => /Example data/.test(document.getElementById('status').textContent));
+  // the period and the units
+  await page.click('[aria-label="Period"] >> text=7 days');
+  await page.waitForFunction(() => document.querySelectorAll('.chart svg')[0] && document.querySelectorAll('.chart svg')[0].querySelectorAll('.hit').length === 7);
+  await page.click('[aria-label="Show"] >> text=kWh');
+  assert.match(await page.textContent('.readline'), /kWh/);
+  await page.locator('.chart').first().focus(); await page.keyboard.press('ArrowLeft');
+  assert.match(await page.textContent('.readline'), /—/, 'arrow keys read another day');
+  // the period is kept for the next page
+  await page.goto(`${base}/patterns.html`);
+  await page.waitForFunction(() => document.querySelector('[aria-label="Period"] [aria-pressed="true"]'));
+  assert.equal(await page.textContent('[aria-label="Period"] [aria-pressed="true"]'), '7 days');
+  // the change log, shown on the daily chart
+  await page.goto(`${base}/home.html`);
+  await page.fill('#clDate', '2026-10-01'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('text=Add to log');
+  await page.waitForSelector('text=Loft insulation topped up');
+  await page.check('#m-loft'); await page.waitForSelector('text=could cut heating');
+  await page.goto(`${base}/index.html`);
+  await page.waitForFunction(() => document.querySelector('.chart .mark'));
+  // the comparison feeds the battery's tariffs
+  await page.goto(`${base}/compare.html`);
+  await page.click('text=Run comparison');
+  await page.waitForSelector('text=Cheapest');
+  assert.ok(await page.locator('#bTariff option').count() >= 3, 'the battery offers the compared tariffs');
+  await page.fill('#bCap', '10');
+  await page.waitForSelector('text=Saved a year');
+  await page.fill('#sSouth', '8');
+  await page.waitForSelector('text=Generated a year');
+  // settings open and close
+  await page.click('text=Connect account'); await page.waitForSelector('#acct');
+  await page.click('.settings >> text=Close'); assert.equal(await page.locator('#acct').count(), 0);
+  // Prices: the region, and an activity's kWh
+  await page.goto(`${base}/prices.html`);
+  await page.waitForSelector('#region');
+  await page.locator('td input.kwh').first().fill('3'); await page.locator('td input.kwh').first().dispatchEvent('change');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.acts') || '{}')[Object.keys(JSON.parse(localStorage.getItem('hse.acts') || '{}'))[0]]), 3);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('dashboard: the account is fetched once, then each page reads it from the cache', async () => {
+  const { page, ctx, errors } = await open('/index.html', { account: true });
+  await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+  await page.waitForTimeout(500);
+  const first = accountCalls;
+  assert.ok(first > 0, 'the account was fetched');
+  assert.match(await page.textContent('.eyebrow'), /A-TEST1234/);
+  for (const id of ['patterns', 'prices', 'compare', 'home', 'index']) {
+    await page.goto(`${base}/${id}.html`);
+    await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+  }
+  assert.equal(accountCalls, first, 'no page fetched the account again');
+  await page.click('text=Refresh');
+  await page.waitForFunction(() => /Signal live/.test(document.getElementById('status').textContent));
+  await page.waitForTimeout(300);
+  assert.ok(accountCalls > first, 'Refresh fetches it afresh');
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 test('cockpit: every kind of weather and power price draws without errors', async () => {
