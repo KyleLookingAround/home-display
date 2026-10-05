@@ -7,6 +7,7 @@
   import { app } from '../../state/app.svelte.js';
   import { houseSettings, saveHouse } from '../../state/house.js';
   import { BIN_COLOURS } from '../../lib/household.js';
+  import DateField from '../DateField.svelte';
   let f = $state(null), saved = $state('');
   const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
   const fill = s => {
@@ -45,7 +46,7 @@
               <div class="field"><label for="bc{i}">Colour</label><select id="bc{i}" bind:value={b.colour}>{#each Object.keys(BIN_COLOURS) as c}<option>{c}</option>{/each}</select></div>
             </div>
             <div class="inline-fields">
-              <div class="field"><label for="bd{i}">A collection date</label><input id="bd{i}" type="date" bind:value={b.date}></div>
+              <div class="field"><label for="bd{i}">A collection date</label><DateField id="bd{i}" bind:value={b.date} /></div>
               <div class="field"><label for="be{i}">Every (weeks)</label><input id="be{i}" type="number" min="1" max="8" bind:value={b.every}></div>
             </div>
             <div class="field"><label for="bw{i}">What goes in it</label><input id="bw{i}" bind:value={b.what} placeholder="Garden and food waste"></div>
@@ -86,7 +87,7 @@
         {#each f.dates as d, i}
           <div class="inline-fields date-row">
             <div class="field"><label for="dn{i}">Who or what</label><input id="dn{i}" bind:value={d.name} placeholder="Sam"></div>
-            <div class="field"><label for="dd{i}">Date</label><input id="dd{i}" type="date" bind:value={d.date}></div>
+            <div class="field"><label for="dd{i}">Date</label><DateField id="dd{i}" bind:value={d.date} /></div>
             <div class="field"><label for="dk{i}">Kind</label><select id="dk{i}" bind:value={d.kind}><option value="birthday">Birthday</option><option value="anniversary">Anniversary</option><option value="once">Just once</option></select></div>
             <button class="btn small" type="button" aria-label="Remove {d.name || 'this date'}" onclick={() => f.dates.splice(i, 1)}>Remove</button>
           </div>
@@ -112,7 +113,9 @@
   .bin summary i{width:14px;height:14px;border-radius:50%;border:1px solid rgba(255,255,255,.25);flex:none}
   .bin summary .muted{margin-left:auto;font-size:13px}
   .bin .btn{justify-self:start}
-  .date-row{align-items:end}
+  .date-row{align-items:end;grid-template-columns:minmax(0,1fr) minmax(150px,1.2fr) minmax(0,1fr)}
+  .date-row .btn{grid-column:1/-1;justify-self:start}
+  @media (max-width:420px){ .date-row{grid-template-columns:minmax(0,1fr) minmax(150px,1.3fr)} }
   .add{justify-self:start}
   .mono{font-family:var(--f-mono);text-transform:uppercase}
   code{font-family:var(--f-mono);font-size:.9em}

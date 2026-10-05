@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -88,6 +88,18 @@ test('birthdays and countdowns: every year, with ages, Christmas and the next ba
   const hu = plain(A.headsUp({ countdowns: c }, now));
   assert.deepEqual(hu.map(h => [h.title, h.sub]), [['Sam\u2019s birthday tomorrow', 'Turning 7']]);
   assert.equal(A.mergeSettings({ wifi: { ssid: 'x' }, dates: [{ name: 'a', date: '2020-01-01' }] }, null).wifi, null, 'never from the public file');
+});
+
+test('dates are written and read day first, the UK way', () => {
+  assert.equal(A.ukDate('2026-10-05'), '05/10/2026');
+  assert.equal(A.ukDate(new Date(2026, 11, 25)), '25/12/2026');
+  assert.equal(A.parseUkDate('5/10/2026'), '2026-10-05', 'the fifth of October, not the tenth of May');
+  assert.equal(A.parseUkDate('05-10-26'), '2026-10-05');
+  assert.equal(A.parseUkDate(' 25.12.2026 '), '2026-12-25');
+  assert.equal(A.parseUkDate('29/02/2027'), null, 'not a real date');
+  assert.equal(A.parseUkDate('13/13/2026'), null);
+  assert.equal(A.parseUkDate('2026-10-05'), null);
+  assert.equal(A.parseUkDate(''), null);
 });
 
 test('night window works across midnight', () => {

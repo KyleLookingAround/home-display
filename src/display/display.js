@@ -471,7 +471,7 @@ function buildSheet(){
   $('#binRows').innerHTML = [0, 1, 2, 3].map(i => `<div class="fields" data-bin="${i}">
     <div class="field"><label for="bN${i}">Bin ${i + 1}</label><input id="bN${i}" placeholder="${['General waste', 'Paper and card', 'Garden waste', 'Glass and cans'][i]}"></div>
     <div class="field"><label for="bC${i}">Colour</label><select id="bC${i}">${colours}</select></div>
-    <div class="field"><label for="bD${i}">A collection date</label><input id="bD${i}" type="date"></div>
+    <div class="field"><label for="bD${i}">A collection date</label><input id="bD${i}" inputmode="numeric" placeholder="dd/mm/yyyy"></div>
     <div class="field"><label for="bE${i}">Comes every</label><select id="bE${i}"><option value="1">Week</option><option value="2">2 weeks</option><option value="3">3 weeks</option><option value="4">4 weeks</option></select></div></div>`).join('');
 }
 function fillSheet(){
@@ -479,7 +479,7 @@ function fillSheet(){
   setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0);
   const near = t => { const p = String(t).split(':'); const m = Math.round(((+p[0] || 0)*60 + (+p[1] || 0)) / 30) * 30 % 1440; return `${pad2(Math.floor(m/60))}:${pad2(m % 60)}`; };
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
-  [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date); setv('bE' + i, b.every || 2); });
+  [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date ? ukDate(b.date) : ''); setv('bE' + i, b.every || 2); });
   setv('fIcal', s.ical); setv('fTrainFrom', s.trainFrom); setv('fTrainTo', s.trainTo); setv('fTrainWalk', s.trainWalk); setv('fTramStop', s.tramStop); setv('fTramWalk', s.tramWalk);
   $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on this screen.` : 'For live draw and today\'s cost, open the phone pages on this screen once (Settings, then Account) and connect your Octopus account.';
   $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
@@ -489,7 +489,7 @@ function fillSheet(){
 }
 function readSheet(){
   const v = id => $('#' + id).value.trim();
-  const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: v('bD' + i), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
+  const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: parseUkDate(v('bD' + i)), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
   return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
     bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
 }

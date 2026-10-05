@@ -3,7 +3,7 @@
    * Every day with readings, as a calendar: one square a day, a week a column, brighter the more was used.
    * Tap, point or use the arrow keys to read a day.
    */
-  import { clamp, DOW, fmtDate, keyDate } from '../../lib/format.js';
+  import { clamp, DOW, fmtDate, keyDate, MON } from '../../lib/format.js';
   let { days = [], colour = '255,181,71', fmt = v => String(v), aria = 'Every day' } = $props();   // days: [{ k, v }], oldest first
 
   let width = $state(340), sel = $state(null);
@@ -17,7 +17,7 @@
   const max = $derived(Math.max(0.001, ...days.map(d => d.v || 0)));
   const fill = v => v == null ? 'rgba(134,152,255,.06)' : `rgba(${colour},${(0.12 + 0.88 * Math.pow(v / max, 0.8)).toFixed(3)})`;
   const W = $derived(26 + cells.weeks * (size + gap)), H = $derived(7 * (size + gap) + 18);
-  const months = $derived.by(() => { const o = []; let last = -1; cells.list.forEach(c => { const d = keyDate(c.k); if (d.getDate() <= 7 && c.row === 0 && d.getMonth() !== last){ o.push({ x: 26 + c.col * (size + gap), text: d.toLocaleString('en-GB', { month: 'short' }) }); last = d.getMonth(); } }); return o; });
+  const months = $derived.by(() => { const o = []; let last = -1; cells.list.forEach(c => { const d = keyDate(c.k); if (d.getDate() <= 7 && c.row === 0 && d.getMonth() !== last){ o.push({ x: 26 + c.col * (size + gap), text: MON[d.getMonth()] }); last = d.getMonth(); } }); return o; });
   const tip = $derived(sel != null && cells.list[sel] ? { c: cells.list[sel] } : null);
   const keys = ev => {
     const step = { ArrowRight: 7, ArrowLeft: -7, ArrowDown: 1, ArrowUp: -1 }[ev.key]; if (!step) return;

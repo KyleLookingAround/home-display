@@ -19,7 +19,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
 - `npm run build` makes both: `build.py`, then `astro build`, then `scripts/relative.mjs` (relative asset paths, so the site works at any address).
 - `src/`: the source.
   - `lib/`: ES modules shared by both, one per service. The dashboard imports them; `build.py` flattens the ones the display needs, dropping the one-line imports and `export` keywords. Keep imports on one line, from `./module.js`, and export only declarations; a test checks.
-    - `format.js`: constants, dates, money and number formatting, `nz`, `niceScale`.
+    - `format.js`: constants, dates (`ukDate`, `parseUkDate`: always day first), money and number formatting, `nz`, `niceScale`.
     - `browser.js`: `$`, `$$` and `store` (per-device `localStorage`, keys prefixed `hse.`).
     - `net.js`: `request`, `NET`, `detectProxy`, `errorText`.
     - `octopus.js`: Octopus REST and GraphQL (rates, consumption, products, the account, the Home Mini, rewards; `COMPARE` and `GAS_COMPARE` with `loadGasOffer`).
@@ -35,6 +35,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `components/`: one Svelte island per card, in a folder per page (`now/`, `money/`, `usage/`, `home/`, `settings/`), plus:
     - `Header.svelte`: the title, the status (`#status`: "Updated hh:mm", "Example data", "Updating…", "No signal", "Offline"), Refresh, and the negative price and Saving Session notifications.
     - `Notices.svelte`: the example-data banner (on Now) and errors.
+    - `DateField.svelte`: every date box: typed and shown day first (05/10/2026), with a calendar to pick from. Don't use `<input type="date">` on its own: it follows the browser's language, which can be American.
     - `now/HeadsUp.svelte`: leave for your train, bins out tonight, flood warnings, rain soon (`headsUp` in `household.js`), as on the TV.
     - `screen/Screen.svelte`: a live picture of the wall display (`display.html#<view>&embed=1` in a scaled frame), pairing with a screen's code, and buttons that change what it shows.
     - `home/Upgrade.svelte`: the shape every upgrade shares: a year's saving, a rough cost, the payback, and the simulator folded under "Work it out".
@@ -99,7 +100,7 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
 - **TV browsers:** code in `src/lib/` and `src/display/` must parse on Chromium 63. Don't use `?.`, `??`, `flatMap`, `.at()`, optional catch binding or `Object.fromEntries`; use `nz(value, fallback)` for nullish defaults. The display's CSS must avoid `inset`, flex `gap` and `:focus-visible`, and give `clamp()`/`min()` a fallback. The dashboard's components and state only run on the dashboard and may use newer syntax.
 - **Ten-foot rules (display):** size text in `rem`, nothing under `0.9rem` (24px at 1080p); keep the 4.5% overscan margin; every control must be reachable with arrows, Enter and Back.
 - **Secrets:** never commit secrets. The Octopus API key is entered per device and kept in `localStorage`. Train and tram keys live only in the helper's `.env`, because Realtime Trains forbids tokens in browser apps. Any hosted version should hold keys in a server-side secret (see `docs/STACK.md`). The repository is public: don't commit the house number or other personal details either.
-- **Copy:** plain British English, written from the user's side. Estimates are labelled as estimates, not advice.
+- **Copy:** plain British English, written from the user's side. Dates day first (05/10/2026, or 5 Oct), times on the 24-hour clock. Estimates are labelled as estimates, not advice.
 
 ## Known gaps
 

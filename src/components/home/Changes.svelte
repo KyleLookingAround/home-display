@@ -4,6 +4,7 @@
   import { app, keep } from '../../state/app.svelte.js';
   import { boot } from '../../state/session.js';
   import { addDays, dayKey, keyDate, longDate, startOfDay } from '../../lib/format.js';
+  import DateField from '../DateField.svelte';
   onMount(() => { if (!date) date = dayKey(Date.now()); boot(); });   // a date typed before the page was ready stays
   let date = $state(''), text = $state('');
   function avgDaily(rows, from, to){
@@ -46,7 +47,7 @@
   {/if}
   <form class="form" onsubmit={add}>
     <div class="inline-fields">
-      <div class="field"><label for="clDate">Date</label><input id="clDate" type="date" required bind:value={date}></div>
+      <div class="field"><label for="clDate">Date</label><DateField id="clDate" required bind:value={date} /></div>
       <div class="field wide"><label for="clText">What changed</label><input id="clText" placeholder="e.g. Boiler flow down to 55°C" required bind:value={text}></div>
     </div>
     <div class="actions"><button class="btn primary small" type="submit">Add</button></div>

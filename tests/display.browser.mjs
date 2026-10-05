@@ -448,7 +448,8 @@ test('dashboard: the controls work', async () => {
   assert.equal(await page.textContent('[aria-label="Period"] [aria-pressed="true"]'), '7 days');
   // Home: a change, marked on the Usage chart
   await page.goto(`${base}/home.html`); await ready(page);
-  await page.fill('#clDate', '2026-10-01'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('#changes button[type=submit]');
+  assert.equal(await page.inputValue('#clDate'), '05/10/2026', 'today, day first');
+  await page.fill('#clDate', '01/10/2026'); await page.fill('#clText', 'Loft insulation topped up'); await page.click('#changes button[type=submit]');
   await page.waitForSelector('text=Loft insulation topped up');
   await page.goto(`${base}/usage.html`);
   await page.waitForFunction(() => document.querySelector('.chart .mark'));

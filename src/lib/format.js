@@ -29,6 +29,15 @@ export const slotLabel = i => `${pad2(Math.floor((i % 48)/2))}:${i % 2 ? '30' : 
 export const fmtDate = d => `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`;
 export const shortDate = d => `${d.getDate()} ${MON[d.getMonth()]}`;
 export const longDate = d => `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
+/** A date as the UK writes it, 05/10/2026, from a Date or a 'YYYY-MM-DD' key. */
+export const ukDate = d => { const x = typeof d === 'string' ? keyDate(d) : d; return isNaN(+x) ? '' : `${pad2(x.getDate())}/${pad2(x.getMonth()+1)}/${x.getFullYear()}`; };
+/** Day first, always: '5/10/2026', '05-10-26', '5.10.2026' or '5 10 2026' to '2026-10-05'; null if it isn't a real date. */
+export function parseUkDate(s){
+  const m = /^\s*(\d{1,2})[\/.\- ]+(\d{1,2})[\/.\- ]+(\d{2}|\d{4})\s*$/.exec(String(s || ''));
+  if (!m) return null;
+  const y = m[3].length === 2 ? 2000 + +m[3] : +m[3], mo = +m[2], d = +m[1], x = new Date(y, mo - 1, d);
+  return x.getFullYear() === y && x.getMonth() === mo - 1 && x.getDate() === d ? `${y}-${pad2(mo)}-${pad2(d)}` : null;
+}
 export const gbp = p => (p < 0 ? '−' : '') + '£' + Math.abs(p/100).toFixed(2);   // pence in, pounds out
 export const gbp0 = p => (p < 0 ? '−' : '') + '£' + Math.round(Math.abs(p/100)).toLocaleString('en-GB');
 export const kwh = v => `${v.toFixed(v >= 100 ? 0 : 1)} kWh`;

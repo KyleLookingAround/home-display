@@ -4,6 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Update** (redesign): dates are typed and shown day first, the UK way (05/10/2026), whatever language the phone, browser or TV is set to. The browser's own date boxes followed its language, so some showed 10/05/2026; they're replaced by one that reads day, month, year, with a calendar to pick from (`DateField.svelte`; `ukDate` and `parseUkDate` in `format.js`).
 - **Creation** (redesign): guest Wi-Fi. Set the network in Settings, Household; Home shows a code a visitor's phone camera reads to join, and the TV shows it big (Guest Wi-Fi on its toolbar, the W key, or Show it on the TV from the phone). The codes are made here (`src/lib/qr.js`) and checked in the tests with a QR reader.
 - **Creation** (redesign): birthdays and countdowns. Birthdays, anniversaries and one-off dates in Settings, with Christmas, the next bank holiday and calendar birthdays: Coming up on Home, a heads-up the day before and on the day ("Sam’s birthday tomorrow, turning 7"), and the nearest on the TV's Today beside the date.
 - **Update** (redesign): Send to the TV now carries guest Wi-Fi, dates and the calendar address with the account, all sealed with the site PIN. They stay out of `household.json`, which is public.
