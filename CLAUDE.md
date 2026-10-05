@@ -26,13 +26,14 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `display/head.html`, `display/body.html`: the display's CSS (ten-foot rules) and markup for its five modes, toolbar and settings sheet.
   - `display/cockpit.js`: the screensaver, a side window onto space. It decides when and where things appear. Everything has a depth, and slides past at the ship's speed divided by it (`speedAt`; `readableAt` caps it for text). Layers, back to front:
     - `cSpace` canvas: sky, painted nebulae (grown a few rows a frame), stars, sun, comets, moon, aurora, planets, traffic, the house, wildlife, the ISS, the train's rail.
-    - `cBoards`: DOM billboards and the space train, in 3D.
+    - The road ahead (`drawAhead`): the next twelve hours along the window, now on the left. The price landscape, weather fronts, calendar beacons and the fuel dock, with canvas labels that stack rather than overlap ([decision 0007](docs/decisions/0007-time-is-distance.md)).
+    - `cBoards`: DOM billboards and the space train, in 3D. Your own train stops at a platform when it's time to leave.
     - `cNear` canvas: huge things sweeping past, dust, warp streaks, debris, rain outside.
-    - `cShip`: the glass (rain, snow, frost, fog), the frame and the dashboard.
+    - `cShip`: the glass (rain, snow, frost, fog), the frame and the dashboard, with its dials.
     - It slows itself down on weak hardware, and shows a still frame under reduced motion.
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
   - `display/sources.js`: the display's household data, mostly pure.
-    - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), and `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`.
+    - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`, `voyageFor` (the road ahead) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost` (the cabin's dials).
     - Huxley2 trains, and household settings merging.
     - Modes, night window and settings defaults.
     - Bins, weather, and the iCal parser and `RRULE` expansion.

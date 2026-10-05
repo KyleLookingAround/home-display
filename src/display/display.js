@@ -275,9 +275,19 @@ function cockpitInfo(now){
   const iss = issPass(issRaw, HOME);
   const x = { agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins,
               events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, iss, sky, label: 'Harold Street · region ' + region() };
+  const voyage = voyageFor(x, now), show = String(D.preview.show || ''), wet = D.preview.wx;
+  // Previews: wet weather is a front we're in; show=front, mytrain and dock bring the rest into view, with real data only
+  if (/^(rain|drizzle|snow|thunder)$/.test(wet || '')) voyage.fronts = [{ from: now - 3600e3, to: now + 2.5*3600e3, kind: wet === 'drizzle' ? 'rain' : wet }];
+  if (/front/.test(show)) voyage.fronts.push({ from: now + 4*3600e3, to: now + 6.5*3600e3, kind: 'rain' });
+  if (/mytrain/.test(show) && voyage.train) voyage.train.mine = true;
+  if (/dock/.test(show) && voyage.dock) voyage.dock = { from: now - 15*60e3, to: now + 105*60e3, avg: voyage.dock.avg, now: true, mins: 0 };
+  let usual = null;
+  if (x.cost != null){ const h = recordCost(store.getJ('costs', {}), now, x.cost); store.setJ('costs', h); usual = usualCost(h, now); }
+  const ahead = shownAhead(voyage);
   return {
     sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null), world: Object.assign(worldFor(x, now), { iss }), preview: D.preview,
-    cards: buildBillboards(x, now),
+    voyage, instruments: instrumentsFor(x, now, usual),
+    cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };
 }

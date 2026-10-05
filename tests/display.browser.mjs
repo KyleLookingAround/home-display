@@ -392,6 +392,27 @@ test('cockpit: every kind of weather and power price draws without errors', asyn
   }
 });
 
+// The road ahead and the cabin's instruments, with an account connected: your train stops, the dials read.
+test('cockpit shows your train and the instruments', async () => {
+  const { page, ctx, errors } = await open('/display.html#screensaver&show=mytrain', { account: true });
+  await page.clock.runFor(1500);
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => ({
+    mine: (document.querySelector('.strain.mine') || {}).textContent || '',
+    draw: document.getElementById('iDraw').hasAttribute('data-off'), drawV: document.getElementById('iDrawV').textContent,
+    cost: document.getElementById('iCost').textContent, air: document.getElementById('iAirV').textContent
+  }));
+  assert.match(r.mine, /Your train/);
+  assert.match(r.mine, /Leave in \d+ min|Leave now|Run for it/);
+  assert.match(r.mine, /Platform/);
+  assert.equal(r.draw, false);
+  assert.match(r.drawV, /^\d[\d,]* W$/);
+  assert.match(r.cost, /£\d+\.\d\d/);
+  assert.ok(r.air.length > 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 // GALLERY=1 SHOTS=1: one screenshot per scene, for looking at the window by eye (skipped otherwise).
 test('cockpit gallery', { skip: !process.env.GALLERY }, async () => {
   const looks = (process.env.GALLERY_LOOKS || [
@@ -401,7 +422,10 @@ test('cockpit gallery', { skip: !process.env.GALLERY }, async () => {
   for (const [width, height] of [[1920, 1080], [390, 844]]) {
     if (width < 1000 && !process.env.GALLERY_PHONE) continue;
     for (const look of looks) {
-      const { page, ctx, errors } = await open('/display.html#screensaver&' + look, { width, height });
+      const { page, ctx, errors } = await open('/display.html#screensaver&' + look, { width, height, account: true });
+      // a few whole days already seen, so the fuel gauge has a usual day to measure against
+      await page.addInitScript(() => { try { localStorage.setItem('hse.costs', JSON.stringify({ '2026-10-01': { p: 310, late: true }, '2026-10-02': { p: 280, late: true }, '2026-10-03': { p: 345, late: true }, '2026-10-04': { p: 300, late: true } })); } catch (e) {} });
+      await page.reload();
       await page.clock.runFor(1500);
       await page.evaluate(() => document.body.classList.remove('chrome-on'));
       await page.waitForTimeout(400);

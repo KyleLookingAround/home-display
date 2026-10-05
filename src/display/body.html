@@ -83,7 +83,25 @@
       </svg>
       <div class="hud" id="cHud" data-engine="cruise">
         <div class="g"><span class="k">Power</span><span class="v" id="hPrice">--</span><span class="s" id="hEngine">Cruising</span></div>
+        <!-- the instruments: a needle for live draw; today's cost as a fuel gauge; grid carbon as a lamp -->
+        <div class="g inst" id="iDraw" data-off="1">
+          <svg class="dial" viewBox="0 0 200 108" aria-hidden="true">
+            <path class="arc" d="M20 100A80 80 0 0 1 180 100"/>
+            <path class="band good" d="M20 100A80 80 0 0 1 44.8 42.1"/>
+            <path class="band warn" d="M44.8 42.1A80 80 0 0 1 135.2 28.2"/>
+            <path class="band bad" d="M135.2 28.2A80 80 0 0 1 180 100"/>
+            <g class="needle" id="iNeedle"><path d="M97 100L100 30L103 100Z"/></g>
+            <circle cx="100" cy="100" r="7"/>
+          </svg>
+          <span class="s"><b class="iv" id="iDrawV">--</b> drawing now</span>
+        </div>
         <div class="g c"><span class="hclock" data-clock>--:--</span><span class="s" id="hDateC"></span></div>
+        <div class="g inst" id="iToday" data-off="1">
+          <span class="k" id="iTodayK">Today</span>
+          <span class="fuel" id="iFuel"><i class="fill" id="iFill"></i><i class="mark" id="iMark"></i></span>
+          <span class="s" id="iCost">--</span>
+          <span class="s air" id="iAir"><i class="lamp" id="iLamp"></i><span id="iAirV"></span></span>
+        </div>
         <div class="g r"><span class="k">Outside</span><span class="v" id="hTemp">--</span><span class="s" id="hWx"></span></div>
       </div>
       <div class="leds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>

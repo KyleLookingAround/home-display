@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = ['src/core.js', 'src/analysis.js', 'src/display/sources.js'].map(read).join('\n');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards NET';
+const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -345,3 +345,59 @@ test('billboards keep to what you need to catch; the rest rides the train', () =
   assert.deepEqual(plain(A.boardCards(cards)).map(c => c.id), ['price', 'bins']);
 });
 
+
+test('the road ahead lays the next twelve hours along the window', () => {
+  const now = at('2026-10-05T14:10:00'), s0 = at('2026-10-05T14:00:00');
+  const agile = [];
+  for (let i = -2; i < 40; i++) agile.push({ from: s0 + i * 1800e3, to: s0 + (i + 1) * 1800e3, p: i >= 20 && i < 24 ? 4 : 20 + (i % 3) });
+  const hours = [0, 1, 2, 3, 4, 5].map(i => ({ t: s0 + i * 3600e3, temp: 12, rain: i === 2 || i === 3 ? 80 : 10, code: i === 3 ? 95 : i === 2 ? 61 : 2 }));
+  const events = [{ title: 'Dentist', start: at('2026-10-05T16:30:00'), end: at('2026-10-05T17:00:00') },
+                  { title: 'Bank holiday', start: at('2026-10-06T00:00:00'), end: at('2026-10-07T00:00:00'), allDay: true },
+                  { title: 'Holiday', start: at('2026-10-07T09:00:00'), end: at('2026-10-07T10:00:00') }];
+  const trains = { station: 'Stockport', list: [{ sched: at('2026-10-05T14:40:00'), exp: at('2026-10-05T14:40:00'), dest: 'Manchester Piccadilly', platform: '2' }] };
+  const v = A.voyageFor({ agile, weather: { hours }, events, trains, walk: 15 }, now);
+  assert.equal(v.to - v.from, 12 * 3600e3);
+  assert.equal(v.range[0].from, s0);                                            // the half hour we're in
+  assert.ok(v.range.every(r => r.from < v.to));
+  assert.equal(v.dock.from, s0 + 20 * 1800e3);                                  // the cheap two hours, 00:00 to 02:00
+  assert.equal(v.dock.now, false);
+  assert.equal(v.dock.mins, 590);
+  assert.deepEqual(plain(v.fronts), [{ from: s0 + 2 * 3600e3, to: s0 + 4 * 3600e3, kind: 'thunder' }]);   // rain, then thunder: one front
+  assert.deepEqual(plain(v.waypoints).map(w => w.title), ['Dentist']);          // not all-day, not beyond twelve hours
+  assert.equal(v.train.mine, true);                                             // leave in 15 minutes
+  assert.equal(v.train.leave.mins, 15);
+  assert.equal(v.train.station, 'Stockport');
+  assert.deepEqual(plain(A.shownAhead(v)), ['cheap', 'train']);
+  const later = A.voyageFor({ agile, trains, walk: 15 }, at('2026-10-06T00:30:00'));
+  assert.equal(later.dock.now, true);
+  assert.equal(later.dock.mins, 0);
+  const far = A.voyageFor({ trains, walk: 15 }, at('2026-10-05T13:30:00'));
+  assert.equal(far.train.mine, false);                                          // 55 minutes to leave
+  assert.equal(far.range, null);
+  assert.equal(far.dock, null);
+  assert.equal(A.wetKind({ code: 73, rain: 0 }), 'snow');
+  assert.equal(A.wetKind({ code: 3, rain: 70 }), 'rain');
+  assert.equal(A.wetKind({ code: 3, rain: 20 }), null);
+});
+
+test('the cabin instruments set today against a usual day', () => {
+  let h = {};
+  ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'].forEach((d, i) => { h = A.recordCost(h, at(d + 'T18:00:00'), 100); h = A.recordCost(h, at(d + 'T22:30:00'), 300 + i * 100); });
+  const now = at('2026-10-05T14:10:00');
+  h = A.recordCost(h, now, 250);
+  assert.equal(A.usualCost(h, now), 450);                                      // median of 300, 400, 500, 600; today left out
+  assert.equal(A.usualCost({}, now), null);
+  const half = A.recordCost({}, at('2026-10-01T15:00:00'), 200);
+  assert.equal(half['2026-10-01'].late, false);                                 // a day seen only in the afternoon doesn't count
+  for (let i = 0; i < 30; i++) h = A.recordCost(h, at('2026-09-01T23:00:00') + i * 864e5, 100);
+  assert.ok(Object.keys(h).length <= 15);
+  const slot = { from: now - 600e3, to: now + 1200e3 };
+  const ins = A.instrumentsFor({ live: { demand: 1500 }, cost: 500, carbon: [Object.assign({ v: 210, index: 'high' }, slot)] }, now, 450);
+  assert.equal(ins.draw.w, 1500);
+  assert.equal(ins.draw.frac, .5);
+  assert.equal(ins.cost.tone, 'bad');                                           // more than a usual day already
+  assert.equal(ins.carbon.tone, 'bad');
+  const none = A.instrumentsFor({}, now, null);
+  assert.equal(none.draw, null); assert.equal(none.cost, null); assert.equal(none.carbon, null);
+  assert.equal(A.instrumentsFor({ cost: 120 }, now, null).cost.frac, null);    // no usual day yet: just the figure
+});

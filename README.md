@@ -8,6 +8,12 @@ A home energy dashboard for your Octopus account, and a household display for th
     - **Things going by:** everything slides past from right to left. Near things go faster than far ones, so the layers of stars, nebulae, planets and traffic give it depth.
     - **The Harold Street Express:** every few minutes a space train passes with one fact on each carriage: the price, the cheapest hours, grid carbon, the weather, sunset, what's coming up.
     - **Billboards:** holographic beacons for what you need to catch: bins, the next train, rain on the way, a price worth knowing about.
+    - **The road ahead:** across the window, left to right, is the next twelve hours. Along the bottom runs a landscape whose height is the power price: peaks are dear, valleys are cheap.
+      - Rain clouds stand over the hours rain is due.
+      - Your calendar's events stand on it as beacons.
+      - A fuel dock waits over the cheapest two hours with a countdown. When they come, it says so: run the dishwasher.
+    - **Your train:** when it's nearly time to leave, the Express becomes your actual train. It stops at the platform for a while, with when to leave, the platform and whether it's on time on its carriages.
+    - **The dials** under the window: a needle for how much power the house is drawing, a fuel gauge for today's cost against a usual day, and a lamp for how clean the grid is.
     - **Your house on an asteroid:** it drifts by now and then. The windows glow brighter the more power you're using, the chimney smokes when it's cold, the porch lantern shows the price, and the bins are out the evening before collection.
     - **Nature tells the story:**
       - the aurora when the grid is clean;
@@ -34,7 +40,7 @@ To see the cockpit in any weather, add it to the link. For example, `display.htm
 - `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;
 - `phase`: dawn, day, dusk or night;
 - `price`: any Agile price in pence;
-- `show`: bring things into view straight away, such as `show=train,house,aurora,comet`. Also `whales`, `jellies`, `birds`, `iss`, `moon`, `traffic` and `flyby`.
+- `show`: bring things into view straight away, such as `show=train,house,aurora,comet`. Also `whales`, `jellies`, `birds`, `iss`, `moon`, `traffic` and `flyby`, and with real data, `mytrain` (your train at the platform), `dock` (cheap power now) and `front` (rain on the way).
 
 | On a TV remote or keyboard | What it does |
 |---|---|

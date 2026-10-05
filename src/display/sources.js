@@ -505,3 +505,78 @@ function worldFor(x, now = Date.now()){
 /** Billboards are for what you need to catch; everything else rides on the space train. */
 const URGENT = ['price', 'plunge', 'bins', 'train', 'rainsoon', 'iss'];
 function boardCards(cards){ return cards.filter(c => c.weight >= 2 || URGENT.indexOf(c.id) >= 0); }
+
+/* ---------- the road ahead: time laid along the window, now at the left and later to the right ---------- */
+const AHEAD = 12 * 3600e3;
+/** What kind of weather a forecast hour brings, if it's wet: thunder, snow or rain. */
+function wetKind(h){
+  const c = +h.code;
+  if (c >= 95) return 'thunder';
+  if ((c >= 71 && c <= 77) || c === 85 || c === 86) return 'snow';
+  if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82) || h.rain >= 60) return 'rain';
+  return null;
+}
+/**
+ * The next twelve hours, for the landscape along the bottom of the window:
+ * - range: the Agile price each half hour (peaks are dear, valleys cheap);
+ * - dock: the cheapest two hours in it, where the fuel dock waits;
+ * - fronts: spells of rain, snow or thunder from the hourly forecast;
+ * - waypoints: calendar events starting in it;
+ * - train: the next train, and whether it's time to think about leaving (mine).
+ */
+function voyageFor(x, now = Date.now()){
+  const end = now + AHEAD, ag = (x.agile || []).filter(r => r.to > now && r.from < end);
+  const range = ag.length ? ag.map(r => ({ from: r.from, to: r.to, p: r.p })) : null;
+  let dock = null;
+  const best = ag.length >= 4 ? cheapestWindow(ag, 4, now) : null;
+  if (best) dock = { from: best.from, to: best.to, avg: best.avg, now: best.from <= now, mins: Math.max(0, Math.round((best.from - now) / 60e3)) };
+  const fronts = [];
+  ((x.weather && x.weather.hours) || []).forEach(h => {
+    const kind = wetKind(h), last = fronts[fronts.length - 1];
+    if (!kind || h.t + 3600e3 <= now || h.t >= end) return;
+    if (last && last.to === h.t){ last.to = h.t + 3600e3; if (kind === 'thunder' || (kind === 'snow' && last.kind === 'rain')) last.kind = kind; }
+    else fronts.push({ from: h.t, to: h.t + 3600e3, kind });
+  });
+  const waypoints = (x.events || []).filter(e => !e.allDay && e.start > now && e.start < end).slice(0, 4).map(e => ({ t: e.start, title: e.title }));
+  let train = null;
+  const t = x.trains ? x.trains.list.filter(d => !d.cancelled && (d.exp || d.sched) - nz(x.walk, 0) * 60e3 > now - 60e3)[0] : null;
+  if (t){
+    const leave = leaveBy(t.exp || t.sched, nz(x.walk, 0), now);
+    train = { dest: t.dest, sched: t.sched, exp: t.exp, platform: t.platform, delayed: t.delayed, station: x.trains.station || '', walk: nz(x.walk, 0), leave,
+              mine: leave.mins <= 20 && leave.mins >= -2 };
+  }
+  return { from: now, to: end, range, dock, fronts, waypoints, train };
+}
+/** Cards the road ahead already shows, so they needn't ride the train or a billboard as well. */
+function shownAhead(v){
+  const ids = [];
+  if (v.dock) ids.push('cheap');
+  if (v.train && v.train.mine) ids.push('train');
+  return ids;
+}
+
+/* ---------- the cabin's instruments: what's true right now ---------- */
+/** Keeps each day's cost, so today can be set against a usual day. A day counts once the screen saw it after 10pm. */
+function recordCost(history, now, pence){
+  const h = Object.assign({}, history || {}), k = dayKey(now);
+  if (pence != null) h[k] = { p: Math.round(pence), late: new Date(now).getHours() >= 22 };
+  Object.keys(h).sort().slice(0, -15).forEach(d => { delete h[d]; });
+  return h;
+}
+/** The usual day's cost: the median of whole days seen, once there are three. */
+function usualCost(history, now){
+  const k = dayKey(now), v = Object.keys(history || {}).filter(d => d !== k && history[d].late).map(d => history[d].p).sort((a, b) => a - b);
+  if (v.length < 3) return null;
+  return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+}
+/** The dials: live draw as a needle, today's cost as a fuel gauge, grid carbon as a lamp. Null where there's no data. */
+function instrumentsFor(x, now, usual){
+  const ci = x.carbon ? x.carbon.filter(r => r.from <= now && now < r.to)[0] : null;
+  const w = x.live && x.live.demand != null ? Math.max(0, x.live.demand) : null;
+  return {
+    draw: w == null ? null : { w, frac: clamp(Math.sqrt(w / 6000), 0, 1), tone: w < 400 ? 'good' : w < 2500 ? 'warn' : 'bad' },
+    cost: x.cost == null ? null : { p: x.cost, usual, frac: usual ? clamp(x.cost / usual / 1.25, 0, 1) : null, mark: usual ? .8 : null,
+                                    tone: usual && x.cost > usual ? 'bad' : 'good' },
+    carbon: ci ? { v: ci.v, index: ci.index, tone: /low/.test(ci.index) ? 'good' : /high/.test(ci.index) ? 'bad' : 'warn' } : null
+  };
+}

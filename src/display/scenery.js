@@ -340,3 +340,60 @@ function drawCruiser(c, len, h, rim, t){
   }
   const e = c.createRadialGradient(len, 0, 0, len, 0, h); e.addColorStop(0, 'rgba(140,230,255,.9)'); e.addColorStop(1, 'rgba(79,214,255,0)'); c.fillStyle = e; c.beginPath(); c.arc(len, 0, h, 0, 7); c.fill();
 }
+
+/* ---------- the fuel dock: where cheap power waits ---------- */
+/** A refuelling depot: a long tank between two spheres, a docking ring and a beacon. u is one unit; it's about 220 units across. */
+function drawDock(c, u, t, lit){
+  const k = .55 + .45 * lit, beat = .5 + .5 * Math.sin(t / (lit > .5 ? 260 : 700));
+  const steel = c.createLinearGradient(0, -30 * u, 0, 30 * u);
+  steel.addColorStop(0, '#9aa3c8'); steel.addColorStop(.45, '#3f4670'); steel.addColorStop(1, '#141830');
+  c.strokeStyle = 'rgba(150,160,210,.5)'; c.lineWidth = Math.max(1, 2 * u);                 // the truss it hangs on
+  c.beginPath(); c.moveTo(-110 * u, -2 * u); c.lineTo(110 * u, -2 * u); c.stroke();
+  for (let x = -100; x <= 100; x += 20){ c.beginPath(); c.moveTo(x * u, -2 * u); c.lineTo((x + 10) * u, 8 * u); c.lineTo((x + 20) * u, -2 * u); c.stroke(); }
+  [-80, 80].forEach(x => {                                                                      // spherical tanks
+    const g = c.createRadialGradient((x - 9) * u, -12 * u, 2 * u, x * u, 0, 26 * u);
+    g.addColorStop(0, '#d8deff'); g.addColorStop(.5, '#5d6596'); g.addColorStop(1, '#151933');
+    c.fillStyle = g; c.beginPath(); c.arc(x * u, 0, 24 * u, 0, 7); c.fill();
+  });
+  c.fillStyle = steel; c.beginPath();                                                           // the long tank
+  c.moveTo(-60 * u, -16 * u); c.lineTo(60 * u, -16 * u); c.arc(60 * u, 0, 16 * u, -Math.PI / 2, Math.PI / 2); c.lineTo(-60 * u, 16 * u); c.arc(-60 * u, 0, 16 * u, Math.PI / 2, Math.PI * 1.5); c.fill();
+  for (let i = 0; i < 5; i++){                                                                  // glowing fuel bands, brighter when it's cheap now
+    const x = (-48 + i * 24) * u, a = (.35 + .65 * k) * (.6 + .4 * Math.sin(t / 400 - i * .8) * lit);
+    c.fillStyle = `rgba(70,230,161,${a.toFixed(3)})`; c.fillRect(x - 3 * u, -15 * u, 6 * u, 30 * u);
+  }
+  c.save(); c.globalCompositeOperation = 'lighter';
+  const halo = c.createRadialGradient(0, 0, 0, 0, 0, 130 * u);
+  halo.addColorStop(0, `rgba(70,230,161,${(.18 + .3 * lit * beat).toFixed(3)})`); halo.addColorStop(1, 'rgba(70,230,161,0)');
+  c.fillStyle = halo; c.beginPath(); c.arc(0, 0, 130 * u, 0, 7); c.fill();
+  c.restore();
+  c.strokeStyle = 'rgba(200,210,255,.7)'; c.lineWidth = Math.max(1, 3 * u);                   // the docking ring, and its beacon
+  c.beginPath(); c.ellipse(0, -30 * u, 12 * u, 5 * u, 0, 0, 7); c.stroke();
+  c.beginPath(); c.moveTo(0, -16 * u); c.lineTo(0, -25 * u); c.stroke();
+  c.fillStyle = `rgba(180,255,220,${(.4 + .6 * beat).toFixed(3)})`; c.beginPath(); c.arc(0, -42 * u, 3.5 * u, 0, 7); c.fill();
+}
+
+/* ---------- the station your train stops at ---------- */
+/** A platform from x0 to x1 with its edge at y, lamps standing behind the train, and a sign with the station's name. */
+function drawPlatform(c, x0, x1, y, trainH, name, rem, t){
+  const top = c.createLinearGradient(0, y, 0, y + rem * .5);
+  top.addColorStop(0, '#5a6290'); top.addColorStop(1, '#2a3058');
+  c.fillStyle = top; c.fillRect(x0, y, x1 - x0, rem * .5);
+  const face = c.createLinearGradient(0, y + rem * .5, 0, y + rem * 1.6);
+  face.addColorStop(0, '#1a1f3e'); face.addColorStop(1, '#070914');
+  c.fillStyle = face; c.fillRect(x0, y + rem * .5, x1 - x0, rem * 1.1);
+  c.fillStyle = 'rgba(255,209,102,.9)'; c.fillRect(x0, y + rem * .08, x1 - x0, rem * .1);   // the yellow line
+  for (let x = x0 + rem * 3; x < x1 - rem; x += rem * 10){                                  // lamps, behind the train
+    c.fillStyle = '#20264a'; c.fillRect(x - 2, y - trainH - rem * 1.6, 4, trainH + rem * 1.6);
+    c.save(); c.globalCompositeOperation = 'lighter';
+    const g = c.createRadialGradient(x, y - trainH - rem * 1.6, 0, x, y - trainH - rem * 1.6, rem * 2.4);
+    g.addColorStop(0, 'rgba(255,224,170,.85)'); g.addColorStop(1, 'rgba(255,200,140,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(x, y - trainH - rem * 1.6, rem * 2.4, 0, 7); c.fill(); c.restore();
+  }
+  if (!name) return;
+  c.font = `600 ${(rem * 1.1).toFixed(1)}px "JetBrains Mono", monospace`;                    // the station's sign, on its own post at the far end
+  const w = c.measureText(name.toUpperCase()).width + rem * 1.4, sx = x1 - w - rem * .6, sy = y - trainH - rem * 3.6;
+  c.fillStyle = '#20264a'; c.fillRect(sx + w / 2 - 2, sy + rem * 1.8, 4, y - sy - rem * 1.8);
+  c.fillStyle = '#0d2a6b'; c.fillRect(sx, sy, w, rem * 1.8);
+  c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = 2; c.strokeRect(sx + 3, sy + 3, w - 6, rem * 1.8 - 6);
+  c.fillStyle = '#ffffff'; c.textBaseline = 'middle'; c.fillText(name.toUpperCase(), sx + rem * .7, sy + rem * .92);
+}

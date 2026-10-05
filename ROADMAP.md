@@ -41,6 +41,11 @@ Put the wall display on its own website on GitHub Pages. It should show househol
   - the house on its own asteroid, lit by your live power use;
   - nature telling the story: the aurora when the grid is clean, a comet in your bins' colours on bin night, the real moon phase, and the real ISS when it's overhead;
   - whales, jellyfish and birds of light.
+- **Time is distance** ([decision 0007](docs/decisions/0007-time-is-distance.md)):
+  - the road ahead: the price landscape, weather fronts and calendar beacons for the next twelve hours;
+  - the fuel dock at the cheapest two hours;
+  - your train stopping at the platform when it's time to leave;
+  - dials in the cabin for live draw, today's cost and grid carbon.
 - **Older TV browsers:** the display's code avoids syntax newer than Chromium 63, and a test checks it.
 - **On GitHub Pages**, a workflow publishes `main`, checking the build, unit tests, layouts and the lock first.
 
