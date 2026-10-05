@@ -48,7 +48,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
   - `display/scenery.js`: how each thing is drawn, with no timing: noise, planets and rings, the moon's phase, ships, the ISS, the house on its asteroid, whales, jellyfish, birds, comets.
   - `display/sources.js`: the display's household data, mostly pure.
     - The cockpit's logic: `skyFor`, `engineFor`, `buildBillboards`, `billboardRotation`, `boardCards` (what goes on billboards rather than the train), `worldFor` (aurora, comet, moon, ISS, the house) with `moonPhase` and `issPass`, `voyageFor` (the road ahead) with `shownAhead`, and `instrumentsFor` with `recordCost` and `usualCost` (the cabin's dials).
-    - Huxley2 trains, and household settings merging.
+    - Trains from public Darwin boards (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), and household settings merging.
     - Modes, night window and settings defaults.
     - Bins, weather, and the iCal parser and `RRULE` expansion.
     - Realtime Trains and TfGM parsing, leave-by countdowns, today's cost.
@@ -96,7 +96,7 @@ Energy, Home, Travel, Screensaver (the cockpit, which new screens open on), Nigh
 
 ## Known gaps
 
-- Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from Huxley2, a free community service with no guarantee. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
+- Octopus allows browser calls, including authenticated ones (checked October 2026). Trains come from free community Darwin boards (Huxley2 and a mirror) with no guarantee; three are tried in turn. Trams (TfGM) and Google Calendar can't be fetched by a browser and need the backend in `ROADMAP.md` item 3.
 - Several GraphQL fields come from community code rather than official docs: Home Mini telemetry, `savingSessions`, `loyaltyPointLedgers`. Each one fails quietly.
 - The EPC register moved to a new government service in 2026. The search endpoint and its parameters in `searchEPC()` are a best guess.
 - The tariff comparison covers electricity only.

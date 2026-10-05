@@ -99,7 +99,7 @@ Everything below works from the published site, in the browser, with no server:
 - **Octopus:** prices, your account, the Home Mini.
 - **National Grid:** the carbon forecast.
 - **Open-Meteo:** the weather.
-- **National Rail:** live trains, through [Huxley2](https://huxley2.azurewebsites.net), a free community service.
+- **National Rail:** live trains, through [Huxley2](https://huxley2.azurewebsites.net) or its mirror, free community services. If one is down, the other is tried.
 - **Where the ISS is:** [wheretheiss.at](https://wheretheiss.at).
 
 A few things can't be fetched by a web page:

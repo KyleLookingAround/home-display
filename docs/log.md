@@ -4,6 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-05
 
+- **Finding:** Huxley2's public departure board returned errors for every station, so no trains showed anywhere. Its staff board and a second public service still worked.
+- **Update:** trains try three departure boards in turn (Huxley2, its mirror at `national-rail-api.davwheat.dev`, then Huxley2's staff board) and start with whichever answered last, so one going down no longer empties the Travel mode and the billboards.
 - **Finding:** a date typed into the change log before the page had finished starting was reset to today. It now stays, and the browser tests wait for the page's islands before using them.
 - **Creation:** a preview of the `redesign` branch at `/preview/` on the published site, behind the same PIN. A push to the branch, once checked, asks for a fresh run on `main`, which builds both. Only `main` deploys.
 - **Update:** the dashboard moved to Astro and Svelte (roadmap item 2). Its five tabs are pages of small islands sharing one state, and the account's data is cached in the browser, so moving between pages doesn't fetch it again. The data code became ES modules in `src/lib/`, which the display's build flattens as before ([0009](decisions/0009-astro-dashboard.md)).

@@ -237,6 +237,22 @@ test('display: content on the TV is real data, labelled examples only where noth
   await bare.ctx.close();
 });
 
+test('display: trains still come when a departure board is down', async () => {
+  // Huxley2's public board fails; the second service answers. Then both fail, and Huxley2's staff board answers.
+  const staff = () => { const j = huxley(); j.trainServices = j.trainServices.map(s => Object.assign({}, s, { std: '2026-10-05T' + s.std + ':00', etd: /^\d/.test(s.etd) ? '2026-10-05T' + s.etd + ':30' : s.etd === 'On time' ? '2026-10-05T' + s.std + ':00' : null })); return j; };
+  for (const down of [['departures'], ['departures', 'davwheat']]) {
+    const { page, ctx } = await open('/display.html#travel', { withHelper: false, settings: { trainFrom: 'SPT' } });
+    await page.route(/^https:\/\/huxley2\.azurewebsites\.net\/departures\//, r => r.fulfill({ status: 500, body: '' }));
+    await page.route(/^https:\/\/huxley2\.azurewebsites\.net\/staffdepartures\//, r => r.fulfill({ json: staff() }));
+    await page.route(/^https:\/\/national-rail-api\.davwheat\.dev\//, r => down.includes('davwheat') ? r.fulfill({ status: 500, body: '' }) : r.fulfill({ json: huxley() }));
+    await page.reload(); await page.waitForTimeout(1200);
+    const trains = await page.textContent('#tTrains');
+    assert.match(trains, /Manchester Piccadilly/, `trains with ${down.join(' and ')} down`);
+    assert.match(trains, /Leave in \d+ min/);
+    await ctx.close();
+  }
+});
+
 test('display: Home Mini live draw and today\'s cost, without using up Octopus\'s rate limit', async () => {
   graphqlCalls = 0;
   const { page, ctx, errors } = await open('/display.html#energy', { account: true });
