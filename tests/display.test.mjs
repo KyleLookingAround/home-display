@@ -9,7 +9,7 @@ import vm from 'node:vm';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = ['src/core.js', 'src/analysis.js', 'src/display/sources.js'].map(read).join('\n');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES stepMode modeFromHash inWindow displaySettings nextCollections exampleBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams leaveBy todayCost nextReload isStale parseWeather weatherText relDay exampleTrains NET';
+const names = 'MODES stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -37,7 +37,7 @@ test('night window works across midnight', () => {
 test('settings keep defaults and drop half-filled bins', () => {
   const s = A.displaySettings({ rotate: 5, bins: [{ name: 'Black', date: '2026-10-08', every: 2 }, { name: '', date: '2026-10-08' }, { name: 'Blue', date: 'soon' }] });
   assert.equal(s.rotate, 5);
-  assert.equal(s.mode, 'energy');
+  assert.equal(s.mode, 'screensaver');                                 // new screens open on the cockpit
   assert.equal(s.bins.length, 1);
   assert.equal(A.displaySettings(null).trainFrom, 'SPT');
 });
@@ -51,7 +51,6 @@ test('bins roll forward from a known collection date', () => {
     { name: 'Garden', colour: 'brown', date: '2026-11-02', every: 1 }  // first one still to come
   ], now));
   assert.deepEqual(b.map(x => [x.name, x.days]), [['Glass', 0], ['Blue', 3], ['Black', 10], ['Garden', 28]]);
-  assert.equal(A.exampleBins(now).length, 3);
 });
 
 const ICS = [
@@ -182,9 +181,91 @@ test('weather: the next twelve hours from now', () => {
   assert.equal(A.weatherText(1234).text, '—');
 });
 
-test('example departures are in the future', () => {
-  const now = at('2026-10-05T14:02:00');
-  assert.ok(A.exampleTrains(now).every(d => d.sched > now));
+test('links can carry cockpit previews after the mode', () => {
+  assert.equal(A.modeFromHash('#screensaver&wx=rain&phase=night', 'energy'), 'screensaver');
+  assert.deepEqual(plain(A.hashOptions('#screensaver&wx=rain&price=-2')), { wx: 'rain', price: '-2' });
+  assert.deepEqual(plain(A.hashOptions('#home')), {});
+});
+
+test('trains from Huxley2: board times, delays, cancellations, just after midnight', () => {
+  const now = at('2026-10-05T23:50:00');
+  assert.equal(A.boardTime('00:10', now), at('2026-10-06T00:10:00'));
+  assert.equal(A.boardTime('23:40', now), at('2026-10-05T23:40:00'));
+  assert.equal(A.boardTime('23:58', at('2026-10-06T00:05:00')), at('2026-10-05T23:58:00'));
+  const svc = (std, etd, dest, extra = {}) => Object.assign({ std, etd, platform: '2', operator: 'Northern', isCancelled: false, destination: [{ locationName: dest, via: null }] }, extra);
+  const r = plain(A.parseHuxley({ locationName: 'Stockport', nrccMessages: [{ value: '<p>Disruption at <a href="x">Crewe</a></p>' }], trainServices: [
+    svc('23:55', 'On time', 'Manchester Piccadilly'), svc('00:15', '00:21', 'Crewe'), svc('23:58', 'Delayed', 'Buxton'), svc('00:05', 'Cancelled', 'Hazel Grove', { isCancelled: true, cancelReason: 'a fault' }) ] }, now));
+  assert.equal(r.station, 'Stockport');
+  assert.deepEqual(r.messages, ['Disruption at Crewe']);
+  assert.deepEqual(r.list.map(d => d.dest), ['Manchester Piccadilly', 'Buxton', 'Hazel Grove', 'Crewe']);
+  assert.equal(r.list[0].exp, r.list[0].sched);
+  assert.equal(r.list[1].delayed, true);
+  assert.equal(r.list[2].cancelled, true);
+  assert.equal(r.list[3].exp - r.list[3].sched, 6 * 60e3);
+  assert.deepEqual(plain(A.parseHuxley({})).list, []);
+});
+
+test('household settings reach every screen, and a screen keeps only its own changes', () => {
+  const house = { bins: [{ name: 'Black', date: '2026-10-08', every: 2 }], trainFrom: 'SPT', trainWalk: 12, ical: 'https://secret' };
+  const s = A.mergeSettings(house, null);
+  assert.equal(s.trainWalk, 12);
+  assert.equal(s.bins.length, 1);
+  assert.equal(s.ical, '', 'a calendar address never comes from the public file');
+  const mine = A.mergeSettings(house, { trainWalk: 5 });
+  assert.equal(mine.trainWalk, 5);
+  assert.equal(mine.bins.length, 1);
+  assert.deepEqual(plain(A.deviceChanges(Object.assign({}, s, { rotate: 5 }), house)), { rotate: 5 });
+});
+
+test('the sky outside follows the weather and the sun', () => {
+  const day = at('2026-10-05T00:00:00');
+  const W = (code, temp, wind, extra) => Object.assign({ now: { code, temp, wind }, days: [{ k: '2026-10-05', rise: day + 7.25 * 3600e3, set: day + 18.67 * 3600e3, max: 15, min: 8 }], hours: [] }, extra || {});
+  const noon = day + 13 * 3600e3;
+  assert.equal(A.skyFor(W(0, 14, 5), noon).phase, 'day');
+  assert.equal(A.skyFor(W(0, 14, 5), noon).sun, 1);
+  assert.equal(A.skyFor(W(0, 14, 5), day + 7.5 * 3600e3).phase, 'dawn');
+  assert.equal(A.skyFor(W(0, 14, 5), day + 18.5 * 3600e3).phase, 'dusk');
+  assert.equal(A.skyFor(W(0, 14, 5), day + 23 * 3600e3).phase, 'night');
+  assert.equal(A.skyFor(W(0, 14, 5), day + 23 * 3600e3).sun, 0);
+  assert.equal(A.skyFor(W(65, 9, 10), noon).rain, 1);
+  assert.equal(A.skyFor(W(75, -3, 10), noon).snow, 1);
+  assert.equal(A.skyFor(W(75, -3, 10), noon).cold, 1);
+  assert.equal(A.skyFor(W(45, 6, 3), noon).fog, 1);
+  assert.equal(A.skyFor(W(95, 16, 20), noon).thunder, 1);
+  assert.ok(A.skyFor(W(2, 12, 40), noon).wind > .9);
+  const soon = A.skyFor(W(2, 12, 5, { hours: [{ t: noon + 3600e3, rain: 20, code: 3 }, { t: noon + 2 * 3600e3, rain: 80, code: 61 }] }), noon);
+  assert.equal(soon.rainSoon, noon + 2 * 3600e3);
+  assert.equal(A.skyFor(null, noon, { wx: 'thunder', phase: 'night' }).thunder, 1);
+  assert.equal(A.skyFor(null, noon, { wx: 'thunder', phase: 'night' }).phase, 'night');
+});
+
+test('the engines follow the power price', () => {
+  assert.equal(A.engineFor(-2).mode, 'warp');
+  assert.equal(A.engineFor(9).mode, 'fast');
+  assert.equal(A.engineFor(20).mode, 'cruise');
+  assert.equal(A.engineFor(31).mode, 'eco');
+  assert.ok(A.engineFor(31).speed < A.engineFor(20).speed && A.engineFor(20).speed < A.engineFor(-2).speed);
+  assert.equal(A.engineFor(null).mode, 'cruise');
+  assert.equal(A.engineFor(20, 'very high').dust, .8);
+});
+
+test('billboards carry real data only, and urgent ones come round more often', () => {
+  const now = at('2026-10-05T17:10:00'), s0 = at('2026-10-05T17:00:00');
+  const agile = []; for (let i = -4; i < 20; i++) agile.push({ from: s0 + i * 1800e3, to: s0 + (i + 1) * 1800e3, p: i === 10 ? -3 : 20 + (i % 3) });
+  const cards = A.buildBillboards({ agile, bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }], walk: 10,
+    trains: { list: [{ sched: now + 18 * 60e3, exp: now + 18 * 60e3, dest: 'Manchester Piccadilly', platform: '1', cancelled: false }] } }, now);
+  const ids = cards.map(c => c.id);
+  assert.ok(ids.includes('price') && ids.includes('cheap') && ids.includes('plunge') && ids.includes('bins') && ids.includes('train') && ids.includes('date'));
+  assert.ok(!ids.includes('wx') && !ids.includes('event0'), 'no weather or calendar billboards without data');
+  const bins = cards.find(c => c.id === 'bins');
+  assert.equal(bins.head, 'Bins tomorrow');
+  assert.equal(bins.sub, 'Put them out tonight');
+  assert.equal(bins.weight, 3);
+  assert.equal(cards.find(c => c.id === 'train').big, 'Leave in 8 min');
+  const rot = plain(A.billboardRotation(cards));
+  assert.equal(rot.filter(c => c.id === 'bins').length, 3);
+  assert.ok(rot.every((c, i) => !i || c.id !== rot[i - 1].id), 'never the same billboard twice running');
+  assert.deepEqual(plain(A.buildBillboards({}, now)).map(c => c.id), ['date']);
 });
 
 // TV browsers from 2019-2021 run Chromium 63-79, which can't parse optional chaining or nullish coalescing.
@@ -199,5 +280,5 @@ test('the display\'s script runs on older TV browsers', () => {
 test('built pages match the source', () => {
   const page = (head, body, scripts) => read(`src/${head}`) + read(`src/${body}`) + '<script>\n(() => {\n"use strict";\n' + scripts.map(f => read(`src/${f}`)).join('') + '\n})();\n</script>\n<script>\n' + read('src/starfield.js') + '</script>\n</body>\n</html>\n';
   assert.equal(read('index.html'), page('head.html', 'body.html', ['core.js', 'analysis.js', 'dom.js']), 'run python3 build.py');
-  assert.equal(read('display.html'), page('display/head.html', 'display/body.html', ['core.js', 'analysis.js', 'display/sources.js', 'display/display.js']), 'run python3 build.py');
+  assert.equal(read('display.html'), page('display/head.html', 'display/body.html', ['core.js', 'analysis.js', 'display/sources.js', 'display/cockpit.js', 'display/display.js']), 'run python3 build.py');
 });

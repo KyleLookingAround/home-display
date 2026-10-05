@@ -2,14 +2,14 @@
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
 const D = {
-  set: displaySettings(store.getJ('display', null)),
+  household: null, preview: {},
+  set: mergeSettings(null, store.getJ('display', null)),
   mode: 'energy', override: null, resume: null,
   lastInput: Date.now(), lastPick: 0, chromeUntil: 0, rotateAt: 0, reloadAt: 0,
   deviceId: null, wake: null, ticks: 0
 };
 const shown = () => D.override || D.mode;
 const region = () => { const r = store.get('region'); return REGIONS[r] ? r : 'G'; };
-const exTag = '<span class="tag">Example</span>';
 
 /* ---------- data sources: each refreshes on its own clock, backs off when it fails, and keeps its last good data ---------- */
 const MIN = 60e3;
@@ -22,7 +22,8 @@ const SRC = {
   live:    { label: 'Home Mini', every: () => SRC.live.data && SRC.live.data.none ? 6*60*MIN : shown() === 'night' ? 30*MIN : (shown() === 'energy' || shown() === 'screensaver') ? 2*MIN : 10*MIN, need: () => !!NET.creds, run: pollMini },
   weather: { label: 'Weather', every: () => 15*MIN, need: () => true, run: loadDisplayWeather },
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
-  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.trainFrom, run: () => loadTrains(D.set.trainFrom, D.set.trainTo) },
+  // Huxley2 is a free community service: ask once a minute only while departures are on screen.
+  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
@@ -56,7 +57,7 @@ function retryAll(){ Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.err
 function setMode(id, opts){
   opts = opts || {};
   D.mode = id; D.override = null;
-  if (!opts.keepHash) try { history.replaceState(null, '', '#' + id); } catch(e){}
+  if (!opts.keepHash){ D.preview = {}; try { history.replaceState(null, '', '#' + id); } catch(e){} }
   if (!opts.rotation) D.lastPick = Date.now();
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   applyMode();
@@ -190,70 +191,62 @@ function renderHome(){
     $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
     $('#hHours').innerHTML = '';
   }
-  const own = D.set.bins.length > 0, bins = nextCollections(own ? D.set.bins : exampleBins(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = `<ul class="list">${bins.map(b => {
+  const bins = nextCollections(D.set.bins, now), hour = new Date(now).getHours();
+  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins in settings, or for every screen in household.json.</p>' : `<ul class="list">${bins.map(b => {
     const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
     return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
-  }).join('')}</ul>${own ? '' : `<p class="note">${exTag} Add your bins in settings.</p>`}`;
+  }).join('')}</ul>`;
   const C = SRC.cal;
   let evs = null, note = '';
-  if (!D.set.ical){ evs = exampleCalendar(now); note = `${exTag} Add your calendar's secret iCal address in settings.`; }
+  if (!D.set.ical) note = 'Add a calendar\'s iCal address in settings to see what\'s coming up.';
   else if (C.data) evs = C.data.filter(e => e.end > now);
-  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Open the display from the home server helper.' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
+  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
   else note = 'Reading the calendar…';
   $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
   $('#hFoot').innerHTML = '<span>Weather from Open-Meteo</span>' + foot(['weather', 'cal']);
 }
 
-function travelNote(src, needKey){
-  if (!NET.proxy) return 'Live departures need the home server helper, which holds the API keys. Showing an example.';
-  if (src.err && src.err.code === 'NOKEY') return esc(src.err.message) + ' Showing an example.';
-  if (needKey && NET.keys[needKey] === false) return 'The home server helper has no key for this yet. Showing an example.';
-  return '';
-}
 function renderTravel(){
-  const now = Date.now(), s = D.set;
-  // trains
-  const T = SRC.trains;
-  let html = '', ex = false, list = null;
+  const now = Date.now(), s = D.set, T = SRC.trains;
+  let html = '', list = null;
   if (!s.trainFrom) html = '<p class="empty">Set a railway station in settings.</p>';
   else if (T.data) list = T.data.list;
-  else if (!T.need() || (T.err && T.err.code === 'NOKEY')){ list = exampleTrains(now); ex = true; }
-  else if (T.err) html = `<p class="empty">${esc(errorText(T.err).join(' '))}</p>`;
+  else if (T.err) html = `<p class="empty">No departures signal: ${esc(errorText(T.err)[0])} Trying again shortly.</p>`;
   else html = '<p class="empty">Checking departures…</p>';
   const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
-  $('#tTrainTitle').innerHTML = `Trains from ${esc(stn)}${s.trainTo ? ' calling at ' + esc(s.trainTo) : ''}${ex ? exTag : ''}`;
+  $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
   if (list){
-    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 6);
+    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 7);
     html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th>Status</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
       const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
+      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
       return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}</td><td class="t opt">${esc(d.platform || '—')}</td><td class="st">${st}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
     }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
-    if (ex) html += `<p class="note">${travelNote(T, 'rtt')}</p>`;
+    if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
   }
   $('#tTrains').innerHTML = html;
-  // trams
-  const M = SRC.trams;
-  html = ''; ex = false; let tr = null;
-  if (!s.tramStop) html = '<p class="empty">Set a Metrolink stop in settings.</p>';
-  else if (M.data) tr = M.data;
-  else if (!M.need() || (M.err && M.err.code === 'NOKEY')){ tr = exampleTrams(now); ex = true; }
-  else if (M.err) html = `<p class="empty">${esc(errorText(M.err).join(' '))}</p>`;
-  else html = '<p class="empty">Checking trams…</p>';
-  $('#tTramTitle').innerHTML = `Trams${s.tramStop ? ' from ' + esc(s.tramStop) : ''}${ex ? exTag : ''}`;
-  if (tr){
-    const age = M.at && !ex ? Math.max(0, Math.floor((now - M.at) / MIN)) : 0;
-    const rows = tr.trams.map(t => ({ dest: t.dest, wait: t.wait - age, status: t.status, carriages: t.carriages })).filter(t => t.wait >= 0).slice(0, 6);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Tram</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(t => {
-      const lv = leaveBy(now + t.wait*MIN, s.tramWalk, now);
-      return `<tr><td class="t">${t.wait === 0 ? 'Due' : t.wait + ' min'}</td><td class="dest">${esc(t.dest)}</td><td class="t opt">${esc(t.carriages || '')}</td><td class="lv ${lv.cls}">${lv.text}</td></tr>`;
-    }).join('')}</tbody></table>` : '<p class="empty">No trams listed right now.</p>';
-    if (tr.messages && tr.messages.length) html += `<p class="note">${esc(tr.messages[0])}</p>`;
-    if (ex) html += `<p class="note">${travelNote(M, 'tfgm')}</p>`;
+  // Trams only show once a stop is set: TfGM needs a server that holds the key.
+  const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
+  tramPanel.hidden = !s.tramStop;
+  if (s.tramStop){
+    let tr = null; html = '';
+    if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';
+    else if (M.data) tr = M.data;
+    else if (M.err) html = `<p class="empty">${esc(M.err.code === 'NOKEY' ? M.err.message : errorText(M.err).join(' '))}</p>`;
+    else html = '<p class="empty">Checking trams…</p>';
+    $('#tTramTitle').textContent = `Trams from ${s.tramStop}`;
+    if (tr){
+      const age = M.at ? Math.max(0, Math.floor((now - M.at) / MIN)) : 0;
+      const rows = tr.trams.map(t => ({ dest: t.dest, wait: t.wait - age, carriages: t.carriages })).filter(t => t.wait >= 0).slice(0, 6);
+      html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Tram</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(t => {
+        const lv = leaveBy(now + t.wait*MIN, s.tramWalk, now);
+        return `<tr><td class="t">${t.wait === 0 ? 'Due' : t.wait + ' min'}</td><td class="dest">${esc(t.dest)}</td><td class="t opt">${esc(t.carriages || '')}</td><td class="lv ${lv.cls}">${lv.text}</td></tr>`;
+      }).join('')}</tbody></table>` : '<p class="empty">No trams listed right now.</p>';
+      if (tr.messages && tr.messages.length) html += `<p class="note">${esc(tr.messages[0])}</p>`;
+    }
+    $('#tTrams').innerHTML = html;
   }
-  $('#tTrams').innerHTML = html;
-  $('#tFoot').innerHTML = '<span>Trains from Realtime Trains · trams from TfGM</span>' + foot(['trains', 'trams']);
+  $('#tFoot').innerHTML = '<span>Live trains from National Rail, via Huxley2</span>' + foot(['trains', 'trams']);
 }
 
 function renderNight(){
@@ -261,80 +254,26 @@ function renderNight(){
   $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : ''].filter(Boolean).join(' · ');
 }
 
-/* ---------- screensaver: planets carrying live numbers, the odd comet, an orbiting clock ---------- */
-// Each planet wanders round its own quarter of the screen, so they rarely meet but every pixel still changes.
-const PLANETS = [
-  { id: 'price', hue: ['#ffd27a', '#c46a12'], ring: false, cx: .27, cy: .28, ax: .17, ay: .14, fx: 1/310, fy: 1/230, px: 0, py: 1.1 },
-  { id: 'temp',  hue: ['#8fe8ff', '#1f5fa8'], ring: true,  cx: .73, cy: .28, ax: .17, ay: .14, fx: 1/270, fy: 1/350, px: 2.2, py: 0.2 },
-  { id: 'go',    hue: ['#d9c4ff', '#5a2fc2'], ring: false, cx: .27, cy: .72, ax: .17, ay: .14, fx: 1/380, fy: 1/260, px: 4.1, py: 2.7 },
-  { id: 'grid',  hue: ['#a6f5cf', '#1b8a5a'], ring: false, cx: .73, cy: .72, ax: .17, ay: .14, fx: 1/240, fy: 1/300, px: 5.3, py: 4.4 }
-];
-let saverRaf = null, saverStill = null, comet = null, nextComet = 0;
-const reducedMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-function planetValues(now){
-  const cur = agileNow(now), W = SRC.weather.data, s = D.set, out = {};
-  out.price = cur ? { v: pence(cur.p), l: 'Agile now', c: priceColour(cur.p) } : { v: '--', l: 'Agile now' };
-  out.temp = W ? { v: Math.round(W.now.temp) + '°', l: weatherText(W.now.code).text } : { v: '--', l: 'Outside' };
-  const T = SRC.trains.data, next = T ? T.list.filter(d => !d.cancelled && (d.exp || d.sched) - s.trainWalk*MIN > now)[0] : null;
-  const M = SRC.trams.data, tram = M ? M.trams.filter(t => t.at - s.tramWalk*MIN > now)[0] : null;
-  out.go = next ? { v: leaveBy(next.exp || next.sched, s.trainWalk, now).text.replace('Leave in ', ''), l: 'Leave for the ' + hhmm(next.sched) }
-        : tram ? { v: leaveBy(tram.at, s.tramWalk, now).text.replace('Leave in ', ''), l: 'Leave for the tram' }
-        : { v: longDay(new Date(now)).split(' ')[0].slice(0, 3) + ' ' + new Date(now).getDate(), l: MONTH_NAMES[new Date(now).getMonth()] };
-  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
-  out.grid = cin ? { v: cin.v + ' g', l: 'Grid · ' + cin.index } : { v: '--', l: 'Grid carbon' };
-  return out;
+/* ---------- screensaver: the view from the cockpit (cockpit.js draws it) ---------- */
+const toneOf = p => p < 0 ? 'neg' : p < 15 ? 'good' : p < 25 ? 'warn' : 'bad';
+function cockpitInfo(now){
+  let ag = SRC.agile.data;
+  const pp = parseFloat(D.preview.price);
+  if (!isNaN(pp)){ const s0 = Math.floor(now / 1800e3) * 1800e3; ag = (ag || []).filter(r => r.to <= s0 || r.from > s0).concat([{ from: s0, to: s0 + 1800e3, p: pp }]).sort((x, y) => x.from - y.from); }
+  const cur = ag ? ag.filter(r => r.from <= now && now < r.to)[0] : null;
+  const ci = SRC.carbon.data ? SRC.carbon.data.filter(r => r.from <= now && now < r.to)[0] : null;
+  const L = SRC.live.data && !SRC.live.data.none ? SRC.live.data : null, T = SRC.tariff.data, W = SRC.weather.data;
+  const sky = skyFor(W, now, D.preview), known = !!W || !!D.preview.wx;
+  return {
+    sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null),
+    cards: buildBillboards({ agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins: D.set.bins,
+      events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, label: 'Harold Street · region ' + region() }, now),
+    hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
+  };
 }
-function renderSaver(){
-  const box = $('#sPlanets'), vals = planetValues(Date.now());
-  if (!box.children.length) box.innerHTML = PLANETS.map(p => `<div class="planet" data-p="${p.id}"><div class="orb" style="background:radial-gradient(circle at 32% 30%, ${p.hue[0]}, ${p.hue[1]} 70%, #05060f);color:${p.hue[0]}">${p.ring ? '<i class="ring"></i>' : ''}</div><span class="val"></span><span class="lbl"></span></div>`).join('');
-  PLANETS.forEach(p => {
-    const el = box.querySelector(`[data-p="${p.id}"]`), v = vals[p.id];
-    el.querySelector('.val').textContent = v.v; el.querySelector('.val').style.color = v.c || '';
-    el.querySelector('.lbl').textContent = v.l;
-  });
-  if (saverStill) placeSaver(Date.now());
-}
-function placeSaver(t){
-  const W = innerWidth, H = innerHeight, s = t / 1000;
-  PLANETS.forEach(p => {
-    const el = document.querySelector(`#sPlanets [data-p="${p.id}"]`); if (!el) return;
-    const x = W * (p.cx + Math.sin(s * 2*Math.PI * p.fx + p.px) * p.ax), y = H * (p.cy + Math.sin(s * 2*Math.PI * p.fy + p.py) * p.ay);
-    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
-  });
-  const a = s / 600 * 2*Math.PI, c = $('#sClock');
-  c.style.transform = `translate(${(W/2 + Math.cos(a) * W * .12).toFixed(1)}px,${(H/2 + Math.sin(a) * H * .1).toFixed(1)}px)`;
-}
-function frameSaver(t){
-  const now = Date.now();
-  placeSaver(now);
-  const el = $('#sComet');
-  if (!comet && now > nextComet){
-    const W = innerWidth, H = innerHeight, ltr = Math.random() < .5, y0 = H * (.1 + Math.random()*.5);
-    comet = { start: now, dur: 3500 + Math.random()*2500, x0: ltr ? -W*.2 : W*1.2, x1: ltr ? W*1.2 : -W*.2, y0, y1: y0 + H*(.15 + Math.random()*.3) };
-    el.hidden = false;
-  }
-  if (comet){
-    const p = (now - comet.start) / comet.dur;
-    if (p >= 1){ comet = null; el.hidden = true; nextComet = now + 45e3 + Math.random()*105e3; }
-    else {
-      const x = comet.x0 + (comet.x1 - comet.x0)*p, y = comet.y0 + (comet.y1 - comet.y0)*p, ang = Math.atan2(comet.y1 - comet.y0, comet.x1 - comet.x0);
-      el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${ang}rad) translateX(-100%)`;
-      el.style.opacity = String(Math.min(1, 4*p, 4*(1 - p)));
-    }
-  }
-  saverRaf = requestAnimationFrame(frameSaver);
-}
-function startSaver(){
-  renderSaver();
-  nextComet = Date.now() + 15e3;
-  if (reducedMotion()){ placeSaver(Date.now()); if (!saverStill) saverStill = setInterval(() => placeSaver(Date.now() * 40), 60e3); return; }
-  if (!saverRaf) saverRaf = requestAnimationFrame(frameSaver);
-}
-function stopSaver(){
-  if (saverRaf) cancelAnimationFrame(saverRaf); saverRaf = null;
-  if (saverStill) clearInterval(saverStill); saverStill = null;
-  comet = null; const el = $('#sComet'); if (el) el.hidden = true;
-}
+function renderSaver(){ Cockpit.update(cockpitInfo(Date.now())); }
+function startSaver(){ renderSaver(); Cockpit.start(); }
+function stopSaver(){ Cockpit.stop(); }
 
 /* ---------- toolbar, settings and remote control ---------- */
 const open = () => !$('#sheet').hidden;
@@ -449,7 +388,7 @@ function readSheet(){
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }
 function closeSheet(){ $('#sheet').hidden = true; D.lastInput = Date.now(); $('#setBtn').blur(); }
 function applySettings(s, regionCode){
-  const old = D.set; D.set = s; store.setJ('display', s);
+  const old = D.set; D.set = s; store.setJ('display', deviceChanges(s, D.household));
   if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
   if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
   if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
@@ -465,7 +404,7 @@ function setupLink(s, withRegion){ return location.href.split('#')[0] + '#setup=
 function importSetup(hash){
   const m = /^#setup=([A-Za-z0-9_-]+)$/.exec(hash || '');
   if (!m) return false;
-  try { const j = JSON.parse(b64.dec(m[1])); applySettings(displaySettings(j), REGIONS[j.region] ? j.region : null); toast('Settings saved on this device.'); }
+  try { const j = JSON.parse(b64.dec(m[1])); delete j.region; applySettings(mergeSettings(D.household, j), REGIONS[JSON.parse(b64.dec(m[1])).region] ? JSON.parse(b64.dec(m[1])).region : null); toast('Settings saved on this device.'); }
   catch(e){ toast('That setup link didn\'t work. Copy it again from the settings.'); }
   return true;
 }
@@ -495,13 +434,13 @@ function wire(){
     if (Math.abs(dx) > 70 && Math.abs(dy) < 50 && !$('#bar').contains(e.target)) setMode(stepMode(D.mode, dx < 0 ? 1 : -1));
     else showChrome();
   }, { passive: true });
-  window.addEventListener('hashchange', () => { if (importSetup(location.hash)){ try { history.replaceState(null, '', '#' + D.mode); } catch(e){} return; } const m = modeFromHash(location.hash, null); if (m && m !== D.mode) setMode(m, { keepHash: true }); });
+  window.addEventListener('hashchange', () => { if (importSetup(location.hash)){ try { history.replaceState(null, '', '#' + D.mode); } catch(e){} return; } D.preview = hashOptions(location.hash); const m = modeFromHash(location.hash, null); if (m && m !== D.mode) setMode(m, { keepHash: true }); else render(); });
   window.addEventListener('online', () => { retryAll(); render(); });
   window.addEventListener('offline', render);
   document.addEventListener('visibilitychange', () => { if (!document.hidden){ keepAwake(); retryAll(); } });
   document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
   document.addEventListener('click', () => keepAwake(), true);
-  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 200); });
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { Cockpit.resize(); render(); }, 200); });
 }
 
 /* ---------- start ---------- */
@@ -509,9 +448,15 @@ function wire(){
   const k = store.get('key'), a = store.get('account');
   if (k && a) NET.creds = { account: a, key: k };
   buildSheet(); wire();
+  // Settings every screen shares, from household.json next to this page. Missing or unreadable is fine.
+  try {
+    const r = await Promise.race([fetch('household.json', { cache: 'no-cache' }), new Promise((_, no) => setTimeout(no, 4000))]);
+    if (r.ok){ D.household = await r.json(); D.set = mergeSettings(D.household, store.getJ('display', null)); }
+  } catch(e){}
   const imported = importSetup(location.hash);
   D.mode = modeFromHash(imported ? '' : location.hash, D.set.mode);
-  try { history.replaceState(null, '', '#' + D.mode); } catch(e){}
+  D.preview = imported ? {} : hashOptions(location.hash);
+  if (imported || !location.hash) try { history.replaceState(null, '', '#' + D.mode); } catch(e){}
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), D.set.reloadAt, Math.random()*10);
   applyMode();

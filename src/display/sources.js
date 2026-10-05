@@ -1,4 +1,4 @@
-/* ===================== display sources: household data, pure parsing, example data ===================== */
+/* ===================== display sources: household data, pure parsing, the cockpit's logic ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -19,7 +19,13 @@ const MODES = [
   { id: 'night', label: 'Night', key: '5' }
 ];
 const ROTATING = ['energy', 'home', 'travel'];
-const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+/** Extras after the mode in a link, such as #screensaver&wx=rain&phase=night&price=-2, for previewing the cockpit. */
+function hashOptions(hash){
+  const out = {};
+  String(hash || '').replace(/^#/, '').split('&').slice(1).forEach(p => { const e = p.indexOf('='); if (e > 0) out[decodeURIComponent(p.slice(0, e))] = decodeURIComponent(p.slice(e + 1)); });
+  return out;
+}
 function stepMode(id, dir){ const i = MODES.findIndex(m => m.id === id); return MODES[(Math.max(0, i) + dir + MODES.length) % MODES.length].id; }
 /** Is the clock time inside a window like 23:00–06:30? Windows may cross midnight. */
 function inWindow(now, from, to){
@@ -30,7 +36,7 @@ function inWindow(now, from, to){
 }
 
 const DISPLAY_DEFAULTS = {
-  mode: 'energy', rotate: 0, saver: 15, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
+  mode: 'screensaver', rotate: 0, saver: 10, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '',
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
 };
@@ -53,14 +59,6 @@ function nextCollections(bins, now = Date.now()){
     return { name: b.name, colour: b.colour || 'grey', date: d, days: Math.round((+d - today) / 864e5) };
   }).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
-function exampleBins(now = Date.now()){
-  const t = startOfDay(new Date(now)), toThu = (4 - t.getDay() + 7) % 7;
-  const thu = addDays(t, toThu);
-  return [{ name: 'General waste', colour: 'black', date: dayKey(thu), every: 2 },
-          { name: 'Paper and card', colour: 'blue', date: dayKey(addDays(thu, 7)), every: 2 },
-          { name: 'Garden waste', colour: 'brown', date: dayKey(addDays(thu, 7)), every: 2 }];
-}
-
 /* ---------- weather (Open-Meteo, no key, allows browser calls) ---------- */
 const WMO = [
   [[0], 'Clear', '☀'], [[1], 'Mostly clear', '☀'], [[2], 'Partly cloudy', '⛅'], [[3], 'Overcast', '☁'],
@@ -215,16 +213,6 @@ async function loadCalendar(url, now = Date.now()){
   if (!/BEGIN:VCALENDAR/.test(text)) throw new ApiError('CALFAIL');
   return calendarWindow(parseICal(text), +startOfDay(new Date(now)), +addDays(startOfDay(new Date(now)), 8));
 }
-function exampleCalendar(now = Date.now()){
-  const t = startOfDay(new Date(now)), at = (d, h, m) => +addDays(t, d) + (h*60 + m)*60e3;
-  return [
-    { title: 'Bins out tonight', start: at(0, 19, 0), end: at(0, 19, 30), allDay: false },
-    { title: 'Dentist', start: at(1, 10, 15), end: at(1, 11, 0), allDay: false },
-    { title: 'Football practice', start: at(2, 17, 30), end: at(2, 19, 0), allDay: false },
-    { title: 'Grandparents visiting', start: +addDays(t, 4), end: +addDays(t, 5), allDay: true }
-  ].filter(e => e.end > now);
-}
-
 /* ---------- trains (Realtime Trains, through the home server helper, which holds the token) ---------- */
 function parseTrains(j){
   const services = (j && j.services) || [];
@@ -285,18 +273,6 @@ function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
-function exampleTrains(now = Date.now()){
-  const base = Math.ceil(now / 300e3) * 300e3, rnd = mulberry32(Math.floor(now / 3600e3));
-  const dests = ['Manchester Piccadilly', 'London Euston', 'Buxton', 'Hazel Grove', 'Sheffield', 'Manchester Airport'];
-  return dests.map((dest, i) => {
-    const sched = base + (6 + i*9) * 60e3, late = rnd() < 0.3 ? Math.round(rnd()*6) * 60e3 : 0;
-    return { sched, exp: sched + late, dest, platform: String(1 + (i % 4)), cancelled: i === 4 && rnd() < 0.5, operator: '' };
-  });
-}
-function exampleTrams(now = Date.now()){
-  return { trams: [['Rochdale Town Centre', 3], ['Shaw and Crompton', 9], ['Rochdale Town Centre', 15], ['Shaw and Crompton', 21]].map(([dest, wait]) => ({ dest, wait, at: now + wait*60e3, status: wait < 4 ? 'Due' : '', carriages: 'Double', platform: 'Outgoing' })), messages: [] };
-}
-
 /* ---------- prices for the display ---------- */
 /** Cost of the Home Mini's half hours today on your tariff, with the standing charge. */
 function todayCost(rows, eSets, now = Date.now()){
@@ -317,3 +293,133 @@ function nextReload(now, at, jitterMin){
 }
 /** Is a source's data too old to trust? Twice its refresh period, with a floor. */
 const isStale = (src, every, now = Date.now()) => !src.at || now - src.at > Math.max(2*every, 5*60e3);
+
+/* ---------- trains without a server: Huxley2 (National Rail Darwin, no key, allows browser calls) ---------- */
+const HUXLEY = 'https://huxley2.azurewebsites.net';
+/** "HH:MM" on the departure board as a time near now: just after midnight counts as tomorrow. */
+function boardTime(hhmm, now, ref){
+  const m = /^(\d\d):(\d\d)$/.exec(String(hhmm || '').trim()); if (!m) return null;
+  const d = new Date(now); d.setHours(+m[1], +m[2], 0, 0);
+  let t = +d;
+  const base = ref || now;
+  if (t < base - 12*3600e3) t += 864e5; else if (t > base + 12*3600e3) t -= 864e5;
+  return t;
+}
+const stripTags = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+function parseHuxley(j, now = Date.now()){
+  const list = ((j && j.trainServices) || []).map(s => {
+    const sched = boardTime(s.std, now); if (sched == null) return null;
+    const etd = String(s.etd || '').trim(), cancelled = !!s.isCancelled || /cancel/i.test(etd);
+    const exp = /^\d\d:\d\d$/.test(etd) ? boardTime(etd, now, sched) : etd === 'On time' ? sched : null;
+    return { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
+             platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || '') };
+  }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
+  return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
+}
+async function loadTrainsLive(from, to){
+  const path = `/departures/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/12`;
+  try { return parseHuxley(await request(HUXLEY + path, { headers: { Accept: 'application/json' } })); }
+  catch(e){ if (NET.proxy && NET.keys.rtt) return loadTrains(from, to); throw e; }
+}
+
+/* ---------- household settings shared by every screen (household.json, editable on GitHub) ---------- */
+/** Defaults, then the household file, then this device's own changes. */
+function mergeSettings(household, device){
+  const h = Object.assign({}, household || {}); delete h.ical;   // a secret address never comes from a public file
+  const s = displaySettings(Object.assign({}, h, device || {}));
+  if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
+  return s;
+}
+/** What this device changed from the household's settings: only that is stored, so later household edits still arrive. */
+function deviceChanges(form, household){
+  const base = mergeSettings(household, null), out = {};
+  Object.keys(form).forEach(k => { if (JSON.stringify(form[k]) !== JSON.stringify(base[k])) out[k] = form[k]; });
+  return out;
+}
+
+/* ---------- the cockpit: what the weather and the power price do to the view ---------- */
+const WX_PRESETS = {
+  clear: { code: 0 }, cloud: { code: 3 }, rain: { code: 63 }, drizzle: { code: 53 }, snow: { code: 73, temp: -1 },
+  fog: { code: 45 }, thunder: { code: 95 }, wind: { code: 2, wind: 38 }, cold: { code: 1, temp: -4 }
+};
+/** The sky outside the window, from Open-Meteo's current weather and the sun's times. Every value runs 0 to 1. */
+function skyFor(W, now = Date.now(), preview){
+  const p = preview || {}, cur = Object.assign({ code: 0, temp: 12, wind: 6 }, W && W.now ? { code: W.now.code, temp: W.now.temp, wind: W.now.wind } : {}, WX_PRESETS[p.wx] || {});
+  const day = W && W.days ? W.days.filter(d => d.k === dayKey(now))[0] || W.days[0] : null;
+  const rise = day ? day.rise : +startOfDay(new Date(now)) + 7*3600e3, set = day ? day.set : +startOfDay(new Date(now)) + 19*3600e3;
+  const phase = p.phase || (now < rise - 40*60e3 || now > set + 40*60e3 ? 'night' : now < rise + 60*60e3 ? 'dawn' : now > set - 60*60e3 ? 'dusk' : 'day');
+  const c = +cur.code, pick = (table, d) => { for (const k in table) if (table[k].indexOf(c) >= 0) return +k; return d; };
+  const rain = pick({ .35: [51, 53, 55, 56, 57], .5: [61, 80], .7: [63, 66, 67, 81], 1: [65, 82], .8: [95, 96, 99] }, 0);
+  const snow = pick({ .4: [71, 77], .7: [73, 85], 1: [75, 86] }, 0);
+  const cloud = pick({ .15: [1], .45: [2], .85: [3], .6: [45, 48], .75: [51, 53, 55, 61, 63, 65, 80, 81, 82, 71, 73, 75, 85, 86], 1: [95, 96, 99] }, 0);
+  const fog = c === 45 || c === 48 ? 1 : 0, thunder = c >= 95 ? 1 : 0;
+  const sun = phase === 'day' ? (c === 0 ? 1 : c === 1 ? .8 : c === 2 ? .45 : 0) : 0;
+  const cold = cur.temp <= -2 ? 1 : cur.temp <= 1 ? .7 : cur.temp <= 4 ? .35 : 0;
+  const wind = clamp((cur.wind - 12) / 26, 0, 1);
+  // Is rain on its way in the next few hours, while it's dry now?
+  let soon = null;
+  if (!rain && !snow && W && W.hours) for (const h of W.hours) if (h.t > now && (h.rain >= 60 || (h.code >= 51 && h.code <= 82))){ soon = h.t; break; }
+  return { phase, rain, snow, cloud, fog, thunder, sun, cold, wind, temp: cur.temp, code: c, rainSoon: soon };
+}
+/** The ship's engines follow the Agile price: paid to use power means warp speed, peak price means power saving. */
+function engineFor(price, carbonIndex){
+  const dust = carbonIndex === 'very high' ? .8 : carbonIndex === 'high' ? .5 : 0;
+  if (price == null) return { mode: 'cruise', label: 'Cruising', speed: 1, tone: 'muted', dust };
+  if (price < 0) return { mode: 'warp', label: 'Warp speed: paid to use power', speed: 4, tone: 'neg', dust };
+  if (price < 15) return { mode: 'fast', label: 'Full speed: power is cheap', speed: 1.8, tone: 'good', dust };
+  if (price < 25) return { mode: 'cruise', label: 'Cruising', speed: 1, tone: 'warn', dust };
+  return { mode: 'eco', label: 'Power saving: peak price', speed: .45, tone: 'bad', dust };
+}
+/**
+ * The billboards that fly past the window: one fact each, built from whatever data has arrived.
+ * weight 2 or 3 means it comes round more often (bins tonight, leave for the train soon, negative prices).
+ */
+function buildBillboards(x, now = Date.now()){
+  const out = [], add = (id, kind, tone, head, big, sub, weight) => out.push({ id, kind, tone, head, big, sub: sub || '', weight: weight || 1 });
+  const ag = x.agile || [], cur = ag.filter(r => r.from <= now && now < r.to)[0];
+  if (cur){
+    const tone = cur.p < 0 ? 'neg' : cur.p < 15 ? 'good' : cur.p < 25 ? 'warn' : 'bad';
+    add('price', 'energy', tone, 'Agile power now', pence(cur.p), cur.p < 0 ? 'You\'re paid to use power' : cur.p < 15 ? 'Cheap: a good time to run things' : cur.p >= 25 ? 'Peak price: save it for later' : 'Per kWh, until ' + hhmm(cur.to), cur.p < 0 ? 3 : 1);
+    const best = cheapestWindow(ag, 4, now);
+    if (best) add('cheap', 'energy', 'good', 'Cheapest two hours', `${hhmm(best.from)}–${hhmm(best.to)}`, `${relDay(best.from, now)} · average ${pence(best.avg)}`);
+    const neg = ag.filter(r => r.to > now && r.p < 0);
+    if (neg.length && !(cur.p < 0)) add('plunge', 'energy', 'neg', 'Plunge pricing ahead', `${relDay(neg[0].from, now)} ${hhmm(neg[0].from)}`, `Agile goes below zero, as low as ${pence(Math.min.apply(null, neg.map(r => r.p)))}`, 3);
+  }
+  if (x.live && x.live.demand != null) add('draw', 'energy', 'warn', 'Home drawing now', Math.round(x.live.demand).toLocaleString('en-GB') + ' W', x.live.today != null ? `${kwh(x.live.today)} used today${x.cost != null ? ' · ' + gbp(x.cost) : ''}` : '');
+  const ci = x.carbon ? x.carbon.filter(r => r.from <= now && now < r.to)[0] : null;
+  if (ci){
+    const g = cheapestWindow(x.carbon.map(r => ({ from: r.from, to: r.to, p: r.v })), 6, now);
+    add('grid', 'energy', /low/.test(ci.index) ? 'good' : /high/.test(ci.index) ? 'bad' : 'warn', 'Grid carbon', `${ci.v} g/kWh`, `${ci.index}${g ? ' · greenest from ' + hhmm(g.from) : ''}`);
+  }
+  const W = x.weather;
+  if (W){
+    const w = weatherText(W.now.code), today = W.days.filter(d => d.k === dayKey(now))[0];
+    add('wx', 'weather', 'cyan', 'Outside', `${Math.round(W.now.temp)}° ${w.text.toLowerCase()}`, today ? `High ${Math.round(today.max)}°, low ${Math.round(today.min)}° · wind ${Math.round(W.now.wind)} mph` : '');
+    const sky = skyFor(W, now);
+    if (sky.rainSoon) add('rainsoon', 'weather', 'cyan', 'Rain on the way', `From ${hhmm(sky.rainSoon)}`, 'Bring the washing in', 2);
+    if (today && now < today.set && today.set - now < 3*3600e3) add('sunset', 'weather', 'warn', 'Sunset', hhmm(today.set), `In ${Math.round((today.set - now) / 60e3)} minutes`);
+    else if (today && now < today.rise) add('sunrise', 'weather', 'warn', 'Sunrise', hhmm(today.rise), '');
+  }
+  const bins = x.bins && x.bins.length ? nextCollections(x.bins, now) : [];
+  if (bins.length){
+    const first = bins[0], same = bins.filter(b => b.days === first.days).map(b => b.name).join(' and ');
+    const hour = new Date(now).getHours();
+    if (first.days <= 1) add('bins', 'home', 'warn', first.days === 0 ? 'Bin day today' : 'Bins tomorrow', same, first.days === 1 && hour >= 12 ? 'Put them out tonight' : '', first.days === 1 && hour >= 16 ? 3 : 2);
+    else add('bins', 'home', 'muted', 'Next bins', relDay(+first.date, now), same);
+  }
+  (x.events || []).filter(e => e.end > now && e.start < now + 2*864e5).slice(0, 3).forEach((e, i) => add('event' + i, 'home', 'violet', relDay(e.start, now) + (e.allDay ? '' : ' ' + hhmm(e.start)), e.title, e.where || ''));
+  const t = x.trains ? x.trains.list.filter(d => !d.cancelled && (d.exp || d.sched) - x.walk*60e3 > now - 60e3)[0] : null;
+  if (t){
+    const lv = leaveBy(t.exp || t.sched, x.walk, now);
+    add('train', 'travel', lv.cls === 'good' ? 'cyan' : lv.cls, `${hhmm(t.sched)} to ${t.dest}`, lv.text, `${t.platform ? 'Platform ' + t.platform + ' · ' : ''}${t.delayed ? 'Delayed' : t.exp && t.exp - t.sched >= 60e3 ? 'Expected ' + hhmm(t.exp) : 'On time'}`, lv.mins <= 10 ? 3 : 1);
+  }
+  add('date', 'home', 'muted', 'Stardate', longDay(new Date(now)), x.label || '');
+  return out;
+}
+/** The order billboards come round in: heavier ones repeat, never the same one twice in a row. */
+function billboardRotation(cards){
+  const out = [], rounds = Math.max.apply(null, cards.map(c => c.weight).concat([1]));
+  for (let r = 0; r < rounds; r++) cards.forEach(c => { if (c.weight > r) out.push(c); });
+  for (let i = 1; i < out.length; i++) if (out[i].id === out[i - 1].id){ const j = out.findIndex((c, k) => k > i && c.id !== out[i].id); if (j > 0){ const tmp = out[i]; out[i] = out[j]; out[j] = tmp; } }
+  return out;
+}

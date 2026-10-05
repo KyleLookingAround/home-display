@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 out="${1:-_site}"
 rm -rf "$out"; mkdir -p "$out"
-cp index.html display.html manifest.webmanifest display.webmanifest icon-180.png icon-192.png icon-512.png "$out/"
+cp index.html display.html household.json manifest.webmanifest display.webmanifest icon-180.png icon-192.png icon-512.png "$out/"
 touch "$out/.nojekyll"
 if [ -n "${SITE_PASSWORD:-}" ]; then
   # One fixed salt keeps "Remember this screen" working across pages and across deploys. A salt isn't secret:

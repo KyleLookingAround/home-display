@@ -28,15 +28,22 @@ Put the wall display on its own website on GitHub Pages. It should show househol
   - Retries with backoff, and an immediate retry when the network returns.
   - "Last updated" in amber when any source is stale.
 - **Setup links** carry one device's settings to another, so the TV doesn't need typing.
+- **The cockpit** (Kyle's idea: space billboards, seen from inside a rocket ship). It's the screensaver, and the view new screens open on.
+  - Billboards in 3D, and traffic at different depths.
+  - Weather on the glass and in the sky; the power price sets the engines. See [decision 0005](docs/decisions/0005-cockpit.md).
+- **No home server needed:** live trains come straight from the browser through Huxley2 ([decision 0004](docs/decisions/0004-no-home-server.md)).
+- **`household.json`:** settings every screen shares, editable on GitHub.
 - **Older TV browsers:** the display's code avoids syntax newer than Chromium 63, and a test checks it.
 - **On GitHub Pages**, a workflow publishes `main`, checking the build, unit tests, layouts and the lock first.
 
 ### Still to do here
 
-- **Trains, trams and Google Calendar on the published site.** These need a server that holds the keys or can fetch the calendar. Realtime Trains forbids its token in a browser, and neither TfGM nor Google allows browser calls. They work through `server.py` at home today. On the published site they need the small backend in item 3, so for now they show labelled examples.
+- **Trams and Google Calendar on the published site.** These need a server: TfGM and Google don't allow browser calls. Two ways that need no hardware:
+  - **A Cloudflare Worker** (item 3) holding the TfGM key and the iCal address as secrets. It's live, and free.
+  - **A scheduled GitHub Action** fetching every few minutes and publishing to a data branch. It needs only GitHub secrets, but runs late at busy times, and anything private would need encrypting with the site PIN.
 - **Buses.** The Bus Open Data Service gives vehicle positions rather than stop departures, so it needs more work.
 - **Bin collections from the council.** These are entered by hand for now. UKBinCollectionData could fill them in, through the backend.
-- **The screen's own settings in one place.** Settings are per device. A household-wide settings store would also need the backend.
+- **More for the cockpit:** a billboard for Saving Sessions, a meteor shower when the bins are due, and the aurora when the grid is greenest.
 
 ### Password lock
 

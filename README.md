@@ -3,16 +3,26 @@
 A home energy dashboard for your Octopus account, and a household display for the wall tablet, phones and the TV.
 
 - **Dashboard** (`index.html`): usage, costs, Agile prices, grid carbon, tariff comparison, battery and solar simulators, and planning tools for the house.
-- **Display** (`display.html`): five full-screen modes made for a screen across the room.
+- **Display** (`display.html`): five full-screen modes made for a screen across the room. It runs entirely in the browser from GitHub Pages; no home server is needed.
+  - **Screensaver: the cockpit.** You're in a rocket ship looking out, and it's what a screen shows when nobody's using it.
+    - Holographic billboards carrying your live numbers fly out of the distance and turn towards you as they pass: the price, the cheapest hours, bins, the next train, the weather, what's coming up.
+    - Satellites, freighters, a ring station and asteroids pass at their own distances.
+    - The real weather shows on the glass and in the sky: rain beads and runs, snow sticks, frost creeps in when it's cold, fog mists the window, thunder flashes, wind rocks the ship.
+    - The sun, moon, dawn and dusk follow Stockport's sunrise and sunset.
+    - The power price sets the engines: warp speed when you're paid to use power, power saving at peak price. High grid carbon hazes the view.
   - **Energy:** Agile price now, the next day's prices, the cheapest two hours, grid carbon, Home Mini live draw and today's cost.
   - **Home:** clock, date, weather now and for the next 12 hours, sunrise and sunset, bin day and your calendar.
-  - **Travel:** next trains and trams, with "leave in 6 min" countdowns that allow for the walk.
-  - **Screensaver:** planets carrying live numbers drift across the stars, with the odd comet and a slowly orbiting clock. It starts after a few idle minutes and any key wakes it.
+  - **Travel:** live trains from your station, with "leave in 6 min" countdowns that allow for the walk.
   - **Night:** a very dim clock and price, from a set time.
 
 ## The display
 
-Open `display.html`, or use the Wall display button on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
+Open https://kylelookingaround.github.io/home-display/display.html, or use the Wall display button on the dashboard. Each mode has its own link, so each screen can open its favourite: `display.html#energy`, `#home`, `#travel`, `#screensaver` or `#night`.
+
+To see the cockpit in any weather, add it to the link. For example, `display.html#screensaver&wx=thunder&phase=night` or `#screensaver&price=-3`:
+- `wx`: clear, cloud, rain, drizzle, snow, fog, thunder, wind or cold;
+- `phase`: dawn, day, dusk or night;
+- `price`: any Agile price in pence.
 
 | On a TV remote or keyboard | What it does |
 |---|---|
@@ -24,7 +34,11 @@ Open `display.html`, or use the Wall display button on the dashboard. Each mode 
 
 On a phone or tablet, swipe left or right to change mode and tap to show the toolbar.
 
-Settings are kept on each device. Set a screen up on your phone, then use **Copy setup link** in the settings and open that link on the TV to copy everything across. In the settings you can:
+**Settings every screen shares** live in [`household.json`](household.json): your bins, station, walk time and the mode screens open on.
+- Edit it on GitHub (open the file, press the pencil, commit). Screens pick it up at their next fresh start.
+- It's published with the site, so keep anything private out of it.
+
+**Each screen** can also change things for itself in its settings, and only those changes are kept on that device. Set a screen up on your phone, then use **Copy setup link** and open the link on the TV to copy everything across. In the settings you can:
 - choose the mode the screen opens on;
 - rotate between energy, home and travel;
 - set when the screensaver and night clock start;
@@ -40,11 +54,22 @@ Unattended screens look after themselves:
 
 Live draw and today's cost come from your Octopus Home Mini. They use the account you connected on the dashboard in the same browser.
 
-## Two ways to run it
+## Where the data comes from
 
-**Quick: open the file, or the published site.** Double-click `index.html` or `display.html`, or open the GitHub Pages site. Octopus, the grid forecast and the weather work straight from the browser. Trains, trams, Google Calendar, PVGIS solar data and the EPC search need the home server helper, so they show labelled examples until then.
+Everything below works from the published site, in the browser, with no server:
+- **Octopus:** prices, your account, the Home Mini.
+- **National Grid:** the carbon forecast.
+- **Open-Meteo:** the weather.
+- **National Rail:** live trains, through [Huxley2](https://huxley2.azurewebsites.net), a free community service.
 
-**Everything: run it on your home server.**
+A few things can't be fetched by a web page:
+- **Metrolink times:** TfGM refuses browser calls.
+- **Google Calendar:** its secret iCal address refuses browser calls. Calendars from hosts that allow them work.
+- **PVGIS solar data and the EPC search** on the dashboard.
+
+These need a small server: the backend in `ROADMAP.md` item 3, or `server.py` on a home server if you ever have one. Until then, the display leaves them out and says what's needed.
+
+## Running the helper on a home server (optional)
 
 1. Copy this whole folder to the server.
 2. Run `python3 server.py` (Python 3.8+, nothing to install).
@@ -65,7 +90,7 @@ It never serves dotfiles, its own code or notes. Keep it on your home network an
 
 ### Train and tram keys
 
-These stay on the server and never reach a browser. Realtime Trains doesn't allow its token in a web page. Create a file called `.env` next to `server.py`:
+These are only needed with a home server. Trains already work without one. The keys stay on the server and never reach a browser: Realtime Trains doesn't allow its token in a web page. Create a file called `.env` next to `server.py`:
 
 ```
 RTT_TOKEN=your Realtime Trains access token
@@ -98,7 +123,7 @@ Then run `sudo systemctl enable --now harold-energy`.
 
 ## Publishing
 
-Every push to `main` is checked and published to GitHub Pages by `.github/workflows/pages.yml`. Only the two pages, their manifests and icons are published, not the source or the helper.
+Every push to `main` is checked (`npm run ci`) and published to GitHub Pages by `.github/workflows/pages.yml`. Only the two pages, `household.json`, the manifests and the icons are published, not the source or the helper.
 
 **The lock.** Add a repository secret called `SITE_PASSWORD` (Settings → Secrets and variables → Actions). It can be a numeric PIN. From the next push, the published pages are encrypted with StatiCrypt. They open with an on-screen keypad you can drive with the TV remote's arrows, and "Remember this screen" means each device asks only once. Without the secret the site is published unlocked, and the workflow says so.
 
@@ -128,13 +153,15 @@ If one of these shows an error, the rest keeps working.
 |---|---|
 | `index.html`, `display.html` | The dashboard and the display. Built from `src/`; don't edit them directly. |
 | `src/` | Dashboard source: styles, markup, data code, analysis, interface, starfield. |
-| `src/display/` | Display source: styles, markup, household data sources, modes and remote control. |
+| `src/display/` | Display source: styles, markup, household data sources, the cockpit, modes and remote control. |
 | `build.py` | `python3 build.py` rebuilds both pages from `src/`. |
 | `server.py` | Home server helper. |
 | `lock/` | The lock screen template and `publish.sh`, which builds the folder Pages publishes. |
-| `tests/` | `node --test tests/*.test.mjs` checks the maths and the display's logic. The `*.browser.mjs` files check phone and TV layouts, the remote and the lock (they need Playwright). |
+| `household.json` | Settings every screen shares. |
+| `package.json` | `npm test`, `npm run test:browser`, `npm run shots` (screenshots in `tests/screens/`) and `npm run ci` (everything CI runs). |
+| `tests/` | `*.test.mjs` check the maths and the display's logic. `*.browser.mjs` check phone and TV layouts, the remote, the cockpit and the lock. |
 | `.github/workflows/` | Checks every push; publishes `main` to GitHub Pages. |
 | `CLAUDE.md` | Brief for a Claude Code session. |
 | `ROADMAP.md` | What's built and what's next. |
-| `docs/` | Stack options and API notes. |
+| `docs/` | Stack options, API notes, decision records (`docs/decisions/`) and a dated log (`docs/log.md`). |
 | `manifest.webmanifest`, `display.webmanifest`, `icon-*.png` | For installing on a phone. |

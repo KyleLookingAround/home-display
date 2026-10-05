@@ -91,7 +91,22 @@ Reference: https://developer.octopus.energy/graphql/reference/queries/ and the B
   - Typical bill: £1,723 a year.
 - Regional figures are in Ofgem's downloadable tables. The app shows the account's actual rates instead.
 
-## Realtime Trains (display: travel)
+## Huxley2 (display: trains, no server)
+
+- **What it is:** a community JSON front end to National Rail's Darwin (OpenLDBWS) at `https://huxley2.azurewebsites.net`. No key needed, and it allows browser calls (`Access-Control-Allow-Origin: *`; checked 5 October 2026).
+- **Departures:** `GET /departures/{CRS}/{rows}`, or `/departures/{CRS}/to/{CRS}/{rows}` to filter.
+- **Response:**
+  - `locationName` and `nrccMessages[].value` (HTML).
+  - `trainServices[]`, each with:
+    - `std` (`"HH:MM"`);
+    - `etd`: `"On time"`, `"Delayed"`, `"Cancelled"` or `"HH:MM"`;
+    - `platform`, `operator` and `isCancelled`;
+    - `cancelReason` and `delayReason`;
+    - `destination[].locationName` and `via`.
+- **Times:** local, with no date. `boardTime()` puts them on the right day around midnight.
+- **Caution:** it's a free community service with no guarantee, and the mirror `national-rail-api.davwheat.dev` answers the same way. The display asks once a minute only while departures are on screen. If Huxley2 fails and a home server holds a Realtime Trains token, it uses that.
+
+## Realtime Trains (display: travel, through a server only)
 
 - **The old API is gone.** `api.rtt.io` stopped on 30 September 2026 and now answers 418 with a pointer to the new one. `secure.realtimetrains.co.uk` follows on 31 March 2027.
 - **New API:** `https://data.rtt.io`, with an OpenAPI spec at https://realtimetrains.github.io/api-specification. Sign up at https://api-portal.rtt.io.

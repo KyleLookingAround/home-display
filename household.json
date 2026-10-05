@@ -1,0 +1,10 @@
+{
+  "_about": "Settings every screen shares. Edit this file on GitHub and each screen picks it up at its next fresh start (03:30 by default). It's published with the site, so keep anything private out of it: the calendar address is set on each screen instead. Any screen can still override these in its own settings.",
+  "mode": "screensaver",
+  "bins": [],
+  "trainFrom": "SPT",
+  "trainTo": "",
+  "trainWalk": 15,
+  "tramStop": "",
+  "tramWalk": 15
+}

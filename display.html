@@ -140,18 +140,43 @@ h1,h2,h3{font-family:var(--f-display);margin:0;text-transform:uppercase;letter-s
 .deps .st{font-family:var(--f-mono);white-space:nowrap}
 @media (max-width:520px){.deps .opt{display:none}}
 
-/* screensaver */
-.mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden}
-.planet,.orbit-clock,.comet{position:absolute;top:0;left:0;will-change:transform}
-.planet{text-align:center;width:12rem;margin:-6rem 0 0 -6rem}
-.planet .orb{width:7rem;height:7rem;margin:0 auto .5rem;border-radius:50%;position:relative;box-shadow:0 0 40px -6px currentColor}
-.planet .ring{position:absolute;left:-30%;right:-30%;top:42%;height:16%;border:2px solid currentColor;border-radius:50%;opacity:.55;transform:rotate(-14deg)}
-.planet .val{display:block;font:500 1.7rem/1.1 var(--f-mono);color:var(--ink);text-shadow:0 0 12px rgba(0,0,0,.9)}
-.planet .lbl{display:block;font:500 .9rem/1.3 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.1em}
-.orbit-clock{z-index:3;font:500 4.5rem/1 var(--f-mono);margin:-2.2rem 0 0 -6.5rem;width:13rem;text-align:center;text-shadow:0 0 6px #04050d,0 0 14px #04050d,0 0 30px rgba(143,107,255,.6)}
-.planet{z-index:1}
-.comet{width:16rem;height:.35rem;margin-top:-.2rem;border-radius:.2rem;background:linear-gradient(90deg,rgba(79,214,255,0),rgba(79,214,255,.5) 70%,#fff)}
-.comet::after{content:"";position:absolute;right:-.5rem;top:-.4rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;box-shadow:0 0 22px 6px rgba(79,214,255,.8)}
+/* screensaver: the cockpit. Space and billboards outside, then the glass, the frame and the dashboard. */
+.mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a}
+body.cockpit #stars{opacity:0}
+#cSpace,#cGlass,#cFrame{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+#cBoards{position:absolute;z-index:1;top:0;left:0;width:100%;height:100%;overflow:hidden;perspective:1100px}
+#cShip{position:absolute;z-index:2;top:-2%;left:-2%;width:104%;height:104%;will-change:transform}
+.board{position:absolute;top:0;left:0;width:23rem;padding:.8rem 1.1rem 1rem;border:2px solid var(--tone);border-radius:3px;color:var(--ink);transform-origin:50% 50%;will-change:transform,opacity;backface-visibility:hidden;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0,rgba(255,255,255,.035) 2px,transparent 2px,transparent 4px),linear-gradient(rgba(8,12,32,.86),rgba(8,12,32,.7));
+  box-shadow:0 0 34px -4px var(--tone),inset 0 0 26px -12px var(--tone);animation:holo 7s infinite}
+.board.wide{width:30rem;text-align:center}
+.board.long .bb{font-size:2rem}
+.board.wide::before{bottom:auto;top:-3.2rem;background:linear-gradient(transparent,var(--tone))}
+.board::before{content:"";position:absolute;left:50%;bottom:-3.2rem;width:2px;height:3.2rem;background:linear-gradient(var(--tone),transparent);opacity:.6}
+.board::after{content:"";position:absolute;top:-.45rem;right:1rem;width:.55rem;height:.55rem;border-radius:50%;background:var(--tone);box-shadow:0 0 12px var(--tone);animation:pulse 1.6s ease-in-out infinite}
+.board .bh{display:block;font:500 .95rem/1.3 var(--f-mono);text-transform:uppercase;letter-spacing:.12em;color:var(--tone)}
+.board .bh::before{content:"\25B8 ";opacity:.7}
+.board .bb{display:block;font:700 2.5rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;margin:.2rem 0;text-shadow:0 0 18px var(--tone);overflow-wrap:anywhere}
+.board .bs{display:block;font:500 1.05rem/1.35 var(--f-body);color:var(--muted)}
+.tone-good{--tone:var(--good)} .tone-warn{--tone:var(--warn)} .tone-bad{--tone:var(--bad)} .tone-neg{--tone:var(--neg)}
+.tone-cyan{--tone:var(--gas)} .tone-violet{--tone:var(--nebula)} .tone-muted{--tone:#8698ff}
+@keyframes holo{0%,100%{filter:none}47%{filter:none}48%{filter:brightness(1.35)}49%{filter:none}50%{filter:brightness(.8)}51%{filter:none}}
+@keyframes pulse{50%{opacity:.3}}
+.hud{position:absolute;left:12%;right:12%;bottom:5.5%;display:grid;grid-template-columns:1fr auto 1fr;grid-gap:1.5rem;gap:1.5rem;align-items:end;text-align:left}
+.hud .g{display:flex;flex-direction:column;min-width:0}
+.hud .g.c{align-items:center;text-align:center}
+.hud .g.r{align-items:flex-end;text-align:right}
+.hud .k{font:500 .9rem/1.3 var(--f-mono);text-transform:uppercase;letter-spacing:.16em;color:var(--gas)}
+.hud .v{font:500 2.1rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;text-shadow:0 0 14px currentColor}
+.hud .s{font:500 .9rem/1.3 var(--f-mono);color:var(--muted)}
+.hud .hclock{font:500 3.4rem/1 var(--f-mono);letter-spacing:.04em;text-shadow:0 0 24px rgba(143,107,255,.7)}
+.hud .muted{color:var(--muted)}
+.leds{position:absolute;left:50%;bottom:2.2%;transform:translateX(-50%);display:flex}
+.leds i{width:.5rem;height:.5rem;border-radius:50%;margin:0 .45rem;background:var(--gas);box-shadow:0 0 10px var(--gas);animation:pulse 2.2s ease-in-out infinite}
+.leds i:nth-child(2){animation-delay:.4s;background:var(--elec);box-shadow:0 0 10px var(--elec)} .leds i:nth-child(3){animation-delay:.8s} .leds i:nth-child(4){animation-delay:1.2s;background:var(--good);box-shadow:0 0 10px var(--good)} .leds i:nth-child(5){animation-delay:1.6s}
+.hud[data-engine="eco"] ~ .leds i{background:var(--bad);box-shadow:0 0 10px var(--bad);animation-duration:3.4s}
+.hud[data-engine="warp"] ~ .leds i{background:var(--neg);box-shadow:0 0 12px var(--neg);animation-duration:.6s}
+.flash{position:absolute;z-index:3;top:0;left:0;right:0;bottom:0;background:#dfe6ff;opacity:0;pointer-events:none}
 
 /* night: very dim, black background, slow drift so nothing burns in */
 body.night{background:#000}
@@ -178,14 +203,16 @@ body.night #stars{opacity:.12}
 .toast{position:fixed;z-index:40;left:50%;bottom:calc(var(--edge-y) + 1rem);transform:translateX(-50%);background:var(--surface);border:1px solid var(--gas);border-radius:4px;padding:.7rem 1rem;font:500 1rem/1.3 var(--f-mono);max-width:90vw;text-align:center}
 
 @media (max-width:699px){
+  .board,.board.wide{width:80vw}
+  .board .bb{font-size:2rem}
+  .hud{left:6%;right:6%;bottom:4%}
+  .hud .v{font-size:1.5rem}
+  .hud .hclock{font-size:2.3rem}
   .bar{display:block;padding-bottom:.4rem}
   .picker,.bar-actions{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
   .bar-actions::-webkit-scrollbar{display:none}
   .wx-now{text-align:left}
   .hours > div:nth-child(n+7){display:none}
-  .mode-saver .planet{width:8rem;margin:-4rem 0 0 -4rem}
-  .planet .orb{width:4rem;height:4rem}
-  .orbit-clock{font-size:2.6rem;width:8rem;margin:-1.3rem 0 0 -4rem}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -245,11 +272,38 @@ body.night #stars{opacity:.12}
     <p class="mode-foot" id="tFoot"></p>
   </section>
 
-  <!-- ================= SCREENSAVER ================= -->
-  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver" hidden>
-    <div class="orbit-clock" id="sClock" data-clock>--:--</div>
-    <div id="sPlanets"></div>
-    <div class="comet" id="sComet" hidden></div>
+  <!-- ================= SCREENSAVER: the cockpit ================= -->
+  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver: the view from the cockpit" hidden>
+    <canvas id="cSpace" aria-hidden="true"></canvas>
+    <div id="cBoards"></div>
+    <div id="cShip">
+      <canvas id="cGlass" aria-hidden="true"></canvas>
+      <svg id="cFrame" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="gHull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2040"/><stop offset="1" stop-color="#080a17"/></linearGradient>
+          <linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
+          <linearGradient id="gSideR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
+          <linearGradient id="gDash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151a36"/><stop offset=".25" stop-color="#0b0e22"/><stop offset="1" stop-color="#04050d"/></linearGradient>
+        </defs>
+        <path d="M0 0H1600V96C1220 44 380 44 0 96Z" fill="url(#gHull)"/>
+        <path d="M0 96C380 44 1220 44 1600 96" fill="none" stroke="#4fd6ff" stroke-opacity=".4" stroke-width="2.5"/>
+        <path d="M0 64L158 78L76 696L0 716Z" fill="url(#gSide)"/>
+        <path d="M158 78L76 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
+        <path d="M1600 64L1442 78L1524 696L1600 716Z" fill="url(#gSideR)"/>
+        <path d="M1442 78L1524 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
+        <path d="M0 700C420 642 1180 642 1600 700V900H0Z" fill="url(#gDash)"/>
+        <path d="M0 700C420 642 1180 642 1600 700" fill="none" stroke="#ffb547" stroke-opacity=".5" stroke-width="2.5"/>
+        <path d="M90 760C500 720 1100 720 1510 760M60 850H1540M520 700V900M1080 700V900" fill="none" stroke="#8698ff" stroke-opacity=".1" stroke-width="2"/>
+        <path d="M600 30H1000M560 46H1040" stroke="#8698ff" stroke-opacity=".12" stroke-width="2"/>
+      </svg>
+      <div class="hud" id="cHud" data-engine="cruise">
+        <div class="g"><span class="k">Power</span><span class="v" id="hPrice">--</span><span class="s" id="hEngine">Cruising</span></div>
+        <div class="g c"><span class="hclock" data-clock>--:--</span><span class="s" id="hDateC"></span></div>
+        <div class="g r"><span class="k">Outside</span><span class="v" id="hTemp">--</span><span class="s" id="hWx"></span></div>
+      </div>
+      <div class="leds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="flash" id="cFlash"></div>
   </section>
 
   <!-- ================= NIGHT ================= -->
@@ -1053,7 +1107,7 @@ function toCSV(raw){
   }
   return lines.join('\n');
 }
-/* ===================== display sources: household data, pure parsing, example data ===================== */
+/* ===================== display sources: household data, pure parsing, the cockpit's logic ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -1074,7 +1128,13 @@ const MODES = [
   { id: 'night', label: 'Night', key: '5' }
 ];
 const ROTATING = ['energy', 'home', 'travel'];
-const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+const modeFromHash = (hash, fallback) => { const id = String(hash || '').replace(/^#/, '').split('&')[0].toLowerCase(); return MODES.some(m => m.id === id) ? id : fallback; };
+/** Extras after the mode in a link, such as #screensaver&wx=rain&phase=night&price=-2, for previewing the cockpit. */
+function hashOptions(hash){
+  const out = {};
+  String(hash || '').replace(/^#/, '').split('&').slice(1).forEach(p => { const e = p.indexOf('='); if (e > 0) out[decodeURIComponent(p.slice(0, e))] = decodeURIComponent(p.slice(e + 1)); });
+  return out;
+}
 function stepMode(id, dir){ const i = MODES.findIndex(m => m.id === id); return MODES[(Math.max(0, i) + dir + MODES.length) % MODES.length].id; }
 /** Is the clock time inside a window like 23:00–06:30? Windows may cross midnight. */
 function inWindow(now, from, to){
@@ -1085,7 +1145,7 @@ function inWindow(now, from, to){
 }
 
 const DISPLAY_DEFAULTS = {
-  mode: 'energy', rotate: 0, saver: 15, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
+  mode: 'screensaver', rotate: 0, saver: 10, night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '',
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
 };
@@ -1108,14 +1168,6 @@ function nextCollections(bins, now = Date.now()){
     return { name: b.name, colour: b.colour || 'grey', date: d, days: Math.round((+d - today) / 864e5) };
   }).sort((a, b) => a.date - b.date || a.name.localeCompare(b.name));
 }
-function exampleBins(now = Date.now()){
-  const t = startOfDay(new Date(now)), toThu = (4 - t.getDay() + 7) % 7;
-  const thu = addDays(t, toThu);
-  return [{ name: 'General waste', colour: 'black', date: dayKey(thu), every: 2 },
-          { name: 'Paper and card', colour: 'blue', date: dayKey(addDays(thu, 7)), every: 2 },
-          { name: 'Garden waste', colour: 'brown', date: dayKey(addDays(thu, 7)), every: 2 }];
-}
-
 /* ---------- weather (Open-Meteo, no key, allows browser calls) ---------- */
 const WMO = [
   [[0], 'Clear', '☀'], [[1], 'Mostly clear', '☀'], [[2], 'Partly cloudy', '⛅'], [[3], 'Overcast', '☁'],
@@ -1270,16 +1322,6 @@ async function loadCalendar(url, now = Date.now()){
   if (!/BEGIN:VCALENDAR/.test(text)) throw new ApiError('CALFAIL');
   return calendarWindow(parseICal(text), +startOfDay(new Date(now)), +addDays(startOfDay(new Date(now)), 8));
 }
-function exampleCalendar(now = Date.now()){
-  const t = startOfDay(new Date(now)), at = (d, h, m) => +addDays(t, d) + (h*60 + m)*60e3;
-  return [
-    { title: 'Bins out tonight', start: at(0, 19, 0), end: at(0, 19, 30), allDay: false },
-    { title: 'Dentist', start: at(1, 10, 15), end: at(1, 11, 0), allDay: false },
-    { title: 'Football practice', start: at(2, 17, 30), end: at(2, 19, 0), allDay: false },
-    { title: 'Grandparents visiting', start: +addDays(t, 4), end: +addDays(t, 5), allDay: true }
-  ].filter(e => e.end > now);
-}
-
 /* ---------- trains (Realtime Trains, through the home server helper, which holds the token) ---------- */
 function parseTrains(j){
   const services = (j && j.services) || [];
@@ -1340,18 +1382,6 @@ function leaveBy(depart, walkMin, now = Date.now()){
   const m = Math.floor((depart - walkMin*60e3 - now) / 60e3);
   return { mins: m, text: m > 1 ? `Leave in ${m} min` : m >= 0 ? 'Leave now' : m >= -Math.max(2, walkMin/3) ? 'Run for it' : 'Too late', cls: m > 4 ? 'good' : m >= 0 ? 'warn' : 'bad' };
 }
-function exampleTrains(now = Date.now()){
-  const base = Math.ceil(now / 300e3) * 300e3, rnd = mulberry32(Math.floor(now / 3600e3));
-  const dests = ['Manchester Piccadilly', 'London Euston', 'Buxton', 'Hazel Grove', 'Sheffield', 'Manchester Airport'];
-  return dests.map((dest, i) => {
-    const sched = base + (6 + i*9) * 60e3, late = rnd() < 0.3 ? Math.round(rnd()*6) * 60e3 : 0;
-    return { sched, exp: sched + late, dest, platform: String(1 + (i % 4)), cancelled: i === 4 && rnd() < 0.5, operator: '' };
-  });
-}
-function exampleTrams(now = Date.now()){
-  return { trams: [['Rochdale Town Centre', 3], ['Shaw and Crompton', 9], ['Rochdale Town Centre', 15], ['Shaw and Crompton', 21]].map(([dest, wait]) => ({ dest, wait, at: now + wait*60e3, status: wait < 4 ? 'Due' : '', carriages: 'Double', platform: 'Outgoing' })), messages: [] };
-}
-
 /* ---------- prices for the display ---------- */
 /** Cost of the Home Mini's half hours today on your tariff, with the standing charge. */
 function todayCost(rows, eSets, now = Date.now()){
@@ -1372,18 +1402,537 @@ function nextReload(now, at, jitterMin){
 }
 /** Is a source's data too old to trust? Twice its refresh period, with a floor. */
 const isStale = (src, every, now = Date.now()) => !src.at || now - src.at > Math.max(2*every, 5*60e3);
+
+/* ---------- trains without a server: Huxley2 (National Rail Darwin, no key, allows browser calls) ---------- */
+const HUXLEY = 'https://huxley2.azurewebsites.net';
+/** "HH:MM" on the departure board as a time near now: just after midnight counts as tomorrow. */
+function boardTime(hhmm, now, ref){
+  const m = /^(\d\d):(\d\d)$/.exec(String(hhmm || '').trim()); if (!m) return null;
+  const d = new Date(now); d.setHours(+m[1], +m[2], 0, 0);
+  let t = +d;
+  const base = ref || now;
+  if (t < base - 12*3600e3) t += 864e5; else if (t > base + 12*3600e3) t -= 864e5;
+  return t;
+}
+const stripTags = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+function parseHuxley(j, now = Date.now()){
+  const list = ((j && j.trainServices) || []).map(s => {
+    const sched = boardTime(s.std, now); if (sched == null) return null;
+    const etd = String(s.etd || '').trim(), cancelled = !!s.isCancelled || /cancel/i.test(etd);
+    const exp = /^\d\d:\d\d$/.test(etd) ? boardTime(etd, now, sched) : etd === 'On time' ? sched : null;
+    return { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
+             platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || '') };
+  }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
+  return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
+}
+async function loadTrainsLive(from, to){
+  const path = `/departures/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/12`;
+  try { return parseHuxley(await request(HUXLEY + path, { headers: { Accept: 'application/json' } })); }
+  catch(e){ if (NET.proxy && NET.keys.rtt) return loadTrains(from, to); throw e; }
+}
+
+/* ---------- household settings shared by every screen (household.json, editable on GitHub) ---------- */
+/** Defaults, then the household file, then this device's own changes. */
+function mergeSettings(household, device){
+  const h = Object.assign({}, household || {}); delete h.ical;   // a secret address never comes from a public file
+  const s = displaySettings(Object.assign({}, h, device || {}));
+  if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
+  return s;
+}
+/** What this device changed from the household's settings: only that is stored, so later household edits still arrive. */
+function deviceChanges(form, household){
+  const base = mergeSettings(household, null), out = {};
+  Object.keys(form).forEach(k => { if (JSON.stringify(form[k]) !== JSON.stringify(base[k])) out[k] = form[k]; });
+  return out;
+}
+
+/* ---------- the cockpit: what the weather and the power price do to the view ---------- */
+const WX_PRESETS = {
+  clear: { code: 0 }, cloud: { code: 3 }, rain: { code: 63 }, drizzle: { code: 53 }, snow: { code: 73, temp: -1 },
+  fog: { code: 45 }, thunder: { code: 95 }, wind: { code: 2, wind: 38 }, cold: { code: 1, temp: -4 }
+};
+/** The sky outside the window, from Open-Meteo's current weather and the sun's times. Every value runs 0 to 1. */
+function skyFor(W, now = Date.now(), preview){
+  const p = preview || {}, cur = Object.assign({ code: 0, temp: 12, wind: 6 }, W && W.now ? { code: W.now.code, temp: W.now.temp, wind: W.now.wind } : {}, WX_PRESETS[p.wx] || {});
+  const day = W && W.days ? W.days.filter(d => d.k === dayKey(now))[0] || W.days[0] : null;
+  const rise = day ? day.rise : +startOfDay(new Date(now)) + 7*3600e3, set = day ? day.set : +startOfDay(new Date(now)) + 19*3600e3;
+  const phase = p.phase || (now < rise - 40*60e3 || now > set + 40*60e3 ? 'night' : now < rise + 60*60e3 ? 'dawn' : now > set - 60*60e3 ? 'dusk' : 'day');
+  const c = +cur.code, pick = (table, d) => { for (const k in table) if (table[k].indexOf(c) >= 0) return +k; return d; };
+  const rain = pick({ .35: [51, 53, 55, 56, 57], .5: [61, 80], .7: [63, 66, 67, 81], 1: [65, 82], .8: [95, 96, 99] }, 0);
+  const snow = pick({ .4: [71, 77], .7: [73, 85], 1: [75, 86] }, 0);
+  const cloud = pick({ .15: [1], .45: [2], .85: [3], .6: [45, 48], .75: [51, 53, 55, 61, 63, 65, 80, 81, 82, 71, 73, 75, 85, 86], 1: [95, 96, 99] }, 0);
+  const fog = c === 45 || c === 48 ? 1 : 0, thunder = c >= 95 ? 1 : 0;
+  const sun = phase === 'day' ? (c === 0 ? 1 : c === 1 ? .8 : c === 2 ? .45 : 0) : 0;
+  const cold = cur.temp <= -2 ? 1 : cur.temp <= 1 ? .7 : cur.temp <= 4 ? .35 : 0;
+  const wind = clamp((cur.wind - 12) / 26, 0, 1);
+  // Is rain on its way in the next few hours, while it's dry now?
+  let soon = null;
+  if (!rain && !snow && W && W.hours) for (const h of W.hours) if (h.t > now && (h.rain >= 60 || (h.code >= 51 && h.code <= 82))){ soon = h.t; break; }
+  return { phase, rain, snow, cloud, fog, thunder, sun, cold, wind, temp: cur.temp, code: c, rainSoon: soon };
+}
+/** The ship's engines follow the Agile price: paid to use power means warp speed, peak price means power saving. */
+function engineFor(price, carbonIndex){
+  const dust = carbonIndex === 'very high' ? .8 : carbonIndex === 'high' ? .5 : 0;
+  if (price == null) return { mode: 'cruise', label: 'Cruising', speed: 1, tone: 'muted', dust };
+  if (price < 0) return { mode: 'warp', label: 'Warp speed: paid to use power', speed: 4, tone: 'neg', dust };
+  if (price < 15) return { mode: 'fast', label: 'Full speed: power is cheap', speed: 1.8, tone: 'good', dust };
+  if (price < 25) return { mode: 'cruise', label: 'Cruising', speed: 1, tone: 'warn', dust };
+  return { mode: 'eco', label: 'Power saving: peak price', speed: .45, tone: 'bad', dust };
+}
+/**
+ * The billboards that fly past the window: one fact each, built from whatever data has arrived.
+ * weight 2 or 3 means it comes round more often (bins tonight, leave for the train soon, negative prices).
+ */
+function buildBillboards(x, now = Date.now()){
+  const out = [], add = (id, kind, tone, head, big, sub, weight) => out.push({ id, kind, tone, head, big, sub: sub || '', weight: weight || 1 });
+  const ag = x.agile || [], cur = ag.filter(r => r.from <= now && now < r.to)[0];
+  if (cur){
+    const tone = cur.p < 0 ? 'neg' : cur.p < 15 ? 'good' : cur.p < 25 ? 'warn' : 'bad';
+    add('price', 'energy', tone, 'Agile power now', pence(cur.p), cur.p < 0 ? 'You\'re paid to use power' : cur.p < 15 ? 'Cheap: a good time to run things' : cur.p >= 25 ? 'Peak price: save it for later' : 'Per kWh, until ' + hhmm(cur.to), cur.p < 0 ? 3 : 1);
+    const best = cheapestWindow(ag, 4, now);
+    if (best) add('cheap', 'energy', 'good', 'Cheapest two hours', `${hhmm(best.from)}–${hhmm(best.to)}`, `${relDay(best.from, now)} · average ${pence(best.avg)}`);
+    const neg = ag.filter(r => r.to > now && r.p < 0);
+    if (neg.length && !(cur.p < 0)) add('plunge', 'energy', 'neg', 'Plunge pricing ahead', `${relDay(neg[0].from, now)} ${hhmm(neg[0].from)}`, `Agile goes below zero, as low as ${pence(Math.min.apply(null, neg.map(r => r.p)))}`, 3);
+  }
+  if (x.live && x.live.demand != null) add('draw', 'energy', 'warn', 'Home drawing now', Math.round(x.live.demand).toLocaleString('en-GB') + ' W', x.live.today != null ? `${kwh(x.live.today)} used today${x.cost != null ? ' · ' + gbp(x.cost) : ''}` : '');
+  const ci = x.carbon ? x.carbon.filter(r => r.from <= now && now < r.to)[0] : null;
+  if (ci){
+    const g = cheapestWindow(x.carbon.map(r => ({ from: r.from, to: r.to, p: r.v })), 6, now);
+    add('grid', 'energy', /low/.test(ci.index) ? 'good' : /high/.test(ci.index) ? 'bad' : 'warn', 'Grid carbon', `${ci.v} g/kWh`, `${ci.index}${g ? ' · greenest from ' + hhmm(g.from) : ''}`);
+  }
+  const W = x.weather;
+  if (W){
+    const w = weatherText(W.now.code), today = W.days.filter(d => d.k === dayKey(now))[0];
+    add('wx', 'weather', 'cyan', 'Outside', `${Math.round(W.now.temp)}° ${w.text.toLowerCase()}`, today ? `High ${Math.round(today.max)}°, low ${Math.round(today.min)}° · wind ${Math.round(W.now.wind)} mph` : '');
+    const sky = skyFor(W, now);
+    if (sky.rainSoon) add('rainsoon', 'weather', 'cyan', 'Rain on the way', `From ${hhmm(sky.rainSoon)}`, 'Bring the washing in', 2);
+    if (today && now < today.set && today.set - now < 3*3600e3) add('sunset', 'weather', 'warn', 'Sunset', hhmm(today.set), `In ${Math.round((today.set - now) / 60e3)} minutes`);
+    else if (today && now < today.rise) add('sunrise', 'weather', 'warn', 'Sunrise', hhmm(today.rise), '');
+  }
+  const bins = x.bins && x.bins.length ? nextCollections(x.bins, now) : [];
+  if (bins.length){
+    const first = bins[0], same = bins.filter(b => b.days === first.days).map(b => b.name).join(' and ');
+    const hour = new Date(now).getHours();
+    if (first.days <= 1) add('bins', 'home', 'warn', first.days === 0 ? 'Bin day today' : 'Bins tomorrow', same, first.days === 1 && hour >= 12 ? 'Put them out tonight' : '', first.days === 1 && hour >= 16 ? 3 : 2);
+    else add('bins', 'home', 'muted', 'Next bins', relDay(+first.date, now), same);
+  }
+  (x.events || []).filter(e => e.end > now && e.start < now + 2*864e5).slice(0, 3).forEach((e, i) => add('event' + i, 'home', 'violet', relDay(e.start, now) + (e.allDay ? '' : ' ' + hhmm(e.start)), e.title, e.where || ''));
+  const t = x.trains ? x.trains.list.filter(d => !d.cancelled && (d.exp || d.sched) - x.walk*60e3 > now - 60e3)[0] : null;
+  if (t){
+    const lv = leaveBy(t.exp || t.sched, x.walk, now);
+    add('train', 'travel', lv.cls === 'good' ? 'cyan' : lv.cls, `${hhmm(t.sched)} to ${t.dest}`, lv.text, `${t.platform ? 'Platform ' + t.platform + ' · ' : ''}${t.delayed ? 'Delayed' : t.exp && t.exp - t.sched >= 60e3 ? 'Expected ' + hhmm(t.exp) : 'On time'}`, lv.mins <= 10 ? 3 : 1);
+  }
+  add('date', 'home', 'muted', 'Stardate', longDay(new Date(now)), x.label || '');
+  return out;
+}
+/** The order billboards come round in: heavier ones repeat, never the same one twice in a row. */
+function billboardRotation(cards){
+  const out = [], rounds = Math.max.apply(null, cards.map(c => c.weight).concat([1]));
+  for (let r = 0; r < rounds; r++) cards.forEach(c => { if (c.weight > r) out.push(c); });
+  for (let i = 1; i < out.length; i++) if (out[i].id === out[i - 1].id){ const j = out.findIndex((c, k) => k > i && c.id !== out[i].id); if (j > 0){ const tmp = out[i]; out[i] = out[j]; out[j] = tmp; } }
+  return out;
+}
+/* ===================== cockpit: the screensaver, looking out of a rocket ship's window ===================== */
+// Billboards carrying your live numbers fly past; the weather outside shows up on the glass and in the sky,
+// and the power price sets the engines. Written for older TV browsers too: no ?. or ?? here.
+const Cockpit = (() => {
+  let on = false, raf = 0, last = 0, frame = 0, W = 0, H = 0, dpr = 1, quality = 1, slowFrames = 0, staticTimer = 0;
+  let sctx = null, gctx = null, planetCache = null, planetKey = '', frostCache = null, frostKey = '';
+  let stars = [], clouds = [], rocks = [], drops = [], flakes = [], motes = [], traffic = [], nextTraffic = 0, galaxies = [];
+  let sky = skyFor(null), engine = engineFor(null), cards = [], rot = [], rotI = 0, boards = [], nextBoard = 0, laneI = 0;
+  let bolt = null, nextBolt = 0, vp = { x: 0, y: 0 };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const el = id => document.getElementById(id);
+  const still = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const narrow = () => W / H < 1.1;
+
+  /* ---------- sizes ---------- */
+  function resize(){
+    W = innerWidth; H = innerHeight; dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    [el('cSpace'), el('cGlass')].forEach(c => { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); });
+    sctx = el('cSpace').getContext('2d'); gctx = el('cGlass').getContext('2d');
+    sctx.setTransform(dpr, 0, 0, dpr, 0, 0); gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    planetKey = ''; frostKey = '';
+    const n = Math.round(W * H / 3400 * quality);
+    stars = []; for (let i = 0; i < n; i++) stars.push(newStar(true));
+    motes = []; for (let i = 0; i < Math.round(26 * quality); i++) motes.push(newMote(true));
+    galaxies = [{ x: .3, y: .3, r: .09, a: -.5, c: '190,170,255' }, { x: .66, y: .17, r: .05, a: .7, c: '150,210,255' }];
+  }
+  function newMote(anywhere){ return { x: rnd(-1.6, 1.6), y: rnd(-1, .9), z: anywhere ? rnd(.02, .25) : .25 }; }
+  function newStar(anywhere){
+    return { x: rnd(-1.7, 1.7), y: rnd(-1.1, 1.1), z: anywhere ? rnd(.05, 1) : 1, c: ['233,236,255', '255,220,180', '180,210,255', '215,195,255'][(Math.random() * 4) | 0] };
+  }
+
+  /* ---------- outside: sky, planet, stars, nebulae, debris, lightning ---------- */
+  function project(x, y, z){ const f = W * .36; return { x: vp.x + x / z * f, y: vp.y + y / z * f }; }
+  function drawSky(t){
+    const c = sctx;
+    c.fillStyle = sky.phase === 'day' ? '#050b24' : '#02030a'; c.fillRect(0, 0, W, H);
+    const glow = (x, y, r, col, a) => { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, `rgba(${col},${a})`); g.addColorStop(1, `rgba(${col},0)`); c.fillStyle = g; c.fillRect(0, 0, W, H); };
+    if (sky.phase === 'dawn'){ glow(0, H, H * 1.1, '255,140,90', .32); glow(W * .2, H, H * .8, '255,95,174', .18); }
+    if (sky.phase === 'dusk'){ glow(W, H, H * 1.1, '255,110,70', .3); glow(W * .8, H, H * .9, '170,80,255', .2); }
+    if (sky.phase === 'day') glow(W * .18, H * .2, H * 1.3, '80,140,255', .22);
+    glow(W * .85, H * .1, H * .9, '143,107,255', .12);
+    if (engine.mode === 'warp') glow(vp.x, vp.y, H * .9, '184,146,255', .18 + .06 * Math.sin(t / 300));
+    if (sky.phase === 'night' && sky.cloud < .8) drawMoon(W * .8, H * .24, H * .055);
+    if (sky.sun > 0) drawSun(W * .2, H * .22, sky.sun);
+  }
+  function drawMoon(x, y, r){
+    const c = sctx, g = c.createRadialGradient(x - r * .3, y - r * .3, r * .1, x, y, r);
+    g.addColorStop(0, '#e8e9f2'); g.addColorStop(1, '#8c90a8');
+    const halo = c.createRadialGradient(x, y, r, x, y, r * 3); halo.addColorStop(0, 'rgba(220,225,255,.12)'); halo.addColorStop(1, 'rgba(220,225,255,0)');
+    c.fillStyle = halo; c.beginPath(); c.arc(x, y, r * 3, 0, 7); c.fill();
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.fillStyle = 'rgba(90,95,120,.35)';
+    [[-.3, -.1, .22], [.25, .3, .16], [.1, -.4, .1], [-.15, .4, .12]].forEach(k => { c.beginPath(); c.arc(x + k[0] * r, y + k[1] * r, k[2] * r, 0, 7); c.fill(); });
+  }
+  function drawSun(x, y, s){
+    const c = sctx;
+    let g = c.createRadialGradient(x, y, 0, x, y, H * .45);
+    g.addColorStop(0, `rgba(255,250,230,${.95 * s})`); g.addColorStop(.06, `rgba(255,230,160,${.8 * s})`); g.addColorStop(.25, `rgba(255,180,90,${.18 * s})`); g.addColorStop(1, 'rgba(255,180,90,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    // lens flare along the line through the middle of the view
+    [[.35, .03, '255,200,120'], [.6, .018, '120,200,255'], [.95, .05, '184,146,255'], [1.25, .025, '70,230,161']].forEach(f => {
+      const fx = x + (vp.x - x) * f[0] * 2, fy = y + (vp.y - y) * f[0] * 2, r = H * f[1] * 2;
+      g = c.createRadialGradient(fx, fy, 0, fx, fy, r); g.addColorStop(0, `rgba(${f[2]},${.16 * s})`); g.addColorStop(1, `rgba(${f[2]},0)`);
+      c.fillStyle = g; c.beginPath(); c.arc(fx, fy, r, 0, 7); c.fill();
+    });
+  }
+  /** A gas giant low on the right, its colours from the temperature outside, lit by the sun when there is one. */
+  function drawPlanet(t){
+    const r = H * .44, key = Math.round(sky.temp) + sky.phase + Math.round(t / 4000) + W + 'x' + H;
+    if (key !== planetKey){
+      planetKey = key;
+      const cv = planetCache || document.createElement('canvas'); planetCache = cv;
+      const s = Math.ceil(r * 2 + 4); cv.width = s; cv.height = s;
+      const c = cv.getContext('2d'), cx = s / 2, temp = sky.temp;
+      const pal = temp <= 0 ? ['#d6f3ff', '#7cc4ee', '#2d5f9e'] : temp <= 9 ? ['#a9f0e6', '#3fa7b5', '#1d4f78'] : temp <= 18 ? ['#ffe2a8', '#d9944a', '#7a3f2a'] : ['#ffd08a', '#e8633c', '#7d1f2a'];
+      c.save(); c.beginPath(); c.arc(cx, cx, r, 0, 7); c.clip();
+      const base = c.createLinearGradient(0, cx - r, 0, cx + r); base.addColorStop(0, pal[0]); base.addColorStop(.5, pal[1]); base.addColorStop(1, pal[2]);
+      c.fillStyle = base; c.fillRect(0, 0, s, s);
+      const off = t / 9000;
+      for (let i = 0; i < 14; i++){
+        const y = cx - r + (i + .5) * (2 * r / 14) + Math.sin(off + i * 1.7) * r * .02;
+        c.fillStyle = i % 2 ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.1)';
+        c.fillRect(0, y - r * .05, s, r * (.04 + .03 * Math.abs(Math.sin(i * 2.3))));
+      }
+      const lx = sky.sun > 0 || sky.phase === 'dawn' ? cx - r * .5 : cx - r * .2;
+      const shade = c.createRadialGradient(lx, cx - r * .5, r * .2, cx, cx, r * 1.05);
+      shade.addColorStop(0, 'rgba(0,0,0,0)'); shade.addColorStop(.7, 'rgba(0,0,10,.35)'); shade.addColorStop(1, `rgba(0,0,10,${sky.phase === 'night' ? .85 : .7})`);
+      c.fillStyle = shade; c.fillRect(0, 0, s, s); c.restore();
+      c.strokeStyle = 'rgba(160,200,255,.35)'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cx, r, 0, 7); c.stroke();
+    }
+    const x = W * .86 + Math.sin(t / 60000) * W * .02 + (vp.x - W / 2) * .15, y = H * .9 + (vp.y - H * .42) * .15;
+    sctx.drawImage(planetCache, x - planetCache.width / 2, y - planetCache.height / 2);
+  }
+  /** Faint spiral galaxies, so far away they barely move. */
+  function drawGalaxies(){
+    const c = sctx;
+    for (const g of galaxies){
+      const x = W * g.x + (vp.x - W / 2) * .04, y = H * g.y + (vp.y - H * .42) * .04, r = H * g.r;
+      c.save(); c.translate(x, y); c.rotate(g.a); c.scale(1, .38);
+      const gr = c.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, `rgba(${g.c},.32)`); gr.addColorStop(.25, `rgba(${g.c},.12)`); gr.addColorStop(1, `rgba(${g.c},0)`);
+      c.fillStyle = gr; c.beginPath(); c.arc(0, 0, r, 0, 7); c.fill();
+      c.strokeStyle = `rgba(${g.c},.1)`; c.lineWidth = r * .08;
+      for (let k = 0; k < 2; k++){ c.beginPath(); for (let i = 0; i < 30; i++){ const an = i / 30 * 4 + k * Math.PI, rr = r * (.15 + i / 30 * .75); c[i ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); } c.stroke(); }
+      c.restore();
+    }
+  }
+  /** Things passing at their own distances: satellites, freighters, a ring station, tumbling asteroids. Far ones are small, dim and blue. */
+  function drawTraffic(t, dt){
+    if (t > nextTraffic && traffic.length < 3){
+      const kinds = ['satellite', 'freighter', 'station', 'asteroid', 'satellite', 'freighter'];
+      const side = Math.random() < .5 ? -1 : 1;
+      traffic.push({ kind: kinds[(Math.random() * kinds.length) | 0], x: side * rnd(.35, 1.1), y: rnd(-.55, .25), z: 1, vx: rnd(-.04, .04), spin: rnd(-.6, .6), a: rnd(0, 6), born: t });
+      nextTraffic = t + rnd(9000, 22000) / Math.max(.6, engine.speed);
+    }
+    traffic.sort((a, b) => b.z - a.z);
+    for (let i = traffic.length - 1; i >= 0; i--){
+      const o = traffic[i];
+      o.z -= .045 * engine.speed * dt / 1000; o.x += o.vx * dt / 1000; o.a += o.spin * dt / 1000;
+      const p = project(o.x, o.y, o.z), size = W * .016 / o.z;
+      if (o.z < .06 || p.x < -size * 4 || p.x > W + size * 4 || p.y > H + size * 4){ traffic.splice(i, 1); continue; }
+      const near = clamp(1 - o.z, 0, 1), fade = Math.min(1, (t - o.born) / 2500);
+      sctx.save(); sctx.globalAlpha = fade * (.35 + .65 * near); sctx.translate(p.x, p.y);
+      shapes[o.kind](sctx, size, o.a, near, t);
+      // distance haze: far things take on the colour of space
+      sctx.restore();
+    }
+  }
+  const shapes = {
+    satellite(c, s, a, near, t){
+      c.rotate(a * .3);
+      c.fillStyle = `rgb(${Math.round(60 + 120 * near)},${Math.round(70 + 110 * near)},${Math.round(110 + 100 * near)})`; c.fillRect(-s * .35, -s * .25, s * .7, s * .5);
+      c.fillStyle = `rgba(60,120,220,${.5 + .4 * near})`; c.strokeStyle = 'rgba(160,210,255,.6)'; c.lineWidth = Math.max(.5, s * .03);
+      [-1, 1].forEach(d => { c.fillRect(d > 0 ? s * .45 : -s * 1.75, -s * .22, s * 1.3, s * .44); c.strokeRect(d > 0 ? s * .45 : -s * 1.75, -s * .22, s * 1.3, s * .44);
+        for (let k = 1; k < 4; k++){ const x = (d > 0 ? s * .45 : -s * 1.75) + k * s * .325; c.beginPath(); c.moveTo(x, -s * .22); c.lineTo(x, s * .22); c.stroke(); } });
+      c.fillStyle = Math.sin(t / 400) > 0 ? '#ff6b7d' : 'rgba(255,107,125,.2)'; c.beginPath(); c.arc(0, -s * .3, Math.max(1, s * .07), 0, 7); c.fill();
+    },
+    freighter(c, s, a, near, t){
+      const L = s * 3.2, h = s * .55;
+      const g = c.createLinearGradient(0, -h, 0, h); g.addColorStop(0, `rgb(${Math.round(70 + 110 * near)},${Math.round(75 + 105 * near)},${Math.round(110 + 90 * near)})`); g.addColorStop(1, '#1a1d30');
+      c.fillStyle = g; c.beginPath(); c.moveTo(-L / 2, -h * .6); c.lineTo(L / 2 - h, -h); c.quadraticCurveTo(L / 2 + h * .4, 0, L / 2 - h, h); c.lineTo(-L / 2, h * .6); c.closePath(); c.fill();
+      c.fillStyle = 'rgba(255,214,140,.9)'; for (let k = 0; k < 7; k++) c.fillRect(-L / 2 + L * (.15 + k * .1), -h * .2, Math.max(1, s * .08), Math.max(1, s * .08));
+      const e = c.createRadialGradient(-L / 2, 0, 0, -L / 2, 0, h * 2); e.addColorStop(0, 'rgba(120,230,255,.9)'); e.addColorStop(1, 'rgba(79,214,255,0)');
+      c.fillStyle = e; c.beginPath(); c.arc(-L / 2, 0, h * 2, 0, 7); c.fill();
+      c.fillStyle = Math.sin(t / 300) > .3 ? '#46e6a1' : 'rgba(70,230,161,.2)'; c.beginPath(); c.arc(L / 2 - h * .6, -h * .9, Math.max(1, s * .06), 0, 7); c.fill();
+    },
+    station(c, s, a, near){
+      const R = s * 2.2, col = `rgba(${Math.round(140 + 100 * near)},${Math.round(150 + 90 * near)},${Math.round(190 + 60 * near)},`;
+      c.save(); c.scale(1, .42); c.lineWidth = Math.max(1, s * .3); c.strokeStyle = col + '.9)'; c.beginPath(); c.arc(0, 0, R, 0, 7); c.stroke();
+      c.lineWidth = Math.max(.5, s * .06); c.strokeStyle = col + '.55)';
+      for (let k = 0; k < 4; k++){ const an = a + k * Math.PI / 2; c.beginPath(); c.moveTo(0, 0); c.lineTo(Math.cos(an) * R, Math.sin(an) * R); c.stroke(); }
+      c.fillStyle = 'rgba(255,214,140,.85)';
+      for (let k = 0; k < 16; k++){ const an = a + k * Math.PI / 8; c.beginPath(); c.arc(Math.cos(an) * R, Math.sin(an) * R, Math.max(.8, s * .07), 0, 7); c.fill(); }
+      c.restore();
+      c.fillStyle = col + '1)'; c.beginPath(); c.arc(0, 0, s * .45, 0, 7); c.fill();
+    },
+    asteroid(c, s, a, near){
+      c.rotate(a); const r = s * 1.1;
+      const g = c.createRadialGradient(-r * .3, -r * .3, r * .1, 0, 0, r); g.addColorStop(0, `rgb(${Math.round(90 + 80 * near)},${Math.round(80 + 70 * near)},${Math.round(95 + 60 * near)})`); g.addColorStop(1, '#16131f');
+      c.fillStyle = g; c.beginPath(); for (let i = 0; i < 11; i++){ const an = i / 11 * 6.283, rr = r * (.75 + .25 * Math.sin(i * 2.3 + 1)); c[i ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); } c.closePath(); c.fill();
+      c.fillStyle = 'rgba(0,0,0,.25)'; [[.3, .2, .2], [-.25, .35, .14], [.05, -.35, .12]].forEach(k => { c.beginPath(); c.arc(k[0] * r, k[1] * r, k[2] * r, 0, 7); c.fill(); });
+    }
+  };
+  /** Dust right by the glass: big, soft and fast, the nearest layer of all. */
+  function drawMotes(dt){
+    const c = sctx, dz = .05 * engine.speed * dt / 1000;
+    for (const m of motes){
+      m.z -= dz;
+      const p = project(m.x, m.y, m.z);
+      if (m.z < .012 || p.x < -60 || p.x > W + 60 || p.y < -60 || p.y > H + 60){ Object.assign(m, newMote(false)); continue; }
+      const r = Math.min(9, .045 / m.z), a = Math.min(.35, (.25 - m.z) * 2);
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, r); g.addColorStop(0, `rgba(220,230,255,${a})`); g.addColorStop(1, 'rgba(220,230,255,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, r, 0, 7); c.fill();
+    }
+  }
+  function drawStars(dt){
+    const c = sctx, speed = .075 * engine.speed * (1 + sky.wind * .3), dz = speed * dt / 1000, trail = 4 + engine.speed * 7;
+    c.lineCap = 'round';
+    for (const s of stars){
+      s.z -= dz;
+      const p = project(s.x, s.y, s.z);
+      if (s.z < .03 || p.x < -50 || p.x > W + 50 || p.y < -50 || p.y > H + 50){ Object.assign(s, newStar(false)); continue; }
+      const q = project(s.x, s.y, Math.min(1, s.z + dz * trail)), a = Math.min(1, (1 - s.z) * 1.3), w = Math.max(.6, 1.9 * (1 - s.z));
+      c.strokeStyle = `rgba(${engine.mode === 'warp' ? '215,195,255' : s.c},${a})`; c.lineWidth = w;
+      c.beginPath(); c.moveTo(q.x, q.y); c.lineTo(p.x + .01, p.y); c.stroke();
+    }
+  }
+  function drawClouds(dt){
+    const want = Math.round(sky.cloud * 7 + sky.fog * 3);
+    while (clouds.length < want) clouds.push({ x: rnd(-1.4, 1.4), y: rnd(-.8, .6), z: clouds.length ? 1 : rnd(.3, 1), r: rnd(.5, 1.1), h: (Math.random() * 3) | 0 });
+    if (clouds.length > want) clouds.length = want;
+    const c = sctx, stormy = sky.rain > 0 || sky.thunder, cols = stormy ? ['70,85,120', '55,60,105', '90,100,140'] : ['143,107,255', '255,95,174', '79,214,255'];
+    for (const k of clouds){
+      k.z -= .02 * engine.speed * dt / 1000;
+      if (k.z < .12) Object.assign(k, { x: rnd(-1.4, 1.4), y: rnd(-.8, .6), z: 1 });
+      const p = project(k.x, k.y, k.z), R = k.r / k.z * W * .09, a = Math.min(.3, (1 - k.z) * .45) * (stormy ? 1.3 : 1);
+      const g = c.createRadialGradient(p.x, p.y, 0, p.x, p.y, R); g.addColorStop(0, `rgba(${cols[k.h]},${a})`); g.addColorStop(1, `rgba(${cols[k.h]},0)`);
+      c.fillStyle = g; c.beginPath(); c.arc(p.x, p.y, R, 0, 7); c.fill();
+    }
+  }
+  function drawRocks(dt){
+    const want = Math.round(sky.wind * 9);
+    while (rocks.length < want) rocks.push({ x: -40 - Math.random() * W * .5, y: rnd(H * .12, H * .68), v: rnd(60, 180), r: rnd(4, 15), a: rnd(0, 6), va: rnd(-2, 2) });
+    if (rocks.length > want) rocks.length = want;
+    const c = sctx;
+    for (const k of rocks){
+      k.x += k.v * (dt / 1000) * (1 + sky.wind); k.a += k.va * dt / 1000;
+      if (k.x > W + 40) Object.assign(k, { x: -40, y: rnd(H * .12, H * .68) });
+      c.save(); c.translate(k.x, k.y); c.rotate(k.a); c.fillStyle = '#4a4560'; c.strokeStyle = 'rgba(200,190,255,.35)';
+      c.beginPath(); for (let i = 0; i < 7; i++){ const an = i / 7 * 6.283, rr = k.r * (.7 + .3 * Math.sin(i * 2.7 + k.r)); c[i ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); }
+      c.closePath(); c.fill(); c.stroke(); c.restore();
+    }
+  }
+  function drawLightning(t){
+    if (!sky.thunder) return;
+    if (!bolt && t > nextBolt){
+      const pts = [], x0 = rnd(W * .2, W * .8); let x = x0, y = H * .1;
+      while (y < H * rnd(.45, .6)){ pts.push([x, y]); x += rnd(-40, 40); y += rnd(18, 45); }
+      bolt = { pts, until: t + 180 }; nextBolt = t + rnd(4000, 11000);
+      const f = el('cFlash'); f.style.transition = 'none'; f.style.opacity = '.45';
+      setTimeout(() => { f.style.transition = 'opacity .9s'; f.style.opacity = '0'; }, 60);
+    }
+    if (bolt){
+      const c = sctx; c.strokeStyle = 'rgba(230,235,255,.95)'; c.lineWidth = 2.5; c.shadowColor = '#b892ff'; c.shadowBlur = 18;
+      c.beginPath(); bolt.pts.forEach((p, i) => c[i ? 'lineTo' : 'moveTo'](p[0], p[1])); c.stroke(); c.shadowBlur = 0;
+      if (t > bolt.until) bolt = null;
+    }
+  }
+  function drawHaze(){
+    if (engine.dust > 0){ sctx.fillStyle = `rgba(150,105,60,${engine.dust * .13})`; sctx.fillRect(0, 0, W, H); }
+  }
+
+  /* ---------- the glass: rain, snow, frost, fog ---------- */
+  function drawGlass(dt){
+    const c = gctx; c.clearRect(0, 0, W, H);
+    const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(.3, 'rgba(255,255,255,0)'); g.addColorStop(.42, 'rgba(255,255,255,.035)'); g.addColorStop(.5, 'rgba(255,255,255,0)');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    if (sky.fog > 0){
+      c.fillStyle = `rgba(165,180,210,${.26 * sky.fog})`; c.fillRect(0, 0, W, H);
+      const fg = c.createRadialGradient(W / 2, H * .45, H * .1, W / 2, H * .45, H * .9); fg.addColorStop(0, 'rgba(165,180,210,0)'); fg.addColorStop(1, `rgba(165,180,210,${.3 * sky.fog})`);
+      c.fillStyle = fg; c.fillRect(0, 0, W, H);
+    }
+    const frost = Math.max(sky.cold, sky.snow * .8);
+    if (frost > 0){ c.globalAlpha = frost; c.drawImage(frostLayer(), 0, 0, W, H); c.globalAlpha = 1; }
+    const sec = dt / 1000;
+    // rain: drops land, sit, and now and then one runs down the glass
+    if (sky.rain > 0 && drops.length < 170 * sky.rain && Math.random() < sky.rain * 9 * sec) drops.push({ x: rnd(0, W), y: rnd(0, H * .82), r: rnd(1.5, 4.5) * (W > 1400 ? 1.4 : 1), life: rnd(15e3, 45e3), age: 0, vy: 0 });
+    if (sky.rain > 0 && Math.random() < sky.rain * .7 * sec){ const d = drops[(Math.random() * drops.length) | 0]; if (d && d.r > 3 && !d.vy) d.vy = rnd(30, 90); }
+    for (let i = drops.length - 1; i >= 0; i--){
+      const d = drops[i]; d.age += dt;
+      if (d.vy){ d.y += d.vy * sec; d.vy = Math.min(220, d.vy + 40 * sec); if (Math.random() < 3 * sec) drops.push({ x: d.x + rnd(-1, 1), y: d.y - d.r * 2, r: d.r * .4, life: rnd(4e3, 9e3), age: 0, vy: 0 }); }
+      if (d.age > d.life || d.y > H){ drops.splice(i, 1); continue; }
+      const a = Math.min(1, (d.life - d.age) / 2500);
+      c.fillStyle = `rgba(170,200,255,${.13 * a})`; c.strokeStyle = `rgba(230,240,255,${.32 * a})`; c.lineWidth = .8;
+      c.beginPath(); if (d.vy) c.ellipse(d.x, d.y, d.r * .85, d.r * 1.25, 0, 0, 7); else c.arc(d.x, d.y, d.r, 0, 7); c.fill(); c.stroke();
+      c.fillStyle = `rgba(255,255,255,${.55 * a})`; c.beginPath(); c.arc(d.x - d.r * .35, d.y - d.r * .35, d.r * .28, 0, 7); c.fill();
+    }
+    // snow: flakes stick to the glass and slowly melt
+    if (sky.snow > 0 && flakes.length < 150 * sky.snow && Math.random() < sky.snow * 7 * sec) flakes.push({ x: rnd(0, W), y: rnd(0, H * .85), r: rnd(1.5, 4) * (W > 1400 ? 1.4 : 1), life: rnd(20e3, 50e3), age: 0, a: rnd(0, 3) });
+    for (let i = flakes.length - 1; i >= 0; i--){
+      const f = flakes[i]; f.age += dt; if (f.age > f.life){ flakes.splice(i, 1); continue; }
+      const a = Math.min(1, (f.life - f.age) / 4000) * .85;
+      c.strokeStyle = `rgba(240,248,255,${a})`; c.lineWidth = 1;
+      c.beginPath(); for (let k = 0; k < 3; k++){ const an = f.a + k * 1.047; c.moveTo(f.x - Math.cos(an) * f.r, f.y - Math.sin(an) * f.r); c.lineTo(f.x + Math.cos(an) * f.r, f.y + Math.sin(an) * f.r); } c.stroke();
+    }
+  }
+  /** Frost creeping in from the edges of the glass, drawn once per size. */
+  function frostLayer(){
+    const key = W + 'x' + H;
+    if (key === frostKey && frostCache) return frostCache;
+    frostKey = key;
+    const cv = frostCache || document.createElement('canvas'); frostCache = cv; cv.width = W; cv.height = H;
+    const c = cv.getContext('2d'), edge = (x0, y0, x1, y1) => { const g = c.createLinearGradient(x0, y0, x1, y1); g.addColorStop(0, 'rgba(225,240,255,.42)'); g.addColorStop(1, 'rgba(225,240,255,0)'); return g; };
+    const m = Math.min(W, H) * .22;
+    c.fillStyle = edge(0, 0, m, 0); c.fillRect(0, 0, m, H);
+    c.fillStyle = edge(W, 0, W - m, 0); c.fillRect(W - m, 0, m, H);
+    c.fillStyle = edge(0, 0, 0, m); c.fillRect(0, 0, W, m);
+    c.strokeStyle = 'rgba(235,245,255,.5)'; c.lineWidth = 1;
+    const branch = (x, y, an, len, depth) => {
+      if (depth > 3 || len < 4) return;
+      const x2 = x + Math.cos(an) * len, y2 = y + Math.sin(an) * len;
+      c.beginPath(); c.moveTo(x, y); c.lineTo(x2, y2); c.stroke();
+      branch(x2, y2, an + rnd(-.5, .5), len * .7, depth + 1);
+      if (Math.random() < .7) branch(x + (x2 - x) * .5, y + (y2 - y) * .5, an + (Math.random() < .5 ? -1 : 1) * rnd(.6, 1.1), len * .5, depth + 1);
+    };
+    for (let i = 0; i < 70; i++){
+      const side = i % 3, len = m * rnd(.15, .4);
+      if (side === 0) branch(0, rnd(0, H), rnd(-.6, .6), len, 0);
+      else if (side === 1) branch(W, rnd(0, H), Math.PI + rnd(-.6, .6), len, 0);
+      else branch(rnd(0, W), 0, Math.PI / 2 + rnd(-.6, .6), len, 0);
+    }
+    return cv;
+  }
+
+  /* ---------- billboards ---------- */
+  const LANES = [{ x: -.27, y: -.06, cls: '' }, { x: .27, y: -.02, cls: '' }, { x: 0, y: -.27, cls: 'wide' }];
+  const NARROW_LANES = [{ x: 0, y: -.17, cls: 'wide' }, { x: 0, y: .05, cls: 'wide' }];
+  function boardHtml(card){
+    return `<span class="bh">${esc(card.head)}</span><span class="bb">${esc(card.big)}</span>${card.sub ? `<span class="bs">${esc(card.sub)}</span>` : ''}`;
+  }
+  function spawn(t){
+    if (!rot.length) return;
+    // Never the same billboard twice on screen at once.
+    let card = rot[rotI++ % rot.length];
+    for (let k = 0; k < rot.length && boards.some(b => b.id === card.id); k++) card = rot[rotI++ % rot.length];
+    if (boards.some(b => b.id === card.id)) return;
+    const lanes = narrow() ? NARROW_LANES : LANES, lane = lanes[laneI++ % lanes.length];
+    const b = document.createElement('div');
+    b.className = `board tone-${card.tone} ${lane.cls}${String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id); b.innerHTML = boardHtml(card);
+    el('cBoards').appendChild(b);
+    boards.push({ el: b, id: card.id, lane, born: t, life: still() ? 20000 : 15000, w: b.offsetWidth, h: b.offsetHeight, seed: Math.random() * 6 });
+  }
+  function scaleAt(p){
+    if (p < .3){ const q = p / .3; return .04 + .81 * Math.pow(q, 2.2); }
+    if (p < .8) return .85 + .2 * (p - .3) / .5;
+    const q = (p - .8) / .2; return 1.05 + 2.6 * q * q;
+  }
+  function placeBoards(t){
+    for (let i = boards.length - 1; i >= 0; i--){
+      const b = boards[i], p = (t - b.born) / b.life;
+      if (p >= 1){ b.el.parentNode && b.el.parentNode.removeChild(b.el); boards.splice(i, 1); continue; }
+      const s = still() ? 1 : scaleAt(p), bob = Math.sin(t / 1700 + b.seed) * 5 * s;
+      const x = vp.x + b.lane.x * W * s, y = vp.y + b.lane.y * H * s + bob;
+      const a = still() ? 1 : p < .08 ? p / .08 : p > .86 ? Math.max(0, 1 - (p - .86) / .14) : 1;
+      // Side billboards turn to face you as they pass; the overhead one tips down. Far away they're soft, dim and blue.
+      const turn = still() ? 0 : Math.min(1, s), ry = b.lane.x < 0 ? 18 * turn : b.lane.x > 0 ? -18 * turn : 0, rx = b.lane.x === 0 ? (b.lane.y < 0 ? -12 : 10) * turn : 0;
+      b.el.style.transform = `translate(${(x - b.w / 2).toFixed(1)}px,${(y - b.h / 2).toFixed(1)}px) scale(${s.toFixed(3)}) rotateY(${ry.toFixed(2)}deg) rotateX(${rx.toFixed(2)}deg)`;
+      b.el.style.opacity = a.toFixed(3);
+      const far = clamp((.6 - s) / .56, 0, 1);
+      b.el.style.filter = far > 0 ? `${quality === 1 ? `blur(${(far * 3).toFixed(2)}px) ` : ''}brightness(${(1 - far * .45).toFixed(2)}) saturate(${(1 - far * .5).toFixed(2)})` : '';
+      b.el.style.zIndex = String(Math.round(s * 100));
+    }
+    if (t >= nextBoard){ spawn(t); nextBoard = t + (still() ? 10000 : narrow() ? 7600 : 5600); }
+  }
+
+  /* ---------- the ship ---------- */
+  function sway(t){
+    el('cBoards').style.perspectiveOrigin = `${vp.x.toFixed(0)}px ${vp.y.toFixed(0)}px`;
+    const k = 1 + sky.wind * 2.5, sx = Math.sin(t / 6300) * 6 * k + Math.sin(t / 23000) * 10, sy = Math.sin(t / 8100) * 4 * k + Math.sin(t / 31000) * 7;
+    const r = Math.sin(t / 9700) * .22 * k;
+    el('cShip').style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px) rotate(${r.toFixed(3)}deg)`;
+    vp.x = W / 2 - sx * 1.6; vp.y = H * (narrow() ? .36 : .42) - sy * 1.6;
+  }
+
+  function loop(t){
+    if (!on) return;
+    const dt = Math.min(80, t - (last || t)); last = t; frame++;
+    if (dt > 34) slowFrames++; else if (slowFrames > 0) slowFrames -= .25;
+    if (slowFrames > 90 && quality > .5){ quality = .5; slowFrames = 0; resize(); }
+    sway(t); drawSky(t); drawGalaxies(); drawPlanet(t); drawClouds(dt); drawStars(dt); drawTraffic(t, dt); drawRocks(dt); drawMotes(dt); drawLightning(t); drawHaze();
+    if (quality === 1 || frame % 2 === 0) drawGlass(quality === 1 ? dt : dt * 2);
+    placeBoards(t);
+    raf = requestAnimationFrame(loop);
+  }
+  /** Reduced motion: one still frame, refreshed every 20 seconds with the next billboards. */
+  function drawStill(){
+    const t = performance.now();
+    sway(0); drawSky(t); drawGalaxies(); drawPlanet(t); drawClouds(0); drawStars(0); drawHaze(); drawGlass(400);
+    boards.forEach(b => b.el.parentNode && b.el.parentNode.removeChild(b.el)); boards = [];
+    LANES.slice(0, narrow() ? 1 : 2).forEach(() => spawn(t)); placeBoards(t + 1);
+  }
+
+  return {
+    start(){
+      if (on) return; on = true; document.body.classList.add('cockpit');
+      resize(); last = 0; nextBoard = 0; nextBolt = performance.now() + 2500;
+      if (still()){ drawStill(); staticTimer = setInterval(drawStill, 20000); }
+      else raf = requestAnimationFrame(loop);
+    },
+    stop(){
+      on = false; cancelAnimationFrame(raf); clearInterval(staticTimer); document.body.classList.remove('cockpit');
+      boards.forEach(b => b.el.parentNode && b.el.parentNode.removeChild(b.el)); boards = []; drops = []; flakes = [];
+    },
+    resize(){ if (on){ resize(); if (still()) drawStill(); } },
+    /** New data: the billboards to come, the sky, the engines and the dashboard. */
+    update(info){
+      sky = info.sky; engine = info.engine;
+      const ids = info.cards.map(c => c.id + c.weight).join();
+      if (ids !== cards.map(c => c.id + c.weight).join()){ rot = billboardRotation(info.cards); rotI = rotI % Math.max(1, rot.length); }
+      cards = info.cards;
+      boards.forEach(b => { const c = cards.filter(x => x.id === b.id)[0]; if (c){ const h = boardHtml(c); if (b.el.innerHTML !== h) b.el.innerHTML = h; } });
+      const h = info.hud;
+      el('hPrice').textContent = h.price; el('hPrice').className = 'v ' + h.priceTone;
+      el('hEngine').textContent = engine.label; el('hEngine').className = 's ' + engine.tone;
+      el('hTemp').textContent = h.temp; el('hWx').textContent = h.wx; el('hDateC').textContent = h.date;
+      el('cHud').setAttribute('data-engine', engine.mode);
+    },
+    running: () => on
+  };
+})();
 /* ===================== display: modes, remote control, scheduling, rendering ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
 const D = {
-  set: displaySettings(store.getJ('display', null)),
+  household: null, preview: {},
+  set: mergeSettings(null, store.getJ('display', null)),
   mode: 'energy', override: null, resume: null,
   lastInput: Date.now(), lastPick: 0, chromeUntil: 0, rotateAt: 0, reloadAt: 0,
   deviceId: null, wake: null, ticks: 0
 };
 const shown = () => D.override || D.mode;
 const region = () => { const r = store.get('region'); return REGIONS[r] ? r : 'G'; };
-const exTag = '<span class="tag">Example</span>';
 
 /* ---------- data sources: each refreshes on its own clock, backs off when it fails, and keeps its last good data ---------- */
 const MIN = 60e3;
@@ -1396,7 +1945,8 @@ const SRC = {
   live:    { label: 'Home Mini', every: () => SRC.live.data && SRC.live.data.none ? 6*60*MIN : shown() === 'night' ? 30*MIN : (shown() === 'energy' || shown() === 'screensaver') ? 2*MIN : 10*MIN, need: () => !!NET.creds, run: pollMini },
   weather: { label: 'Weather', every: () => 15*MIN, need: () => true, run: loadDisplayWeather },
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
-  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.trainFrom, run: () => loadTrains(D.set.trainFrom, D.set.trainTo) },
+  // Huxley2 is a free community service: ask once a minute only while departures are on screen.
+  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
@@ -1430,7 +1980,7 @@ function retryAll(){ Object.keys(SRC).forEach(k => { const s = SRC[k]; if (s.err
 function setMode(id, opts){
   opts = opts || {};
   D.mode = id; D.override = null;
-  if (!opts.keepHash) try { history.replaceState(null, '', '#' + id); } catch(e){}
+  if (!opts.keepHash){ D.preview = {}; try { history.replaceState(null, '', '#' + id); } catch(e){} }
   if (!opts.rotation) D.lastPick = Date.now();
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   applyMode();
@@ -1564,70 +2114,62 @@ function renderHome(){
     $('#hNow').innerHTML = `<p class="d">${SRC.weather.err ? 'No weather signal, trying again' : 'Checking the weather…'}</p>`;
     $('#hHours').innerHTML = '';
   }
-  const own = D.set.bins.length > 0, bins = nextCollections(own ? D.set.bins : exampleBins(now), now), hour = new Date(now).getHours();
-  $('#hBins').innerHTML = `<ul class="list">${bins.map(b => {
+  const bins = nextCollections(D.set.bins, now), hour = new Date(now).getHours();
+  $('#hBins').innerHTML = !bins.length ? '<p class="empty">Add your bins in settings, or for every screen in household.json.</p>' : `<ul class="list">${bins.map(b => {
     const when = b.days === 0 ? 'Today' : b.days === 1 ? (hour >= 12 ? 'Tomorrow · put it out tonight' : 'Tomorrow') : relDay(+b.date, now);
     return `<li><span class="what"><i class="bin" style="background:${BIN_COLOURS[b.colour] || BIN_COLOURS.grey}"></i>${esc(b.name)}</span><span class="when${b.days <= 1 ? ' soon' : ''}">${esc(when)}</span></li>`;
-  }).join('')}</ul>${own ? '' : `<p class="note">${exTag} Add your bins in settings.</p>`}`;
+  }).join('')}</ul>`;
   const C = SRC.cal;
   let evs = null, note = '';
-  if (!D.set.ical){ evs = exampleCalendar(now); note = `${exTag} Add your calendar's secret iCal address in settings.`; }
+  if (!D.set.ical) note = 'Add a calendar\'s iCal address in settings to see what\'s coming up.';
   else if (C.data) evs = C.data.filter(e => e.end > now);
-  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Open the display from the home server helper.' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
+  else if (C.err) note = esc(C.err.code === 'NOPROXY' ? 'This calendar doesn\'t let a web page read it directly. Google calendars need a small server (see the README).' : C.err.code === 'CALFAIL' ? 'Couldn\'t read the calendar. Check the secret iCal address in settings.' : errorText(C.err).join(' '));
   else note = 'Reading the calendar…';
   $('#hCal').innerHTML = (evs ? (evs.length ? `<ul class="list">${evs.slice(0, 6).map(e => `<li><span class="what">${esc(e.title)}</span><span class="when">${relDay(e.start, now)}${e.allDay ? '' : ' ' + hhmm(e.start)}</span></li>`).join('')}</ul>` : '<p class="empty">Nothing in the next week.</p>') : '') + (note ? `<p class="note">${note}</p>` : '');
   $('#hFoot').innerHTML = '<span>Weather from Open-Meteo</span>' + foot(['weather', 'cal']);
 }
 
-function travelNote(src, needKey){
-  if (!NET.proxy) return 'Live departures need the home server helper, which holds the API keys. Showing an example.';
-  if (src.err && src.err.code === 'NOKEY') return esc(src.err.message) + ' Showing an example.';
-  if (needKey && NET.keys[needKey] === false) return 'The home server helper has no key for this yet. Showing an example.';
-  return '';
-}
 function renderTravel(){
-  const now = Date.now(), s = D.set;
-  // trains
-  const T = SRC.trains;
-  let html = '', ex = false, list = null;
+  const now = Date.now(), s = D.set, T = SRC.trains;
+  let html = '', list = null;
   if (!s.trainFrom) html = '<p class="empty">Set a railway station in settings.</p>';
   else if (T.data) list = T.data.list;
-  else if (!T.need() || (T.err && T.err.code === 'NOKEY')){ list = exampleTrains(now); ex = true; }
-  else if (T.err) html = `<p class="empty">${esc(errorText(T.err).join(' '))}</p>`;
+  else if (T.err) html = `<p class="empty">No departures signal: ${esc(errorText(T.err)[0])} Trying again shortly.</p>`;
   else html = '<p class="empty">Checking departures…</p>';
   const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
-  $('#tTrainTitle').innerHTML = `Trains from ${esc(stn)}${s.trainTo ? ' calling at ' + esc(s.trainTo) : ''}${ex ? exTag : ''}`;
+  $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
   if (list){
-    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 6);
+    const rows = list.filter(d => (d.exp || d.sched) > now - 30e3).slice(0, 7);
     html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Plat</th><th>Status</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(d => {
       const late = d.exp && d.exp - d.sched >= 60e3, lv = leaveBy(d.exp || d.sched, s.trainWalk, now);
-      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
+      const st = d.cancelled ? '<span class="bad">Cancelled</span>' : d.delayed ? '<span class="warn">Delayed</span>' : late ? `<span class="warn">Exp ${hhmm(d.exp)}</span>` : '<span class="good">On time</span>';
       return `<tr><td class="t">${hhmm(d.sched)}</td><td class="dest">${esc(d.dest)}</td><td class="t opt">${esc(d.platform || '—')}</td><td class="st">${st}</td><td class="lv ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</td></tr>`;
     }).join('')}</tbody></table>` : '<p class="empty">No more departures in the next two hours.</p>';
-    if (ex) html += `<p class="note">${travelNote(T, 'rtt')}</p>`;
+    if (T.data.messages && T.data.messages.length) html += `<p class="note">${esc(T.data.messages[0])}</p>`;
   }
   $('#tTrains').innerHTML = html;
-  // trams
-  const M = SRC.trams;
-  html = ''; ex = false; let tr = null;
-  if (!s.tramStop) html = '<p class="empty">Set a Metrolink stop in settings.</p>';
-  else if (M.data) tr = M.data;
-  else if (!M.need() || (M.err && M.err.code === 'NOKEY')){ tr = exampleTrams(now); ex = true; }
-  else if (M.err) html = `<p class="empty">${esc(errorText(M.err).join(' '))}</p>`;
-  else html = '<p class="empty">Checking trams…</p>';
-  $('#tTramTitle').innerHTML = `Trams${s.tramStop ? ' from ' + esc(s.tramStop) : ''}${ex ? exTag : ''}`;
-  if (tr){
-    const age = M.at && !ex ? Math.max(0, Math.floor((now - M.at) / MIN)) : 0;
-    const rows = tr.trams.map(t => ({ dest: t.dest, wait: t.wait - age, status: t.status, carriages: t.carriages })).filter(t => t.wait >= 0).slice(0, 6);
-    html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Tram</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(t => {
-      const lv = leaveBy(now + t.wait*MIN, s.tramWalk, now);
-      return `<tr><td class="t">${t.wait === 0 ? 'Due' : t.wait + ' min'}</td><td class="dest">${esc(t.dest)}</td><td class="t opt">${esc(t.carriages || '')}</td><td class="lv ${lv.cls}">${lv.text}</td></tr>`;
-    }).join('')}</tbody></table>` : '<p class="empty">No trams listed right now.</p>';
-    if (tr.messages && tr.messages.length) html += `<p class="note">${esc(tr.messages[0])}</p>`;
-    if (ex) html += `<p class="note">${travelNote(M, 'tfgm')}</p>`;
+  // Trams only show once a stop is set: TfGM needs a server that holds the key.
+  const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
+  tramPanel.hidden = !s.tramStop;
+  if (s.tramStop){
+    let tr = null; html = '';
+    if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';
+    else if (M.data) tr = M.data;
+    else if (M.err) html = `<p class="empty">${esc(M.err.code === 'NOKEY' ? M.err.message : errorText(M.err).join(' '))}</p>`;
+    else html = '<p class="empty">Checking trams…</p>';
+    $('#tTramTitle').textContent = `Trams from ${s.tramStop}`;
+    if (tr){
+      const age = M.at ? Math.max(0, Math.floor((now - M.at) / MIN)) : 0;
+      const rows = tr.trams.map(t => ({ dest: t.dest, wait: t.wait - age, carriages: t.carriages })).filter(t => t.wait >= 0).slice(0, 6);
+      html = rows.length ? `<table class="deps"><thead><tr><th>Due</th><th>To</th><th class="opt">Tram</th><th class="lv">Go</th></tr></thead><tbody>${rows.map(t => {
+        const lv = leaveBy(now + t.wait*MIN, s.tramWalk, now);
+        return `<tr><td class="t">${t.wait === 0 ? 'Due' : t.wait + ' min'}</td><td class="dest">${esc(t.dest)}</td><td class="t opt">${esc(t.carriages || '')}</td><td class="lv ${lv.cls}">${lv.text}</td></tr>`;
+      }).join('')}</tbody></table>` : '<p class="empty">No trams listed right now.</p>';
+      if (tr.messages && tr.messages.length) html += `<p class="note">${esc(tr.messages[0])}</p>`;
+    }
+    $('#tTrams').innerHTML = html;
   }
-  $('#tTrams').innerHTML = html;
-  $('#tFoot').innerHTML = '<span>Trains from Realtime Trains · trams from TfGM</span>' + foot(['trains', 'trams']);
+  $('#tFoot').innerHTML = '<span>Live trains from National Rail, via Huxley2</span>' + foot(['trains', 'trams']);
 }
 
 function renderNight(){
@@ -1635,80 +2177,26 @@ function renderNight(){
   $('#nSub').textContent = [cur ? `Agile ${pence(cur.p)}` : '', W ? `${Math.round(W.now.temp)}°` : ''].filter(Boolean).join(' · ');
 }
 
-/* ---------- screensaver: planets carrying live numbers, the odd comet, an orbiting clock ---------- */
-// Each planet wanders round its own quarter of the screen, so they rarely meet but every pixel still changes.
-const PLANETS = [
-  { id: 'price', hue: ['#ffd27a', '#c46a12'], ring: false, cx: .27, cy: .28, ax: .17, ay: .14, fx: 1/310, fy: 1/230, px: 0, py: 1.1 },
-  { id: 'temp',  hue: ['#8fe8ff', '#1f5fa8'], ring: true,  cx: .73, cy: .28, ax: .17, ay: .14, fx: 1/270, fy: 1/350, px: 2.2, py: 0.2 },
-  { id: 'go',    hue: ['#d9c4ff', '#5a2fc2'], ring: false, cx: .27, cy: .72, ax: .17, ay: .14, fx: 1/380, fy: 1/260, px: 4.1, py: 2.7 },
-  { id: 'grid',  hue: ['#a6f5cf', '#1b8a5a'], ring: false, cx: .73, cy: .72, ax: .17, ay: .14, fx: 1/240, fy: 1/300, px: 5.3, py: 4.4 }
-];
-let saverRaf = null, saverStill = null, comet = null, nextComet = 0;
-const reducedMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-function planetValues(now){
-  const cur = agileNow(now), W = SRC.weather.data, s = D.set, out = {};
-  out.price = cur ? { v: pence(cur.p), l: 'Agile now', c: priceColour(cur.p) } : { v: '--', l: 'Agile now' };
-  out.temp = W ? { v: Math.round(W.now.temp) + '°', l: weatherText(W.now.code).text } : { v: '--', l: 'Outside' };
-  const T = SRC.trains.data, next = T ? T.list.filter(d => !d.cancelled && (d.exp || d.sched) - s.trainWalk*MIN > now)[0] : null;
-  const M = SRC.trams.data, tram = M ? M.trams.filter(t => t.at - s.tramWalk*MIN > now)[0] : null;
-  out.go = next ? { v: leaveBy(next.exp || next.sched, s.trainWalk, now).text.replace('Leave in ', ''), l: 'Leave for the ' + hhmm(next.sched) }
-        : tram ? { v: leaveBy(tram.at, s.tramWalk, now).text.replace('Leave in ', ''), l: 'Leave for the tram' }
-        : { v: longDay(new Date(now)).split(' ')[0].slice(0, 3) + ' ' + new Date(now).getDate(), l: MONTH_NAMES[new Date(now).getMonth()] };
-  const ci = SRC.carbon.data, cin = ci ? ci.filter(r => r.from <= now && now < r.to)[0] : null;
-  out.grid = cin ? { v: cin.v + ' g', l: 'Grid · ' + cin.index } : { v: '--', l: 'Grid carbon' };
-  return out;
+/* ---------- screensaver: the view from the cockpit (cockpit.js draws it) ---------- */
+const toneOf = p => p < 0 ? 'neg' : p < 15 ? 'good' : p < 25 ? 'warn' : 'bad';
+function cockpitInfo(now){
+  let ag = SRC.agile.data;
+  const pp = parseFloat(D.preview.price);
+  if (!isNaN(pp)){ const s0 = Math.floor(now / 1800e3) * 1800e3; ag = (ag || []).filter(r => r.to <= s0 || r.from > s0).concat([{ from: s0, to: s0 + 1800e3, p: pp }]).sort((x, y) => x.from - y.from); }
+  const cur = ag ? ag.filter(r => r.from <= now && now < r.to)[0] : null;
+  const ci = SRC.carbon.data ? SRC.carbon.data.filter(r => r.from <= now && now < r.to)[0] : null;
+  const L = SRC.live.data && !SRC.live.data.none ? SRC.live.data : null, T = SRC.tariff.data, W = SRC.weather.data;
+  const sky = skyFor(W, now, D.preview), known = !!W || !!D.preview.wx;
+  return {
+    sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null),
+    cards: buildBillboards({ agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins: D.set.bins,
+      events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, label: 'Harold Street · region ' + region() }, now),
+    hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
+  };
 }
-function renderSaver(){
-  const box = $('#sPlanets'), vals = planetValues(Date.now());
-  if (!box.children.length) box.innerHTML = PLANETS.map(p => `<div class="planet" data-p="${p.id}"><div class="orb" style="background:radial-gradient(circle at 32% 30%, ${p.hue[0]}, ${p.hue[1]} 70%, #05060f);color:${p.hue[0]}">${p.ring ? '<i class="ring"></i>' : ''}</div><span class="val"></span><span class="lbl"></span></div>`).join('');
-  PLANETS.forEach(p => {
-    const el = box.querySelector(`[data-p="${p.id}"]`), v = vals[p.id];
-    el.querySelector('.val').textContent = v.v; el.querySelector('.val').style.color = v.c || '';
-    el.querySelector('.lbl').textContent = v.l;
-  });
-  if (saverStill) placeSaver(Date.now());
-}
-function placeSaver(t){
-  const W = innerWidth, H = innerHeight, s = t / 1000;
-  PLANETS.forEach(p => {
-    const el = document.querySelector(`#sPlanets [data-p="${p.id}"]`); if (!el) return;
-    const x = W * (p.cx + Math.sin(s * 2*Math.PI * p.fx + p.px) * p.ax), y = H * (p.cy + Math.sin(s * 2*Math.PI * p.fy + p.py) * p.ay);
-    el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`;
-  });
-  const a = s / 600 * 2*Math.PI, c = $('#sClock');
-  c.style.transform = `translate(${(W/2 + Math.cos(a) * W * .12).toFixed(1)}px,${(H/2 + Math.sin(a) * H * .1).toFixed(1)}px)`;
-}
-function frameSaver(t){
-  const now = Date.now();
-  placeSaver(now);
-  const el = $('#sComet');
-  if (!comet && now > nextComet){
-    const W = innerWidth, H = innerHeight, ltr = Math.random() < .5, y0 = H * (.1 + Math.random()*.5);
-    comet = { start: now, dur: 3500 + Math.random()*2500, x0: ltr ? -W*.2 : W*1.2, x1: ltr ? W*1.2 : -W*.2, y0, y1: y0 + H*(.15 + Math.random()*.3) };
-    el.hidden = false;
-  }
-  if (comet){
-    const p = (now - comet.start) / comet.dur;
-    if (p >= 1){ comet = null; el.hidden = true; nextComet = now + 45e3 + Math.random()*105e3; }
-    else {
-      const x = comet.x0 + (comet.x1 - comet.x0)*p, y = comet.y0 + (comet.y1 - comet.y0)*p, ang = Math.atan2(comet.y1 - comet.y0, comet.x1 - comet.x0);
-      el.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${ang}rad) translateX(-100%)`;
-      el.style.opacity = String(Math.min(1, 4*p, 4*(1 - p)));
-    }
-  }
-  saverRaf = requestAnimationFrame(frameSaver);
-}
-function startSaver(){
-  renderSaver();
-  nextComet = Date.now() + 15e3;
-  if (reducedMotion()){ placeSaver(Date.now()); if (!saverStill) saverStill = setInterval(() => placeSaver(Date.now() * 40), 60e3); return; }
-  if (!saverRaf) saverRaf = requestAnimationFrame(frameSaver);
-}
-function stopSaver(){
-  if (saverRaf) cancelAnimationFrame(saverRaf); saverRaf = null;
-  if (saverStill) clearInterval(saverStill); saverStill = null;
-  comet = null; const el = $('#sComet'); if (el) el.hidden = true;
-}
+function renderSaver(){ Cockpit.update(cockpitInfo(Date.now())); }
+function startSaver(){ renderSaver(); Cockpit.start(); }
+function stopSaver(){ Cockpit.stop(); }
 
 /* ---------- toolbar, settings and remote control ---------- */
 const open = () => !$('#sheet').hidden;
@@ -1823,7 +2311,7 @@ function readSheet(){
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }
 function closeSheet(){ $('#sheet').hidden = true; D.lastInput = Date.now(); $('#setBtn').blur(); }
 function applySettings(s, regionCode){
-  const old = D.set; D.set = s; store.setJ('display', s);
+  const old = D.set; D.set = s; store.setJ('display', deviceChanges(s, D.household));
   if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
   if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
   if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
@@ -1839,7 +2327,7 @@ function setupLink(s, withRegion){ return location.href.split('#')[0] + '#setup=
 function importSetup(hash){
   const m = /^#setup=([A-Za-z0-9_-]+)$/.exec(hash || '');
   if (!m) return false;
-  try { const j = JSON.parse(b64.dec(m[1])); applySettings(displaySettings(j), REGIONS[j.region] ? j.region : null); toast('Settings saved on this device.'); }
+  try { const j = JSON.parse(b64.dec(m[1])); delete j.region; applySettings(mergeSettings(D.household, j), REGIONS[JSON.parse(b64.dec(m[1])).region] ? JSON.parse(b64.dec(m[1])).region : null); toast('Settings saved on this device.'); }
   catch(e){ toast('That setup link didn\'t work. Copy it again from the settings.'); }
   return true;
 }
@@ -1869,13 +2357,13 @@ function wire(){
     if (Math.abs(dx) > 70 && Math.abs(dy) < 50 && !$('#bar').contains(e.target)) setMode(stepMode(D.mode, dx < 0 ? 1 : -1));
     else showChrome();
   }, { passive: true });
-  window.addEventListener('hashchange', () => { if (importSetup(location.hash)){ try { history.replaceState(null, '', '#' + D.mode); } catch(e){} return; } const m = modeFromHash(location.hash, null); if (m && m !== D.mode) setMode(m, { keepHash: true }); });
+  window.addEventListener('hashchange', () => { if (importSetup(location.hash)){ try { history.replaceState(null, '', '#' + D.mode); } catch(e){} return; } D.preview = hashOptions(location.hash); const m = modeFromHash(location.hash, null); if (m && m !== D.mode) setMode(m, { keepHash: true }); else render(); });
   window.addEventListener('online', () => { retryAll(); render(); });
   window.addEventListener('offline', render);
   document.addEventListener('visibilitychange', () => { if (!document.hidden){ keepAwake(); retryAll(); } });
   document.addEventListener('fullscreenchange', syncFs); document.addEventListener('webkitfullscreenchange', syncFs);
   document.addEventListener('click', () => keepAwake(), true);
-  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 200); });
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { Cockpit.resize(); render(); }, 200); });
 }
 
 /* ---------- start ---------- */
@@ -1883,9 +2371,15 @@ function wire(){
   const k = store.get('key'), a = store.get('account');
   if (k && a) NET.creds = { account: a, key: k };
   buildSheet(); wire();
+  // Settings every screen shares, from household.json next to this page. Missing or unreadable is fine.
+  try {
+    const r = await Promise.race([fetch('household.json', { cache: 'no-cache' }), new Promise((_, no) => setTimeout(no, 4000))]);
+    if (r.ok){ D.household = await r.json(); D.set = mergeSettings(D.household, store.getJ('display', null)); }
+  } catch(e){}
   const imported = importSetup(location.hash);
   D.mode = modeFromHash(imported ? '' : location.hash, D.set.mode);
-  try { history.replaceState(null, '', '#' + D.mode); } catch(e){}
+  D.preview = imported ? {} : hashOptions(location.hash);
+  if (imported || !location.hash) try { history.replaceState(null, '', '#' + D.mode); } catch(e){}
   D.rotateAt = Date.now() + D.set.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), D.set.reloadAt, Math.random()*10);
   applyMode();

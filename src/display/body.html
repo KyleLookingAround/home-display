@@ -53,11 +53,38 @@
     <p class="mode-foot" id="tFoot"></p>
   </section>
 
-  <!-- ================= SCREENSAVER ================= -->
-  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver" hidden>
-    <div class="orbit-clock" id="sClock" data-clock>--:--</div>
-    <div id="sPlanets"></div>
-    <div class="comet" id="sComet" hidden></div>
+  <!-- ================= SCREENSAVER: the cockpit ================= -->
+  <section class="mode mode-saver" data-mode="screensaver" aria-label="Screensaver: the view from the cockpit" hidden>
+    <canvas id="cSpace" aria-hidden="true"></canvas>
+    <div id="cBoards"></div>
+    <div id="cShip">
+      <canvas id="cGlass" aria-hidden="true"></canvas>
+      <svg id="cFrame" viewBox="0 0 1600 900" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="gHull" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2040"/><stop offset="1" stop-color="#080a17"/></linearGradient>
+          <linearGradient id="gSide" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
+          <linearGradient id="gSideR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#060813"/><stop offset="1" stop-color="#181d38"/></linearGradient>
+          <linearGradient id="gDash" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151a36"/><stop offset=".25" stop-color="#0b0e22"/><stop offset="1" stop-color="#04050d"/></linearGradient>
+        </defs>
+        <path d="M0 0H1600V96C1220 44 380 44 0 96Z" fill="url(#gHull)"/>
+        <path d="M0 96C380 44 1220 44 1600 96" fill="none" stroke="#4fd6ff" stroke-opacity=".4" stroke-width="2.5"/>
+        <path d="M0 64L158 78L76 696L0 716Z" fill="url(#gSide)"/>
+        <path d="M158 78L76 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
+        <path d="M1600 64L1442 78L1524 696L1600 716Z" fill="url(#gSideR)"/>
+        <path d="M1442 78L1524 696" stroke="#4fd6ff" stroke-opacity=".32" stroke-width="2.5"/>
+        <path d="M0 700C420 642 1180 642 1600 700V900H0Z" fill="url(#gDash)"/>
+        <path d="M0 700C420 642 1180 642 1600 700" fill="none" stroke="#ffb547" stroke-opacity=".5" stroke-width="2.5"/>
+        <path d="M90 760C500 720 1100 720 1510 760M60 850H1540M520 700V900M1080 700V900" fill="none" stroke="#8698ff" stroke-opacity=".1" stroke-width="2"/>
+        <path d="M600 30H1000M560 46H1040" stroke="#8698ff" stroke-opacity=".12" stroke-width="2"/>
+      </svg>
+      <div class="hud" id="cHud" data-engine="cruise">
+        <div class="g"><span class="k">Power</span><span class="v" id="hPrice">--</span><span class="s" id="hEngine">Cruising</span></div>
+        <div class="g c"><span class="hclock" data-clock>--:--</span><span class="s" id="hDateC"></span></div>
+        <div class="g r"><span class="k">Outside</span><span class="v" id="hTemp">--</span><span class="s" id="hWx"></span></div>
+      </div>
+      <div class="leds" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="flash" id="cFlash"></div>
   </section>
 
   <!-- ================= NIGHT ================= -->

@@ -64,6 +64,13 @@ function trains(){
     svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', { late: 6 }), svc(24, 'Buxton', '4'),
     svc(31, 'Hazel Grove', '2', { cancel: true }), svc(38, 'Sheffield', '3'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4') ] };
 }
+function huxley(){
+  const hm = m => { const d = new Date(+NOW + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
+  const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, destination: [{ locationName: dest, via: null }] }, extra || {});
+  return { locationName: 'Stockport', crs: 'SPT', nrccMessages: null, trainServices: [
+    svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', hm(23)), svc(24, 'Buxton', '4'),
+    svc(31, 'Hazel Grove', '2', 'Cancelled', { isCancelled: true }), svc(38, 'Sheffield', '3', 'Delayed'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4') ] };
+}
 const trams = { value: [
   { Id: 1, StationLocation: 'East Didsbury', Direction: 'Outgoing', Dest0: 'Rochdale Town Centre', Carriages0: 'Double', Status0: 'Due', Wait0: '4', Dest1: 'Shaw and Crompton', Carriages1: 'Single', Wait1: '12', Dest2: 'Rochdale Town Centre', Wait2: '19', MessageBoard: 'Welcome to Metrolink. Engineering works this Sunday: see tfgm.com.' },
   { Id: 2, StationLocation: 'East Didsbury', Direction: 'Incoming', Dest0: 'Terminates Here', Wait0: '2', MessageBoard: '<no message>' } ] };
@@ -137,6 +144,7 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   await page.route(/^https:\/\/api\.carbonintensity\.org\.uk\//, r => r.fulfill({ json: carbon() }));
   await page.route(/^https:\/\/api\.open-meteo\.com\//, r => r.fulfill({ json: weather() }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
+  await page.route(/^https:\/\/huxley2\.azurewebsites\.net\//, r => r.fulfill({ json: huxley() }));
   await page.clock.install({ time: at });
   if (settings) await page.addInitScript(s => { try { localStorage.setItem('hse.display', s); } catch (e) {} }, JSON.stringify(settings));
   if (account) await page.addInitScript(() => { try { localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test'); } catch (e) {} });
@@ -213,11 +221,17 @@ test('display: content on the TV is real data, labelled examples only where noth
   assert.match(await page.textContent('#hCal'), /Parents' evening/);
   assert.match(await page.textContent('#hBins'), /General waste\s*Tomorrow/);
   await ctx.close();
-  const pages = await open('/display.html#travel', { withHelper: false, settings: null });
+  // GitHub Pages, no home server: trains still come straight from Huxley2; trams say what they need.
+  const pages = await open('/display.html#travel', { withHelper: false, settings: { tramStop: 'East Didsbury' } });
   await pages.page.waitForTimeout(500);
-  assert.match(await pages.page.textContent('#tTrainTitle'), /Example/);
-  assert.match(await pages.page.textContent('#tTrains'), /home server helper/);
+  assert.match(await pages.page.textContent('#tTrains'), /Manchester Piccadilly/);
+  assert.match(await pages.page.textContent('#tTrains'), /Delayed/);
+  assert.match(await pages.page.textContent('#tTrams'), /TfGM key/);
+  assert.doesNotMatch(await pages.page.textContent('#screen'), /Example/);
   await pages.ctx.close();
+  const bare = await open('/display.html#travel', { withHelper: false, settings: null });
+  assert.equal(await bare.page.isVisible('#tTrams'), false, 'no tram stop, no tram panel');
+  await bare.ctx.close();
 });
 
 test('display: Home Mini live draw and today\'s cost, without using up Octopus\'s rate limit', async () => {
@@ -257,7 +271,7 @@ test('display: every mode works on a phone without sideways scroll', async () =>
   await shot(page, 'phone-toolbar');
   await page.keyboard.press('s');
   await page.waitForTimeout(300);
-  assert.equal(await page.inputValue('#fMode'), 'energy', 'the s key opens settings without typing into them');
+  assert.equal(await page.inputValue('#fMode'), 'screensaver', 'the s key opens settings without typing into them');
   const l = await layout(page);
   assert.ok(l.sw <= l.iw, 'settings scroll sideways on a phone');
   await shot(page, 'phone-settings');
@@ -306,9 +320,9 @@ test('display: screensaver after idle minutes, woken by any key', async () => {
   await page.waitForTimeout(300);
   assert.equal(await visibleMode(page), 'screensaver');
   assert.equal(await page.evaluate(() => location.hash), '#travel', 'the link still names the chosen mode');
-  const vals = await page.$$eval('#sPlanets .val', els => els.map(e => e.textContent));
-  assert.equal(vals.length, 4);
-  assert.match(vals[0], /p$/, 'a planet carries the price');
+  await page.waitForTimeout(1500);
+  assert.match(await page.textContent('#hPrice'), /p$/, 'the dashboard shows the price');
+  assert.ok(await page.$$eval('#cBoards .board', els => els.length) >= 1, 'billboards are flying past');
   await shot(page, 'tv-screensaver-idle');
   await page.keyboard.press('ArrowDown');
   assert.equal(await visibleMode(page), 'travel', 'the key only wakes it');
@@ -336,7 +350,7 @@ test('display: a setup link copies settings to this device', async () => {
   assert.equal(saved[0].trainFrom, 'MAN');
   assert.equal(saved[0].rotate, 5);
   assert.equal(saved[1], 'C');
-  assert.equal(saved[2], '#energy');
+  assert.equal(saved[2], '#screensaver', 'opens on the household default, the cockpit');
   assert.match(await page.textContent('#toast'), /Settings saved/);
   await ctx.close();
 });
@@ -353,6 +367,25 @@ test('dashboard: no sideways scroll on a phone or a TV', async () => {
     assert.equal(await page.getAttribute('#wallBtn', 'href'), 'display.html#energy');
     assert.deepEqual(errors, []);
     await shot(page, `dashboard-${width}`);
+    await ctx.close();
+  }
+});
+
+test('cockpit: every kind of weather and power price draws without errors', async () => {
+  const looks = ['', '&wx=clear&phase=day', '&wx=rain&phase=night', '&wx=snow', '&wx=fog', '&wx=thunder&phase=night', '&wx=wind&phase=dusk', '&wx=cold&phase=dawn', '&price=-3', '&price=34&wx=cloud'];
+  for (const [width, height] of [[1920, 1080], [390, 844]]) {
+    const { page, ctx, errors } = await open('/display.html#screensaver', { width, height });
+    for (const look of looks) {
+      await page.evaluate(h => { location.hash = h; }, 'screensaver' + look);
+      await page.waitForTimeout(200);
+      for (let i = 0; i < (process.env.SHOTS ? 40 : 12); i++) { await page.clock.runFor(1000); }
+      await page.waitForTimeout(300);
+      assert.equal(await visibleMode(page), 'screensaver');
+      const l = await layout(page);
+      assert.ok(l.sw <= l.iw, `${look}: scrolls sideways at ${width}`);
+      await shot(page, `cockpit-${width}${look.replace(/[&=]/g, '-') || '-now'}`);
+    }
+    assert.deepEqual(errors, []);
     await ctx.close();
   }
 });

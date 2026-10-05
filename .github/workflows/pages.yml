@@ -16,27 +16,19 @@ concurrency:
 
 jobs:
   check:
-    name: Build, tests, phone and TV checks
+    name: npm run ci (build, tests, phone and TV checks, lock)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Built pages match the source
+      - name: Install (Playwright for the phone and TV checks)
         run: |
-          python3 build.py
-          git diff --exit-code index.html display.html || { echo "::error::Run python3 build.py and commit the pages."; exit 1; }
-      - name: Home server helper compiles
-        run: python3 -m py_compile server.py
-      - name: Unit tests
-        run: node --test tests/*.test.mjs
-      - name: Install Playwright
-        run: |
-          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Browser checks (phone and TV layout, remote control, lock)
-        run: node --test tests/display.browser.mjs tests/lock.browser.mjs
+      - name: Everything a contributor runs (npm run ci)
+        run: npm run ci
       - name: Build the published folder
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:

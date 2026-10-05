@@ -1,0 +1,20 @@
+{
+  "name": "home-display",
+  "private": true,
+  "description": "Harold Street Energy: an Octopus dashboard and a household display for phones, a wall tablet and the TV.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node --test tests/display.browser.mjs tests/lock.browser.mjs",
+    "shots": "SHOTS=1 node --test tests/display.browser.mjs",
+    "serve": "python3 server.py",
+    "ci": "python3 -m py_compile server.py && npm test && npm run test:browser"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
