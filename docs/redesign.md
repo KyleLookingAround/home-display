@@ -1,12 +1,23 @@
 # A full redesign of everything: the plan
 
-**Status:** proposed, October 2026. Nothing here is built. The questions at the end need Kyle's answers first.
+**Status:** proposed, October 2026, and still being worked out. Nothing here is built.
 
 "Everything" means:
 - the dashboard;
 - the household display: Energy, Home, Travel, the screensaver and Night;
 - the lock screen and how screens get set up;
 - the code that holds them together.
+
+## Decided so far
+
+| Question | Kyle's answer | What it means |
+|---|---|---|
+| Which screen comes first? | **Phone** | Every page is designed at 390px wide first, then widened for a laptop. The TV and wall tablet come after the phone pages. |
+| How strong a theme? | **Calmer** | Same colours, fonts and starfield; more space, one card style, glow only on what's live or what matters now. |
+| What are pages called? | **Plain** | Now, Money, Usage, Home, Settings. |
+| Who uses the phone pages? | **Just Kyle** | Pages can lead with energy and money detail. They don't need simplifying for anyone else. |
+
+Still open: see [Questions](#questions-still-open) at the end.
 
 ## Where things stand
 
@@ -21,11 +32,11 @@ They share the data code and the colours, and little else.
 - **Charts:** each has its own (SVG bars, and canvas).
 
 What isn't working:
-- **The dashboard's pages follow the old file, not your questions.** "Prices" mixes the live draw, market prices and what a kettle costs. On a phone, the first screen is the header's four buttons and two tariff cards that change twice a year.
+- **The dashboard's pages follow the old file, not the questions you ask.** "Prices" mixes the live draw, market prices and what a kettle costs. On a phone, the first screen is the header's four buttons and two tariff cards that change twice a year.
 - **Every panel shouts at the same volume.** The same frame, eyebrow and capital heading everywhere, so nothing says where to look.
-- **Household things live only on the TV.** Bins, the calendar and trains are on the display. On a phone, which is where you'd check a train, they're missing.
-- **Answers are worded differently on each screen.** The best ideas from the screensaver ("time is distance", the fuel dock, your train at the platform, the dials) exist only in the screensaver. The display's Energy mode and the dashboard's Prices page answer the same questions in different words.
-- **The what-ifs start with a form.** The battery and solar simulators ask for numbers before showing anything. Their answers aren't laid out alike, so they can't be compared.
+- **Household things live only on the TV.** Bins, the calendar and trains are on the display; on a phone, where you'd check a train, they're missing.
+- **Answers are worded differently on each screen.** The best ideas from the screensaver (time is distance, the fuel dock, your train at the platform, the dials) exist only in the screensaver. The display's Energy mode and the dashboard's Prices page answer the same questions in different words.
+- **The what-ifs start with a form.** The battery and solar simulators ask for numbers before showing anything, and their answers can't be compared side by side.
 - **Setting up a screen means two systems.** The account is typed into one, the screen's settings into another, and a setup link carries only half.
 
 ## What it should be
@@ -34,146 +45,248 @@ One product, the **Harold Street** household app, on three kinds of screen, answ
 
 | Screen | How it's used | Its job |
 |---|---|---|
-| **Phone and laptop** | Picked up, looked at, put down; sometimes explored | Answers and decisions: is now a good time, how's the month, what would save money, when to leave |
-| **Wall tablet** | Glanced at in passing, touched now and then | The household's day at a glance, by touch |
-| **TV** | Seen from the sofa, steered with a remote | Ambient: the same day, readable across the room, then the screensaver |
+| **Phone** (first) | Picked up, looked at, put down; sometimes explored | Answers and decisions: is now a good time, how's the month, what's unusual, what would save money |
+| **Laptop** | Sat down with, now and then | The same pages, wider: room for longer charts and side-by-side comparisons |
+| **TV and wall tablet** | Seen across the room; remote or touch | The day at a glance, readable at ten feet, then the screensaver |
 
 Principles for every screen:
 1. **One clear answer first**, then the evidence, then the detail. On the TV, only the answer and the evidence.
-2. **Time runs left to right everywhere**, with now near the left, as in the screensaver. One picture of the next twelve hours appears on the phone's Now page, the display's Energy mode and in the screensaver: price, weather, events, trains.
+2. **Time runs left to right, now near the left**, as in the screensaver. One picture of the next twelve hours (price, weather, events, trains) appears on the phone's Now page, the display's Energy mode and in the screensaver.
 3. **Colour means one thing:**
-   - amber for electricity and cyan for gas;
-   - violet below zero;
-   - green, amber and red for cheap, normal and peak;
-   - violet for your calendar too.
-4. **Keep the theme** (deep space, the starfield, glow for what's live), but calmer: space and type do the work, glow is kept for now.
-5. **Nothing lost.** Every feature today has a place below. Anything moved is noted in the log as it moves.
+   - amber for electricity, cyan for gas;
+   - violet below zero, and for your calendar;
+   - green, amber and red for cheap, normal and peak.
+4. **Calmer:** space and type do the work. Glow is kept for live things.
+5. **Nothing lost:** every feature today has a home in the table below. Anything moved is noted in the log as it moves.
 
-## What's where
+## Every feature's new home
 
-### Phone and laptop
+### The dashboard today
 
-Five places, named for what you go there for. A bottom bar on a phone, a side rail on a laptop.
-
-| Place | The question | What's on it |
+| Today | Feature | New home |
 |---|---|---|
-| **Now** (first page) | Is now a good time? What's next? | See below. |
-| **Money** | How are we doing this month? | This month against last and where it's heading; the Direct Debit check; your tariff and the price cap countdown; Saving Sessions and Octopoints; the weekly log to copy. |
-| **Usage** | When do we use it? Anything odd? | See below. |
-| **Home** | What's on, what's due, what would save us money? | See below. |
-| **Settings** | | See below. |
+| Bridge | Status, Refresh | A slim header on every page: page title, a status dot ("Updated 13:10"), Refresh |
+| Bridge | Connect account, Forget | **Settings › Account** |
+| Bridge | Wall display link | **Settings › Screens** |
+| Bridge | Plunge pricing banner, notifications | **Now** (banner when coming up); notifications in **Settings** |
+| Overview | Tariff cards | **Money › Your tariff** (rates and standing charges, collapsed to one line each) |
+| Overview | Period totals | **Usage** (kWh) and **Money** (£), each with its own period |
+| Overview | Daily chart with change-log marks | **Usage** |
+| Overview | Bill tracker, Direct Debit check | **Money**, at the top |
+| Overview | Price cap countdown | **Money › Your tariff** |
+| Overview | Saving Sessions and Octopoints | **Money › Rewards**; an upcoming session also on **Now** |
+| Overview | Weekly mission log | **Money › This week**, with Copy |
+| Patterns | Use by half hour, insights | **Usage › Your day** (the clock face) |
+| Patterns | Boiler schedule check | **Usage › Heating** |
+| Patterns | Spike detective | **Usage › Unusual** |
+| Patterns | Carbon footprint | **Usage › Carbon** |
+| Patterns | Gas against the weather, forecast | **Usage › Heating** |
+| Prices | Home Mini live draw | **Now**, near the top |
+| Prices | Agile today and tomorrow, region | **Now** (the curve); region in **Settings** |
+| Prices | Grid carbon forecast | **Now** (a band under the curve) |
+| Prices | Best time to run | **Now › Run it now or later?** |
+| Prices | What things cost (editable kWh) | **Now › Run it now or later?**, expanded; editing the kWh in **Settings › Appliances** |
+| Compare | Tariff comparison, Agile looking back | **Home › Upgrades › Tariffs** |
+| Compare | Battery simulator | **Home › Upgrades › Battery** |
+| Compare | Solar simulator | **Home › Upgrades › Solar** |
+| Home | Change log | **Home › Changes** (still marked on the Usage chart) |
+| Home | Insulation and heating plan | **Home › Upgrades › Insulation** |
+| Home | EPC ratings, notes, search | **Home › Upgrades › Certificate** |
+| Home | CSV export, helper notes, install tips | **Settings › Data** |
 
-The places in more detail:
-- **Now:**
-  - a verdict in one line ("Good time: 12.4p until 16:00");
-  - the next twelve hours as one strip: the price curve with the cheapest window, rain, your events, the next train and when to leave;
-  - the live draw and today's cost;
-  - grid carbon;
-  - bins due;
-  - plunge pricing or Saving Sessions coming up.
-- **Usage:**
-  - a calendar heat map of every day with readings;
-  - the daily chart, against a period you choose;
-  - use by time of day drawn round a clock face;
-  - the boiler check, the spike detective, gas against the weather, and the carbon footprint;
-  - the change log's before and after.
-- **Home:**
-  - **Household:** bins, calendar, trains and trams, as on the display.
-  - **Upgrades:** each idea as a scenario showing a year's saving, the cost and the payback. Tariffs, battery, solar, insulation, boiler settings and the EPC.
-- **Settings:**
-  - the account;
-  - the household's shared settings (bins, station);
-  - this device;
-  - notifications, CSV export, the home server helper;
-  - **Add a screen:** a code or link that sets up the TV or tablet with everything, the account included if you choose.
+### The display today
 
-### The display (wall tablet and TV)
+| Today | Feature | New home |
+|---|---|---|
+| Energy mode | Price now, next day, cheapest, carbon, live draw, today's cost | **Energy**, rebuilt on the twelve-hour strip and the dials |
+| Home mode | Clock, weather, sunrise and sunset, bins, calendar | **Home** on the display; bins, calendar and weather also on the phone's **Home › Household** |
+| Travel mode | Trains and trams with "leave in" | **Travel** on the display; also on the phone's **Home › Household** |
+| Screensaver | The voyage | Stays; takes the shared colours, strip and wording |
+| Night | Dim clock and price | Stays; adds the morning's verdict |
+| Settings sheet | Modes, timings, detail, bins, calendar, station, walks | **Settings** in the shared model; the TV keeps its remote-friendly sheet |
+| Setup link | Copies one screen's settings | **Settings › Screens › Add a screen**, carrying the account too if you choose |
 
-The same modes, rebuilt from the same parts, readable at ten feet, driven by remote or touch:
-- **Energy:** the next twelve hours strip, big; the verdict; the dials (live draw, today's cost, grid carbon).
-- **Home:** clock and date, weather now and through the day, bins, the calendar.
-- **Travel:** the next trains and trams, with "leave in" countdowns, and your train highlighted as in the screensaver.
-- **Screensaver:** keeps its recent redesign. It takes the shared colours and the same twelve-hour strip, and its billboards use the shared wording.
-- **Night:** a dim clock with the verdict for the morning ("Cheapest from 02:00").
-- **The toolbar and settings** move to the same Settings model as the phone, with the remote-friendly layout.
+## The phone pages, top to bottom
 
-### The lock screen
+Each page opens on its answer; everything below it scrolls. Sections marked *(folded)* start closed.
 
-The PIN keypad restyled to match, with the same remote-friendly behaviour. "Remember this screen" stays on.
+### Now
+
+1. **Header:** "Now", the status dot, Refresh.
+2. **The verdict,** one line, coloured by price:
+   - "Good time: 12.4p until 16:00";
+   - "Wait: 31.2p now, 9.8p from 21:00";
+   - "You're paid to use power: −2.1p until 03:30".
+3. **The next twelve hours:** one strip, full width.
+   - The Agile curve, filled below, coloured by band.
+   - The cheapest two hours shaded and labelled.
+   - Now marked at the left.
+   - Grid carbon as a thin band beneath.
+   - Rain, your next event and the next train as small markers on top.
+   - Tap anywhere for that half hour's price.
+4. **Right now:** three stats in a row:
+   - live draw in watts, as a small dial;
+   - today so far, £ and kWh;
+   - grid carbon now.
+5. **Coming up** (only when there is something):
+   - plunge pricing;
+   - a Saving Session you could join;
+   - tomorrow's prices arriving ("Tomorrow's prices are in: cheapest 02:00").
+6. **Run it now or later?:** your three most used appliances with the cost now, the cheapest start and its cost. *(folded)* All appliances.
+7. **Example data** banner at the very top when no account is connected, with **Connect your account**.
+
+### Money
+
+1. **This month:** "£84 so far · on track for £131", with a small bar against last month's total.
+2. **Direct Debit:** "Your £120 a month looks about right", or how far off it is. The amount is editable in place.
+3. **The year ahead:** projected total, the cost per month, and how gas is projected (weather or recent).
+4. **Your tariff:** one line each for electricity and gas (unit rate, standing charge), and the price cap countdown. *(folded)* Meter numbers and tariff codes.
+5. **Rewards:** Octopoints, Saving Sessions joined and coming up.
+6. **This week:** the weekly log with Copy.
+
+### Usage
+
+1. **A period chooser:** 7, 30 or 90 days, and "compared with the period before".
+2. **The headline:** "Electricity 301 kWh (−8%) · Gas 440 kWh (+12%)" for the period.
+3. **Every day:** the daily chart, kWh or £, with the previous period ghosted behind and change-log marks.
+4. **The year:** a calendar heat map of every day with readings; tap a day for its detail.
+5. **Your day:** use by time of day drawn round a clock face, with the cheap overnight window and the evening peak marked. Under it, the insights: always-on watts, overnight share, peak share, evening kWh.
+6. **Heating:**
+   - the boiler's usual hours and the overnight check;
+   - gas against the weather and the forecast week.
+7. **Unusual:** half hours and days well above normal.
+8. **Carbon:** the period's footprint.
+
+### Home
+
+1. **Household:**
+   - bins due (next collection and which bins);
+   - today's and tomorrow's events;
+   - the next trains (and trams, once there's a server) with "leave in";
+   - the weather now and later.
+2. **Upgrades:** one card per idea, all the same shape, each opening to its full simulator:
+   - tariffs (the cheapest for your use, and Agile looking back);
+   - battery;
+   - solar;
+   - insulation;
+   - certificate (EPC).
+
+   Each card shows three numbers: a year's saving, the cost, the payback. The cards are worked out from sensible defaults, so they show an answer before any form is touched.
+3. **Changes:** the change log, with each entry's before and after.
+
+### Settings
+
+- **Account:** connect or forget, gas meter units, how you pay, region.
+- **Notifications:** negative prices, Saving Sessions.
+- **Household:** bins, station and walk time, tram stop, calendar address. Shared settings come from `household.json`; changes made here stay on this device.
+- **Appliances:** the kWh for each.
+- **Screens:**
+  - **Add a screen:** a link that sets up the TV or tablet. It carries the account if you choose, encrypted with the site PIN.
+  - The wall display link.
+  - Screensaver detail.
+- **Data:** download readings (CSV), clear what's cached, the home server helper's status.
+- **About:** the estimates note and the gas conversion, as in today's footer.
+
+## Navigation and the frame
+
+- **Phone:** a bottom bar with five items (icon and label): Now, Money, Usage, Home, Settings.
+  - Fixed, above the safe area.
+  - The current one is lit in cyan.
+  - Pages are links, so the browser's back button works.
+- **Laptop (900px and wider):** the bar becomes a rail down the left. Pages use two columns where it helps: Now puts the strip beside the stats, Usage puts the chart beside the heat map.
+- **Header:** slim on every page: the page's title in Syncopate, the status dot, Refresh. No buttons beyond Refresh. The starfield sits behind, slower and dimmer than now.
+- **Install:** the app can be added to the phone's home screen as now. In standalone mode the bottom bar sits above the home indicator.
+
+## Loading, empty and error states
+
+| State | What you see |
+|---|---|
+| **First visit, no account** | Example figures with the banner at the top of Now: "You're looking at example data", and **Connect your account**. Figures quoted elsewhere say "example". |
+| **Opening again** | The cached figures straight away, with "Updated 13:10" in the header; the dot pulses while it fetches. |
+| **Loading, nothing cached** | Grey placeholder shapes where the figures will go, never a blank page. |
+| **A source fails** | That card says what's missing in a line ("Couldn't reach National Grid: trying again in 5 minutes"); everything else carries on. |
+| **Offline** | The cached figures, the header says "Offline · last updated 13:10". |
+| **Not set up** (no Home Mini, no station) | The card says how to set it up and links to Settings. |
 
 ## How it looks
 
-- **Calmer cards:** one card style without corner brackets. The page's main answer gets the only large type and the only glow.
-- **Two densities from one set of tokens:**
-  - near (phone and laptop), with text from 15px;
-  - ten-foot (TV), from 0.9rem, which is 24px at 1080p.
+A first set of tokens, to be tried in the mock-ups:
 
-  Same colours, same shapes.
-- **A shared kit of parts:**
-  - verdict, stat and dial;
-  - the twelve-hour strip;
-  - price and carbon curves;
-  - bars;
-  - a heat map;
-  - the clock face of use;
-  - a sparkline;
-  - departures;
-  - bins.
+| Token | Value | Notes |
+|---|---|---|
+| Ground | `#04050d` | As now |
+| Card | `rgba(14,18,40,.72)`, 1px border `rgba(134,152,255,.14)`, radius 14px | One style; no corner brackets |
+| Text | `#e9ecff`; muted `#9aa2c8` | Muted lifted for contrast (at least 4.5:1 on the card) |
+| Electricity | `#ffb547` | As now |
+| Gas | `#4fd6ff` | As now; also the accent for what's selected |
+| Below zero, calendar | `#b892ff` | As now |
+| Cheap, normal, peak | `#46e6a1`, `#ffd166`, `#ff6b7d` | As now; shared with the TV |
+| Type (phone) | 13, 15, 17, 20, 28 and 40px | 40px only for the page's main figure |
+| Spacing | 4, 8, 12, 16, 24 and 32px | Cards 16px inside, 12px apart |
+| Fonts | Syncopate (titles, the main figure), Exo 2 (reading), JetBrains Mono (figures) | As now |
 
-  Each reads the same way: tap or point for a label by your finger, arrows on a remote or keyboard, units always shown.
-- **Type:** Syncopate for titles and the one big figure; Exo 2 for reading; JetBrains Mono for figures that line up.
-- **Example data:** one clear banner on the phone instead of a tag on every figure. The display still never shows examples.
-- **Motion:** the starfield slower; numbers count up once when they arrive; only "live" things pulse. TVs get the lighter detail they already have.
+The same tokens drive the TV at ten-foot sizes: text from 0.9rem (24px at 1080p), the same colours, larger spacing.
+
+**The chart kit** (Svelte, one style):
+
+| Part | Used for |
+|---|---|
+| **Strip** | The next twelve hours: curve, bands, markers |
+| **Curve** | Prices and carbon over a day or two |
+| **Bars** | Daily use, with a ghosted comparison |
+| **Heat map** | Days of the year |
+| **Clock face** | Use by time of day |
+| **Dial** | Live draw |
+| **Sparkline** | Inside stat cards |
+| **Scatter** | Gas against temperature |
+
+Every chart reads the same way:
+- tap or point for a label beside your finger;
+- arrows on a keyboard;
+- units always shown;
+- a one-line text version of its main point for screen readers.
+
+**Motion:** numbers count up once when they arrive; only live things pulse; nothing moves under reduced motion.
 
 ## Under the hood
 
-Recommendation, pending a test on the real TV:
-- **One app, one build.** The display's modes become Astro pages too, built from the same Svelte parts.
-- **TV compatibility:** the display's build is compiled down for the TV's browser (Vite targeting Chromium 63 or whatever the TV turns out to run). Its pages stay free of anything an old browser can't do.
-- **Fallback:** if the TV can't run them, the display keeps its own hand-built file but takes the shared tokens and wording. That's a smaller win, but safe.
-- **One data service** for both. Each source has its own refresh period, a cache, backing off on failure, and "last updated".
-  - It merges the dashboard's session and the display's scheduler.
-  - A screen loads from the cache first, so it's never blank.
+- **The phone pages come first, on the Astro build we have now.** The display keeps its own file until the phone is done.
+- **One data service:** the dashboard's session and the display's scheduler merge. Each source has its own refresh period, a cache, backing off on failure, and "last updated". Every page loads from the cache first.
 - **One settings model:**
-  - household settings (in `household.json`, as now);
-  - account settings (per device, never published);
-  - screen settings (per device).
-
-  The setup link carries all three, encrypted with the site PIN if it includes the account.
-- **One test harness:** every page and mode on a phone, a tablet, a laptop and a 1080p TV. Screenshots for each, and the frame-rate budget on a slowed CPU for the TV.
+  - household (in `household.json`, published);
+  - account (per device, never published);
+  - screen (per device).
+- **The TV:** before the display's modes are rebuilt, a small Svelte page built for the TV's browser is opened on the real TV.
+  - If it runs, the display's modes become Astro pages from the same parts.
+  - If not, the display keeps its own file but takes the shared tokens and wording.
+- **Tests and screenshots:**
+  - Every page at 390px (phone), 768px (tablet) and 1280px (laptop), connected and with example data, plus the TV at 1080p.
+  - No sideways scroll, no errors, contrast checked.
+  - The screensaver's frame-rate budget is kept.
 
 ## How it gets built
 
-Each step ships on its own, and the old page or mode stays until its replacement is live. `npm run ci` is green at every push and the screenshots are looked at.
+Each step ships on its own, and the old page stays until its replacement is live. `npm run ci` is green at every push and the screenshots are looked at.
 
 | Step | What | Size |
 |---|---|---|
-| 1 | **Mock-ups** of Now, Money and Usage on a phone, and Energy and Home on the TV, as a page you can open and click through. Your yes, or changes. | One session |
-| 2 | **The TV test:** a small Svelte page built for the TV's browser, opened on your TV. It decides between one app and the fallback above. | Short |
-| 3 | **The kit:** shared tokens in both densities, the cards and the chart parts, and a hidden page showing every piece. | One or two sessions |
-| 4 | **The data service and settings model**, under both the dashboard and the display, with nothing on screen changing yet. | One session |
-| 5 | **The phone's shell:** the bottom bar and side rail, Settings, "Add a screen", the example banner. | One session |
-| 6 | **Now** | One session |
-| 7 | **Money** | One session |
-| 8 | **Usage** | One session |
-| 9 | **Home:** household and upgrades | One or two sessions |
-| 10 | **The display's modes:** Energy, Home, Travel, Night, on the kit, with the remote and the ten-foot rules | Two sessions |
-| 11 | **The screensaver and the lock screen:** the shared colours, strip and wording; the keypad restyled | One session |
-| 12 | **Tidy-up:** retire the old pages and the old display file, update the brief, the log and a decision record | Short |
+| 1 | **Mock-ups** of Now, Money and Usage at phone size, clickable between them, with real example figures. Your yes, or changes. | One session |
+| 2 | **The kit:** tokens, card and stat styles, the chart parts, and a hidden page showing every piece | One or two sessions |
+| 3 | **The shell:** bottom bar and rail, slim header, Settings (account moves there), the example banner, loading and error states | One session |
+| 4 | **Now**, which becomes the first page | One session |
+| 5 | **Money** | One session |
+| 6 | **Usage** | One session |
+| 7 | **Home:** household and upgrades | One or two sessions |
+| 8 | **The data service and settings model** shared with the display, and "Add a screen" | One session |
+| 9 | **The TV test** on the real TV, to choose how the display is rebuilt | Short |
+| 10 | **The display's modes:** Energy, Home, Travel, Night | Two sessions |
+| 11 | **The screensaver and the lock screen:** shared colours, strip and wording; the keypad restyled | One session |
+| 12 | **Tidy-up:** retire the old pages, update the brief, the log and a decision record | Short |
 
-## Checks along the way
+## Questions still open
 
-- **No sideways scroll:** on any screen size, and no errors.
-- **Ten-foot rules on the TV:** text at least 24px at 1080p, the overscan margin, everything reachable with arrows, Enter and Back.
-- **Accessibility:** contrast checked on the dark background, every chart readable by keyboard with a text version of its main point, and reduced motion respected.
-- **Speed:** each page useful within a second from the cache. The TV holds its frame budget at the lighter detail.
-- **Example data:** never shown on the display, and always labelled on the phone.
-
-## Questions for Kyle
-
-1. **Which screens matter most?** Phone, laptop, wall tablet or TV, in order. That decides which gets designed first.
-2. **The theme:** keep it as intense as now, calmer as above, or bolder, like the screensaver throughout?
-3. **Names:** plain (Now, Money, Usage, Home, Settings) or in character (Bridge, Ledger, Telemetry, Quarters, Systems)?
-4. **One app for the TV too?** It's worth trying if the TV's browser can run it (step 2 finds out). Is it all right to keep the TV on its own file if not?
-5. **Who uses it?** If others in the house use the phone pages too, Now should lead with what they need (bins, "good time to run the washing").
-6. **Anything to drop?** For example the EPC search or the simulators, if nobody uses them. Less to redesign means a sharper result.
+1. **The TV:** if its browser can't run the shared parts, is it all right for it to keep its own file with the shared look? (Step 9 decides; this is just whether that outcome is acceptable.)
+2. **Anything to drop?** For example the EPC search, or a simulator you'd never use. Less to redesign means a sharper result.
+3. **Now's markers:** should the next train and your next event sit on the twelve-hour strip, or keep Now purely about energy?
+4. **Corners:** sharp, like the sci-fi panels now, or softly rounded (14px), as drafted? The mock-ups can show both.
+5. **Appliances:** which three do you run most (washing machine, dishwasher, tumble dryer, oven, an EV)? They lead "Run it now or later?".
