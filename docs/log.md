@@ -2,6 +2,10 @@
 
 Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
+## 2026-10-06
+
+- **Update**: the redesign is merged into `main` and live, at Kyle's word: the phone pages ([decision 0010](decisions/0010-redesign.md)), the new wall display ([decision 0011](decisions/0011-wall-display.md)) and everything built on the `redesign` branch since 2026-10-05 (the entries marked "(redesign)" below). The `redesign` branch is still published at /preview/ while it exists; it now matches the live site.
+
 ## 2026-10-05
 
 - **Update** (redesign): the TV's Travel view shows the trains as the station does too, in the same orange dot-matrix: the departures board (time, destination, platform, expected, and when to leave with your walk; the ones it's too late for dimmed, "Run" flashing) and beneath it the platform sign (1st, 2nd, 3rd, the scrolling calling points and a clock with seconds). Nothing to press: on a TV both show at once. With no tram stop set, the signs take the full width. The sign's words (`signStatus`, `signExpected`, `signGo`, `signLine`, `signTrains`) are shared in `household.js`, so the phone and the TV say the same. Each part is only redrawn when it changes, so the scrolling line runs on.
