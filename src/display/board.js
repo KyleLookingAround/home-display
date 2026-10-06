@@ -100,3 +100,19 @@ function signHtml(trains, walk, now){
   if (!S.first3.length) plat = `<div class="row centre">${S.missed ? 'No more you can make' : 'No trains for now'}</div><div class="row centre dim">Please check the timetable</div>`;
   return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
 }
+
+/* ---------- the journey map (src/lib/geo.js): CARTO's dark tiles with the route, stations, home and the train ---------- */
+function mapHtml(j, w, h){
+  const v = fitView(j.fit.length ? j.fit : j.places, w, h, 60, 9, 15), pt = p => onView(v, p), xy = p => { const q = pt(p); return q.x.toFixed(1) + ',' + q.y.toFixed(1); };
+  const tiles = viewTiles(v).map(t => `<img src="${mapTile(t)}" alt="" style="left:${t.left}px;top:${t.top}px">`).join('');
+  let svg = j.walks.map(wk => `<polyline class="walk" points="${wk.map(xy).join(' ')}"/>`).join('');
+  if (j.route.length) svg += `<polyline class="glow" points="${j.route.map(xy).join(' ')}"/><polyline class="route" points="${j.route.map(xy).join(' ')}"/>`;
+  j.places.forEach(p => {
+    const q = pt(p);
+    if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
+    else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
+    else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
+  });
+  j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false; svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
+  return `<div class="jmap" style="height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg><span class="credit">${esc(MAP_CREDIT)}</span></div>`;
+}

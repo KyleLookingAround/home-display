@@ -171,6 +171,25 @@ body.lite .dmx{text-shadow:none}
 .dmx .clock-s{text-align:center;font-size:1.5rem;line-height:1.25;letter-spacing:.06em}
 @media (prefers-reduced-motion:reduce){.dmx .row.calls{white-space:normal}.dmx .run{display:inline;padding-left:0;animation:none}.dmx .blink{animation:none}}
 .travel .solo{grid-column:1/-1}
+/* the journey map (mapHtml in board.js), beside the sign when there are no trams */
+.jmap{position:relative;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16;margin-top:.5rem}
+.jmap img{position:absolute;width:256px;height:256px;max-width:none}
+.jmap svg{position:absolute;left:0;top:0}
+.jmap .route{fill:none;stroke:var(--elec);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.jmap .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+.jmap .walk{fill:none;stroke:var(--gas);stroke-width:4;stroke-dasharray:3 10;stroke-linecap:round}
+.jmap .stn{fill:#0b0d16;stroke:var(--elec);stroke-width:3}
+.jmap .stn.big{stroke-width:4;fill:#1a1408}
+.jmap .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.jmap .train{fill:var(--elec);stroke:#04050d;stroke-width:3}
+.jmap .train-ring{fill:rgba(255,181,71,.22);animation:jpulse 1.6s ease-out infinite;transform-origin:center;transform-box:fill-box}
+body.lite .jmap .train-ring{animation:none}
+@keyframes jpulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.6);opacity:0}}
+.jmap .lbl{font:500 1rem var(--f-body);fill:#aab0d6;paint-order:stroke;stroke:#04050d;stroke-width:5px;stroke-linejoin:round}
+.jmap .lbl.strong{fill:var(--ink);font-weight:600}
+.jmap .credit{position:absolute;right:.5rem;bottom:.3rem;font:.9rem var(--f-mono);color:var(--muted);text-shadow:0 0 3px #000}
+.jnow{font-size:1.1rem;font-weight:600;color:var(--elec);margin:.5rem 0 0}
+.jline{font-size:1rem;color:var(--muted);margin:.25rem 0 0}
 @media (min-width:900px){ .travel .solo .dmx{font-size:1.3rem} .travel .solo .dmx .clock-s{font-size:2rem} }
 
 @media (max-width:520px){.dmx{font-size:.95rem}.deps-sign .row{grid-template-columns:5ch minmax(0,1fr) 3ch 9ch}.deps-sign .g{display:none}.travel .solo .dmx{font-size:.95rem}}

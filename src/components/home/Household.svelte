@@ -8,6 +8,7 @@
   import Radar from '../charts/Radar.svelte';
   import DepartureBoard from './DepartureBoard.svelte';
   import OfficeWeek from './OfficeWeek.svelte';
+  import Journey from './Journey.svelte';
   import { qrSvg, wifiCode } from '../../lib/qr.js';
   import { cleanCode, sendRemote } from '../../lib/remote.js';
   import { store } from '../../lib/browser.js';
@@ -111,6 +112,7 @@
     {:else}<div class="skel" style="height:96px"></div>{/if}
     {#if app.house && app.house.trainTo}<OfficeWeek />{/if}
   </section>
+  <Journey />
   <section class="card">
     <h2 class="label">Coming up</h2>
     {#if cds && cds.length}

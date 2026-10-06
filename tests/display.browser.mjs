@@ -83,11 +83,18 @@ let boardAt = NOW;
 const CRS = { 'Heaton Chapel': 'HTC', Levenshulme: 'LVM', 'Manchester Piccadilly': 'MAN', 'Manchester Airport': 'MIA', Stockport: 'SPT', Davenport: 'DVN', 'Hazel Grove': 'HAZ', Buxton: 'BUX', Macclesfield: 'MAC', Crewe: 'CRE' };
 function huxley(url = ''){
   const hm = m => { const d = new Date(+boardAt + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
+  // a service's live details (/service/<id>): where it has been, with actual times, and where it calls next
+  const sv = /\/service\/(S(H?)(\d+))$/.exec(url);
+  if (sv){
+    const board = huxley(sv[2] ? '/departures/MAN/' : '/departures/SPT/'), x = board.trainServices.filter(t => t.serviceIdUrlSafe === sv[1])[0];
+    if (!x) return {};
+    return Object.assign({}, x, { crs: board.crs, locationName: board.locationName, previousCallingPoints: sv[2] ? null : [{ callingPoint: [{ locationName: 'Hazel Grove', crs: 'HAZ', st: hm(+sv[3] - 12), at: 'On time' }] }] });
+  }
   const home = /\/departures\/MAN\//i.test(url), to = (/\/to\/([A-Z]{3})\//i.exec(url) || [])[1];
   const calls = home ? { Buxton: [['Stockport', 9], ['Davenport', 13], ['Hazel Grove', 17], ['Buxton', 45]], Crewe: [['Stockport', 8], ['Macclesfield', 20], ['Crewe', 40]], 'Hazel Grove': [['Levenshulme', 6], ['Heaton Chapel', 9], ['Stockport', 12], ['Hazel Grove', 20]] }
     : { 'Manchester Piccadilly': [['Heaton Chapel', 4], ['Levenshulme', 7], ['Manchester Piccadilly', 11]], 'London Euston': [['Macclesfield', 12], ['Stoke-on-Trent', 30], ['Milton Keynes Central', 90], ['London Euston', 120]],
         Buxton: [['Davenport', 4], ['Hazel Grove', 9], ['Disley', 15], ['Buxton', 35]], 'Manchester Airport': [['Manchester Piccadilly', 10], ['Manchester Airport', 30]] };
-  const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, length: 4, destination: [{ locationName: dest, via: null }],
+  const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, length: 4, destination: [{ locationName: dest, via: null }], serviceIdUrlSafe: 'S' + (home ? 'H' : '') + m,
     subsequentCallingPoints: [{ callingPoint: (calls[dest] || [[dest, 30]]).map(([n, k]) => ({ locationName: n, crs: CRS[n] || null, st: hm(m + k), et: 'On time' })) }] }, extra || {});
   const named = { MAN: 'Manchester Piccadilly', SPT: 'Stockport' };
   if (home) return { locationName: 'Manchester Piccadilly', crs: 'MAN', filterLocationName: to ? named[to] : null, nrccMessages: null, trainServices: [
@@ -301,7 +308,9 @@ test('display: Travel shows the trains as the station sign does', async () => {
     const plats = await page.locator('#tBoard .row:not(.hdr) .p').evaluateAll(ps => ps.map(p => Math.round(p.getBoundingClientRect().left)));
     assert.equal(new Set(plats).size, 1, 'the platforms line up');
     assert.ok(await page.evaluate(() => [...document.querySelectorAll('.dmx')].every(el => [...el.querySelectorAll('.s,.g')].every(s => s.getBoundingClientRect().right <= el.getBoundingClientRect().right - 8))), 'nothing runs off the sign');
-    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('tTrains').parentNode).gridColumnEnd === '-1'), !tramStop, 'with no trams, the sign takes the width');
+    if (!tramStop) await page.waitForFunction(() => !document.getElementById('tJourneyCard').hidden);
+    assert.equal(await page.evaluate(() => getComputedStyle(document.getElementById('tTrains').parentNode).gridColumnEnd === '-1'), false, 'the sign shares the width: with the trams, or with no trams, your next train on a map');
+    if (!tramStop) assert.match(await page.textContent('#tJourneyTitle'), /^Your next train · 14:27 to London Euston/);
     await shot(page, tramStop ? 'tv-travel-sign' : 'tv-travel-solo');
     assert.ok(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), 'fits the screen');
     assert.deepEqual(errors, []);
@@ -814,6 +823,42 @@ test('the commute: a day changed on the phone changes the trains there and on th
   await office.scrollIntoViewIfNeeded(); await shot(phone.page, 'home-office-days');
   assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
   await tv.ctx.close(); await phone.ctx.close();
+});
+
+test('journey: your train on a map, moving between its live times, on the phone and the TV', async () => {
+  // Tuesday 07:35, in for 08:30: the 07:44 left Hazel Grove at 07:32 and is on its way to Stockport
+  let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false });
+  const card = page.locator('.card.journey');
+  await card.waitFor();
+  await page.waitForFunction(() => /Hazel Grove/.test((document.querySelector('.journey .now') || {}).textContent || ''), null, { timeout: 15000 });
+  assert.match(await card.locator('.label').textContent(), /Your way in/);
+  assert.match(await card.textContent(), /07:44\s*to Manchester Piccadilly, platform 1/);
+  assert.match(await card.locator('.now').textContent(), /(Just left Hazel Grove|Between Hazel Grove and Stockport), on time/);
+  assert.match(await card.textContent(), /Leaves Stockport 07:44 · Manchester Piccadilly 07:55 · at work by 08:20/);
+  await page.waitForFunction(() => /In town at 17:30: \d+°/.test(document.querySelector('.journey').textContent), null, { timeout: 15000 });
+  assert.ok(await card.locator('.map img').count() >= 2, 'map tiles');
+  assert.equal(await card.locator('.map circle.train').count(), 1, 'the train on the map');
+  assert.equal(await card.locator('.map .lbl', { hasText: 'Home' }).count(), 1);
+  await card.scrollIntoViewIfNeeded(); await shot(page, 'home-journey');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // Now: the journey sits under the heads-ups when the train is within the hour
+  ({ page, ctx, errors } = await open('/index.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false }));
+  await page.locator('.card.journey .map').waitFor();
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // the TV, with no tram stop: the map beside the station sign
+  ({ page, ctx, errors } = await open('/display.html#travel', { at: TUESDAY_EARLY, settings: { ...COMMUTE, tramStop: '' } }));
+  await page.waitForFunction(() => !document.getElementById('tJourneyCard').hidden && /Hazel Grove/.test(document.querySelector('#tJourney .jnow').textContent), null, { timeout: 15000 });
+  assert.equal(await page.textContent('#tJourneyTitle'), 'Your way in · 07:44 to Manchester Piccadilly');
+  assert.match(await page.textContent('#tJourney'), /Leaves Stockport 07:44 · Manchester Piccadilly 07:55 · at work by 08:20/);
+  assert.ok(await page.locator('#tJourney .jmap img').count() >= 2);
+  await page.evaluate(() => document.body.classList.remove('chrome-on'));
+  const l = await layout(page);
+  assert.ok(l.sh <= l.ih, `Travel fits (${l.sh})`); assert.ok(l.sw <= l.iw); assert.deepEqual(l.small, []);
+  await shot(page, 'tv-travel-journey');
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {

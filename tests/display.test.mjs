@@ -9,9 +9,9 @@ import { execFileSync } from 'node:child_process';
 import { shared } from './shared.mjs';
 
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
+const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'geo', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -427,6 +427,53 @@ test('the commute: the train that gets you in for your start, or home once you f
   assert.equal(A.trainsTitle(back, {}), 'Trains home');
 });
 
+test('maps: distance, walks, stations near a place, and a view that fits', () => {
+  const SPT = { lat: 53.40545, lon: -2.16304 }, MAN = { lat: 53.47722, lon: -2.23014 };
+  assert.ok(Math.abs(A.distKm(SPT, MAN) - 9.2) < 0.2, 'Stockport to Piccadilly as the crow flies');
+  assert.equal(A.walkMins(1.6), 26); assert.equal(A.walkMins(0), 1);
+  const idx = A.stationIndex({ s: [['SPT', 'Stockport', 53.40545, -2.16304], ['MAN', 'Manchester Piccadilly', 53.47722, -2.23014], ['HTC', 'Heaton Chapel', 53.42599, -2.17929], ['bad', 'x', 1, 2], ['LVM', 'Levenshulme', 'n', 0]] });
+  assert.deepEqual(plain(Object.keys(idx).sort()), ['HTC', 'MAN', 'SPT']);
+  assert.deepEqual(plain(A.nearestStations(idx, { lat: 53.41, lon: -2.165 }, 2, 5).map(x => x.crs)), ['SPT', 'HTC']);
+  const v = A.fitView([SPT, MAN], 360, 240, 20, 9, 15);
+  assert.equal(v.z, 11, 'the closest zoom both fit');
+  const a = A.onView(v, SPT), b = A.onView(v, MAN);
+  assert.ok(a.x >= 20 && a.x <= 340 && b.y >= 20 && b.y <= 220 && b.y < a.y, 'both inside, Piccadilly north of Stockport');
+  const tiles = A.viewTiles(v);
+  assert.ok(tiles.length >= 2 && tiles.length <= 6 && tiles.every(t => t.left > -256 && t.top > -256 && t.left < 360 && t.top < 240));
+  assert.match(A.mapTile(tiles[0]), /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/dark_nolabels\/11\/\d+\/\d+\.png$/);
+});
+
+test('maps: where a train is, from either board\'s live times', () => {
+  const t = h => at('2026-10-06T' + h + ':00'), idx = A.stationIndex({ s: [['HAZ', 'Hazel Grove', 53.37741, -2.12212], ['SPT', 'Stockport', 53.40545, -2.16304], ['HTC', 'Heaton Chapel', 53.42599, -2.17929], ['LVM', 'Levenshulme', 53.4449, -2.19296], ['MAN', 'Manchester Piccadilly', 53.47722, -2.23014]] });
+  // the public board: before Stockport with actual times, after it with expected ones
+  const pub = { crs: 'SPT', locationName: 'Stockport', std: '08:12', etd: '08:14', atd: null,
+    previousCallingPoints: [{ callingPoint: [{ locationName: 'Hazel Grove', crs: 'HAZ', st: '08:04', at: '08:06' }] }],
+    subsequentCallingPoints: [{ callingPoint: [{ locationName: 'Heaton Chapel', crs: 'HTC', st: '08:16', et: '08:18' }, { locationName: 'Levenshulme', crs: 'LVM', st: '08:19', et: 'Delayed' }, { locationName: 'Manchester Piccadilly', crs: 'MAN', st: '08:24', et: '08:26' }] }] };
+  let stops = A.parseService(pub, t('08:10'));
+  assert.deepEqual(plain(stops.map(x => [x.crs, x.done, new Date(x.t).toTimeString().slice(0, 5)])), [['HAZ', true, '08:06'], ['SPT', false, '08:14'], ['HTC', false, '08:18'], ['LVM', false, '08:19'], ['MAN', false, '08:26']]);
+  let p = A.trainAt(stops, t('08:10'), idx);
+  assert.equal(p.from.crs, 'HAZ'); assert.equal(p.to.crs, 'SPT'); assert.ok(p.frac > 0.4 && p.frac < 0.6);
+  assert.equal(p.late, 2); assert.equal(A.trainText(p), 'Between Hazel Grove and Stockport, 2 min late');
+  assert.equal(A.dueAt(p, 'MAN').text, 'Due at Manchester Piccadilly 08:26');
+  assert.equal(A.trainText(A.trainAt(stops.map(x => Object.assign({}, x, { done: false })), t('08:03'), idx)), 'Not left Hazel Grove yet, expected 2 min late');
+  const m = A.journeyMap(p, 'SPT', 'MAN', { lat: 53.41, lon: -2.16 });
+  assert.deepEqual(plain(m.stops.map(x => x.crs)), ['HAZ', 'SPT', 'HTC', 'LVM', 'MAN'], 'from where the train is to where you get off');
+  assert.equal(m.on.crs, 'SPT');
+  // the staff board: full times, junctions and stations it runs through left out
+  const staff = { locations: [
+    { locationName: 'Stockport', crs: 'SPT', std: '2026-10-06T08:12:00', atd: '2026-10-06T08:13:10', etd: '0001-01-01T00:00:00', sta: '0001-01-01T00:00:00' },
+    { locationName: 'Slade Lane Jn', crs: null, isPass: true, std: '2026-10-06T08:15:00' },
+    { locationName: 'Heaton Chapel', crs: 'HTC', isPass: true, std: '2026-10-06T08:15:30' },
+    { locationName: 'Manchester Piccadilly', crs: 'MAN', sta: '2026-10-06T08:22:00', eta: '2026-10-06T08:23:00', std: '0001-01-01T00:00:00', atd: '0001-01-01T00:00:00', ata: '0001-01-01T00:00:00' } ] };
+  stops = A.parseService(staff, t('08:16'));
+  assert.deepEqual(plain(stops.map(x => [x.crs, x.done])), [['SPT', true], ['MAN', false]]);
+  p = A.trainAt(stops, t('08:16'), idx);
+  assert.equal(A.trainText(p), 'Between Stockport and Manchester Piccadilly, 1 min late');
+  assert.equal(A.trainText(A.trainAt(stops, t('08:21'), idx)), 'Nearly at Manchester Piccadilly, 1 min late');
+  assert.equal(A.trainText(A.trainAt(stops, at('2026-10-06T08:13:20'), idx)), 'At Stockport, 1 min late', 'just left, still at the platform');
+  assert.equal(A.trainAt([stops[0]], t('08:16'), idx), null);
+});
+
 test('the station sign words a train the same on the phone and the TV', () => {
   const now = at('2026-10-05T20:31:00'), d = (h, m, extra = {}) => Object.assign({ sched: at(`2026-10-05T${h}:${m}:00`), exp: at(`2026-10-05T${h}:${m}:00`), dest: 'Crewe', platform: '3' }, extra);
   assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23].map(A.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd']);
@@ -593,7 +640,7 @@ test('the built display matches the source', () => {
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music', 'musicdata', 'queue', 'discover']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'geo', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music', 'musicdata', 'queue', 'discover']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

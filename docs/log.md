@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation**: maps, stage 1: your journey on a map ([decision 0015](decisions/0015-maps-and-location.md)).
+  - The train that matters (the one that gets you in, home once you finish, or the next you can make) on a dark map with the line, its stations, home and the walk to the station. The train moves between stations from its live times ("Between Hazel Grove and Stockport, on time"), and is followed once it has left until it gets you there.
+  - Under the map: where you get on and off and when you're at work or home, and the weather in town for when you finish.
+  - On Home under the trains, on Now from an hour before the train, and on the TV's Travel beside the station sign (when no tram stop is set).
+  - `src/lib/geo.js` (distances, stations, a service's live details, where a train is, map views and tiles), `public/stations.json` (UK stations, ODbL), `charts/MapView.svelte`, `home/Journey.svelte`, `state/journey.svelte.js`; departures now keep their service id.
 - **Update**: the commute follows your office days and hours, which change from week to week.
   - Your usual week (Settings, Household: `workDays`, `workStart`, `workEnd`) stays on each device and goes to the TV sealed, like guest Wi-Fi: it says when the house is empty, so it never goes in household.json, which is public, and `mergeSettings` ignores it there. The Monday-to-Friday guess published earlier today is gone. `homeFrom` is gone too: the trains turn round halfway through your day.
   - Going in, the trains pick out the last one that gets you to work for your start ("For 09:00, the 08:12: Manchester Piccadilly 08:23, at work by 08:48. Leave home by 07:57."), and the leave-now heads-up is for that train. If none can, it says so and gives the next. Going home, it's the first you can make once you finish, with when to leave work (`commuteTrain`, `commuteLine`).

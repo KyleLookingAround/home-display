@@ -28,6 +28,10 @@ const SRC = {
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   // the commute turns round in the afternoon on a work day (commuteLeg): when it does, the trains are due at once
   trains:  { label: 'Trains',  every: () => legTurned() ? 0 : shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => { const leg = legNow(); return loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg: leg })); } },
+  // your journey (src/lib/geo.js): the stations once a day, the train that matters every 45 seconds while it shows
+  stations: { label: 'Stations', every: () => 24*60*MIN, need: () => !!D.set.trainFrom && /^https?:$/.test(location.protocol), run: loadStations },
+  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
+  town:    { label: 'Town weather', every: () => 30*MIN, need: () => !!townStation(), run: () => loadPlaceWeather(townStation()) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
   nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
@@ -58,6 +62,28 @@ async function pollMini(){
 D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
 const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
 function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
+/* ---------- your journey: the train that matters, followed once it has left, until it gets you there ---------- */
+function journeyPick(now){ D.jPick = pickTrain(SRC.trains.data, D.jPick, now); return D.jPick; }
+function journeyTurned(){ const d = SRC.service.data, p = D.jPick; return !!p && (!d || (d.d.sid || d.d.rid) !== (p.sid || p.rid) || d.d.sched !== p.sched); }
+function loadJourney(){ const d = journeyPick(Date.now()); return loadService(d).then(j => ({ d: d, stops: parseService(j, Date.now()) })); }
+function townStation(){ const T = SRC.trains.data, leg = T && T.leg, idx = SRC.stations.data; const c = leg ? (leg.home ? leg.from : leg.work ? leg.to : '') : ''; return c && idx ? idx[c] : null; }
+/** Beside the station sign when there are no trams: the map, where the train is, and when you're there. */
+function renderJourney(now){
+  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data;
+  const d = S && D.jPick && (S.d.sid || S.d.rid) === (D.jPick.sid || D.jPick.rid) ? S.d : null;
+  const on = !D.set.tramStop && !!(T && T.leg && idx && d);
+  card.hidden = !on; $('#tTrains').parentNode.classList.toggle('solo', !D.set.tramStop && !on);
+  if (!on) return;
+  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, T.leg, idx, HOME), box = $('#tJourney');
+  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = T.leg.end && (T.leg.work || now < T.leg.end) ? weatherThen(SRC.town.data, T.leg.end, 'In town') : null;
+  $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
+  // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
+  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length].join('|');
+  if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
+  if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
+  box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
+  setHtml(box.querySelector('.jl'), journeyLines(j, pos).concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
+}
 function due(s, now){
   if (!s.need() || s.busy) return false;
   const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
@@ -115,6 +141,7 @@ function tick(){
   if (D.chromeUntil && now > D.chromeUntil && !open() && (!$('#bar').contains(document.activeElement) || idle > 30e3)) hideChrome();
   Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
   if (++D.ticks % 30 === 0) render();
+  else if (D.ticks % 5 === 0 && shown() === 'travel') renderJourney(now);   // the train moves between its live times
 }
 
 /** The station sign's clock, with seconds. */
@@ -274,7 +301,8 @@ function renderTravel(){
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
   const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
   tramPanel.hidden = !s.tramStop;
-  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width
+  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width, unless the journey's there
+  renderJourney(now);
   if (s.tramStop){
     let tr = null; html = '';
     if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';

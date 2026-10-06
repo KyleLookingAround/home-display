@@ -3,6 +3,7 @@ import App from '../layouts/App.astro';
 import Notices from '../components/Notices.svelte';
 import Verdict from '../components/now/Verdict.svelte';
 import HeadsUp from '../components/now/HeadsUp.svelte';
+import Journey from '../components/home/Journey.svelte';
 import Ahead from '../components/now/Ahead.svelte';
 import RightNow from '../components/now/RightNow.svelte';
 import ComingUp from '../components/now/ComingUp.svelte';
@@ -13,6 +14,7 @@ import MusicNow from '../components/now/MusicNow.svelte';
   <Notices client:load example />
   <Verdict client:load />
   <HeadsUp client:load />
+  <Journey client:load compact />
   <MusicNow client:load />
   <div class="cols">
     <div class="page span"><Ahead client:load /></div>

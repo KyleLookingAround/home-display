@@ -640,7 +640,8 @@ export function parseHuxley(j, now = Date.now(), to){
     else (s.subsequentLocations || []).forEach(l => { if (l && l.crs && !l.isPass && !l.isOperational && l.locationName) calls.push(l.locationName); });
     const out = { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
              platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || ''),
-             calls, coaches: +s.length > 0 ? +s.length : null, arr: null, arrSched: null };
+             calls, coaches: +s.length > 0 ? +s.length : null, arr: null, arrSched: null,
+             sid: s.serviceIdUrlSafe || null, rid: s.rid || null };   // for its live details (loadService in geo.js)
     const a = arrivalAt(s, to, sched, now); if (a){ out.arr = a.arr; out.arrSched = a.arrSched; }
     return out;
   }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));

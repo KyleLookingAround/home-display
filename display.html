@@ -171,6 +171,25 @@ body.lite .dmx{text-shadow:none}
 .dmx .clock-s{text-align:center;font-size:1.5rem;line-height:1.25;letter-spacing:.06em}
 @media (prefers-reduced-motion:reduce){.dmx .row.calls{white-space:normal}.dmx .run{display:inline;padding-left:0;animation:none}.dmx .blink{animation:none}}
 .travel .solo{grid-column:1/-1}
+/* the journey map (mapHtml in board.js), beside the sign when there are no trams */
+.jmap{position:relative;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16;margin-top:.5rem}
+.jmap img{position:absolute;width:256px;height:256px;max-width:none}
+.jmap svg{position:absolute;left:0;top:0}
+.jmap .route{fill:none;stroke:var(--elec);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
+.jmap .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
+.jmap .walk{fill:none;stroke:var(--gas);stroke-width:4;stroke-dasharray:3 10;stroke-linecap:round}
+.jmap .stn{fill:#0b0d16;stroke:var(--elec);stroke-width:3}
+.jmap .stn.big{stroke-width:4;fill:#1a1408}
+.jmap .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.jmap .train{fill:var(--elec);stroke:#04050d;stroke-width:3}
+.jmap .train-ring{fill:rgba(255,181,71,.22);animation:jpulse 1.6s ease-out infinite;transform-origin:center;transform-box:fill-box}
+body.lite .jmap .train-ring{animation:none}
+@keyframes jpulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.6);opacity:0}}
+.jmap .lbl{font:500 1rem var(--f-body);fill:#aab0d6;paint-order:stroke;stroke:#04050d;stroke-width:5px;stroke-linejoin:round}
+.jmap .lbl.strong{fill:var(--ink);font-weight:600}
+.jmap .credit{position:absolute;right:.5rem;bottom:.3rem;font:.9rem var(--f-mono);color:var(--muted);text-shadow:0 0 3px #000}
+.jnow{font-size:1.1rem;font-weight:600;color:var(--elec);margin:.5rem 0 0}
+.jline{font-size:1rem;color:var(--muted);margin:.25rem 0 0}
 @media (min-width:900px){ .travel .solo .dmx{font-size:1.3rem} .travel .solo .dmx .clock-s{font-size:2rem} }
 
 @media (max-width:520px){.dmx{font-size:.95rem}.deps-sign .row{grid-template-columns:5ch minmax(0,1fr) 3ch 9ch}.deps-sign .g{display:none}.travel .solo .dmx{font-size:.95rem}}
@@ -476,6 +495,7 @@ body.embed .bar,body.embed .toast{display:none!important}
     <div class="grid2 travel">
       <section class="card"><h2 class="label" id="tTrainTitle">Trains</h2><div id="tTrains"></div></section>
       <section class="card"><h2 class="label" id="tTramTitle">Trams</h2><div id="tTrams"></div></section>
+      <section class="card" id="tJourneyCard" hidden><h2 class="label" id="tJourneyTitle">Your journey</h2><div id="tJourney"></div></section>
     </div>
     <p class="foot" id="tFoot"></p>
   </section>
@@ -2165,7 +2185,8 @@ function parseHuxley(j, now = Date.now(), to){
     else (s.subsequentLocations || []).forEach(l => { if (l && l.crs && !l.isPass && !l.isOperational && l.locationName) calls.push(l.locationName); });
     const out = { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
              platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || ''),
-             calls, coaches: +s.length > 0 ? +s.length : null, arr: null, arrSched: null };
+             calls, coaches: +s.length > 0 ? +s.length : null, arr: null, arrSched: null,
+             sid: s.serviceIdUrlSafe || null, rid: s.rid || null };   // for its live details (loadService in geo.js)
     const a = arrivalAt(s, to, sched, now); if (a){ out.arr = a.arr; out.arrSched = a.arrSched; }
     return out;
   }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
@@ -2200,6 +2221,233 @@ function mergeSettings(household, device){
 function deviceChanges(form, household){
   const base = mergeSettings(household, null), out = {};
   Object.keys(form).forEach(k => { if (JSON.stringify(form[k]) !== JSON.stringify(base[k])) out[k] = form[k]; });
+  return out;
+}
+/*
+ * Maps and distance: where stations are (public/stations.json), where a train is between them from its live times,
+ * how long a walk is, and a map drawn from CARTO's dark tiles with our own lines and labels on top.
+ * Plain enough for TV browsers (Chromium 63): no optional chaining or nullish defaults.
+ */
+
+/* ---------- distance ---------- */
+/** Great-circle distance in kilometres between two { lat, lon }. */
+function distKm(a, b){
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+/** Minutes to walk a straight-line distance: streets add about a third, at 4.8 km/h. At least a minute. */
+const walkMins = km => Math.max(1, Math.round(km * 1.3 / 4.8 * 60));
+const MILES = 0.621371;
+
+/* ---------- stations (davwheat/uk-railway-stations, from Trainline EU's; Open Database License) ---------- */
+/** The stations file, { s: [[crs, name, lat, lon], …] }, as a lookup by code. */
+function stationIndex(j){
+  const out = {};
+  ((j && j.s) || []).forEach(r => { if (r && /^[A-Z]{3}$/.test(r[0]) && isFinite(r[2]) && isFinite(r[3])) out[r[0]] = { crs: r[0], name: String(r[1]), lat: +r[2], lon: +r[3] }; });
+  return out;
+}
+let stationsP = null;
+/** Loads the stations once a page (about 100 kB, kept by the service worker on the phone). */
+function loadStations(){
+  if (!stationsP) stationsP = request('stations.json').then(stationIndex, e => { stationsP = null; throw e; });
+  return stationsP;
+}
+/** The nearest stations to a point, nearest first, each with `km`: at most `n`, within `maxKm`. */
+function nearestStations(index, at, n, maxKm){
+  const out = [];
+  Object.keys(index || {}).forEach(k => { const s = index[k], km = distKm(at, s); if (km <= maxKm) out.push({ crs: s.crs, name: s.name, lat: s.lat, lon: s.lon, km: km }); });
+  return out.sort((a, b) => a.km - b.km).slice(0, n);
+}
+
+/* ---------- a train between stations, from its live times ---------- */
+const realTime = t => !!t && !/^0001-/.test(String(t));
+/**
+ * Where a service calls, in order, each { crs, name, sched, t, done, cancelled }: `t` is when it left (or reached)
+ * there if it has, else when it's expected, else when it's booked; `done` once it has. From either board's service
+ * details: the public board's calling points (before and after the station asked about), or the staff board's
+ * locations (stations it runs through and junctions left out).
+ */
+function parseService(j, now){
+  const stops = [];
+  if (!j) return stops;
+  if (Array.isArray(j.locations)){
+    j.locations.forEach(l => {
+      if (!l || !l.crs || l.isPass || l.isOperational) return;
+      const booked = realTime(l.std) ? l.std : realTime(l.sta) ? l.sta : null;
+      if (!booked) return;
+      const sched = boardTime(booked, now);
+      const act = realTime(l.atd) ? l.atd : realTime(l.ata) ? l.ata : null, exp = realTime(l.etd) ? l.etd : realTime(l.eta) ? l.eta : null;
+      stops.push({ crs: l.crs, name: l.locationName, sched: sched, t: boardTime(act || exp || booked, now, sched), done: !!act, cancelled: !!l.isCancelled });
+    });
+    return stops;
+  }
+  const add = (crs, name, st, at, et, cancelled) => {
+    const sched = boardTime(st, now); if (!crs || sched == null) return;
+    const a = String(at || '').trim(), e = String(et || '').trim();
+    const done = a === 'On time' || /^\d\d:\d\d/.test(a);
+    const t = done ? (a === 'On time' ? sched : boardTime(a, now, sched)) : /^\d\d:\d\d/.test(e) ? boardTime(e, now, sched) : sched;
+    stops.push({ crs: crs, name: name, sched: sched, t: t, done: done, cancelled: !!cancelled || /cancel/i.test(a + e) });
+  };
+  const points = side => (side && side[0] && side[0].callingPoint) || [];
+  points(j.previousCallingPoints).forEach(c => add(c.crs, c.locationName, c.st, c.at, c.et, c.isCancelled));
+  add(j.crs, j.locationName, j.std || j.sta, j.atd || j.ata, j.etd || j.eta, j.isCancelled);
+  points(j.subsequentCallingPoints).forEach(c => add(c.crs, c.locationName, c.st, c.at, c.et, c.isCancelled));
+  return stops;
+}
+/** A service's details, by the id its departure board gave (`sid`, or the staff board's `rid`). */
+async function loadService(d){
+  if (!d || !(d.sid || d.rid)) throw new ApiError('NOSERVICE');
+  const urls = d.rid ? [HUXLEY + '/service/' + d.rid] : [HUXLEY + '/service/' + d.sid, 'https://national-rail-api.davwheat.dev/service/' + d.sid];
+  let err = null;
+  for (let i = 0; i < urls.length; i++){
+    try { return await Promise.race([request(urls[i], { headers: { Accept: 'application/json' } }), new Promise((_, no) => setTimeout(() => no(new ApiError('NETWORK')), 10000))]); }
+    catch(e){ err = e; }
+  }
+  throw err;
+}
+/**
+ * Where the train is now, from its stops and the stations' places: at a station (`at`), or between two (`from`, `to`,
+ * `frac` of the way by time), not yet left its first stop (`before`) or at its last (`end`). `late` in whole minutes
+ * at the next stop (or the last, once there). Null without two stops on the map.
+ */
+function trainAt(stops, now, index){
+  const s = (stops || []).filter(x => !x.cancelled && index[x.crs]);
+  if (s.length < 2) return null;
+  let i = -1;
+  for (let k = 0; k < s.length; k++) if (s[k].done) i = k;
+  // a stop that doesn't report: the train is past it once a later one has, or once it's well past its time
+  while (i + 1 < s.length - 1 && !s[i + 1].done && s[i + 1].t + 60e3 < now && s[i + 2] && s[i + 2].t > now) i++;
+  const place = x => ({ lat: index[x.crs].lat, lon: index[x.crs].lon });
+  const lateAt = x => Math.max(0, Math.round((x.t - x.sched) / 60e3));
+  if (i < 0) return Object.assign(place(s[0]), { at: s[0], before: true, late: lateAt(s[0]), stops: s });
+  if (i >= s.length - 1) return Object.assign(place(s[s.length - 1]), { at: s[s.length - 1], end: true, late: lateAt(s[s.length - 1]), stops: s });
+  const a = s[i], b = s[i + 1], pa = place(a), pb = place(b);
+  if (now - a.t < 30e3 && now >= a.t) return Object.assign(pa, { at: a, late: lateAt(b), stops: s });
+  const span = Math.max(60e3, b.t - a.t), f = Math.max(0, Math.min(0.95, (now - a.t) / span));
+  return { lat: pa.lat + (pb.lat - pa.lat) * f, lon: pa.lon + (pb.lon - pa.lon) * f, from: a, to: b, frac: f, late: lateAt(b), stops: s };
+}
+/** In words: "Between Heaton Chapel and Levenshulme, 2 min late", "At Stockport", "Not left Hazel Grove yet". */
+function trainText(p){
+  if (!p) return '';
+  const late = p.late >= 1 ? ', ' + p.late + ' min late' : ', on time';
+  if (p.end) return 'Arrived at ' + p.at.name + (p.late >= 1 ? ', ' + p.late + ' min late' : '');
+  if (p.before) return 'Not left ' + p.at.name + ' yet' + (p.late >= 1 ? ', expected ' + p.late + ' min late' : '');
+  if (p.at) return 'At ' + p.at.name + late;
+  return (p.frac < 0.25 ? 'Just left ' + p.from.name : p.frac > 0.75 ? 'Nearly at ' + p.to.name : 'Between ' + p.from.name + ' and ' + p.to.name) + late;
+}
+/** When the train is due at a station on its way ("Due at Stockport 18:01"), from its stops. */
+function dueAt(p, crs){
+  const x = p && p.stops ? p.stops.filter(s => s.crs === crs)[0] : null;
+  return x ? { t: x.t, done: x.done, text: (x.done ? 'At ' : 'Due at ') + x.name + ' ' + hhmm(x.t) } : null;
+}
+
+/** The train to show: once one has left with you on it, that one until it arrives; else the commute's, else the next. */
+function pickTrain(trains, followed, now){
+  if (!trains || !trains.list || !trains.leg) return null;
+  const f = followed, gone = f && (f.exp || f.sched) <= now;
+  if (gone && f.leg === trains.leg.from + '>' + trains.leg.to && now < (f.arr || (f.exp || f.sched) + 3600e3) + 5 * 60e3) return f;
+  const c = commuteTrain(trains, now);
+  const d = c ? c.d : catchable(trains.list.filter(x => !x.cancelled), trains.leg.walk, now).list[0];
+  return d ? Object.assign({}, d, { leg: trains.leg.from + '>' + trains.leg.to }) : null;
+}
+
+
+/* ---------- a map from tiles ---------- */
+const TILE = 256;
+/** A point in world pixels at zoom z (Web Mercator, 256-pixel tiles). */
+function worldPx(lat, lon, z){
+  const n = TILE * Math.pow(2, z), r = lat * Math.PI / 180;
+  return { x: (lon + 180) / 360 * n, y: (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n };
+}
+/** The view that fits these points in a w×h box with a margin: the closest zoom from `min` to `max`, centred on them. */
+function fitView(points, w, h, pad, min, max){
+  const pts = (points || []).filter(p => p && isFinite(p.lat) && isFinite(p.lon));
+  if (!pts.length) pts.push(HOME);
+  let z = max || 15, box = null;
+  for (; z >= (min || 3); z--){
+    const ps = pts.map(p => worldPx(p.lat, p.lon, z));
+    box = { x0: Math.min.apply(null, ps.map(p => p.x)), x1: Math.max.apply(null, ps.map(p => p.x)), y0: Math.min.apply(null, ps.map(p => p.y)), y1: Math.max.apply(null, ps.map(p => p.y)) };
+    if (box.x1 - box.x0 <= w - 2 * pad && box.y1 - box.y0 <= h - 2 * pad) break;
+  }
+  z = Math.max(z, min || 3);
+  return { z: z, cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2, w: w, h: h };
+}
+/** Where a place falls in the view's box, in pixels. */
+function onView(v, p){ const q = worldPx(p.lat, p.lon, v.z); return { x: q.x - v.cx + v.w / 2, y: q.y - v.cy + v.h / 2 }; }
+/** The tiles covering the view, each { z, x, y, left, top } in the box's pixels. */
+function viewTiles(v){
+  const out = [], left = v.cx - v.w / 2, top = v.cy - v.h / 2;
+  for (let ty = Math.floor(top / TILE); ty * TILE < top + v.h; ty++)
+    for (let tx = Math.floor(left / TILE); tx * TILE < left + v.w; tx++) out.push({ z: v.z, x: tx, y: ty, left: Math.round(tx * TILE - left), top: Math.round(ty * TILE - top) });
+  return out;
+}
+/** CARTO's dark map without labels (© OpenStreetMap contributors © CARTO); our labels go on top. */
+const mapTile = t => 'https://' + 'abcd'.charAt(Math.abs(t.x + t.y) % 4) + '.basemaps.cartocdn.com/dark_nolabels/' + t.z + '/' + t.x + '/' + t.y + '.png';
+const MAP_CREDIT = '© OpenStreetMap · CARTO';
+
+/* ---------- the journey: what goes on the map ---------- */
+/**
+ * The map's places for a train: the stops from where the train is (or the station you board at, if it's further
+ * back) to where you get off, with home at the end you live at. `on` is where you board, `off` where you get off.
+ */
+function journeyMap(p, on, off, home){
+  if (!p || !p.stops) return null;
+  const s = p.stops, iOn = s.map(x => x.crs).indexOf(on), iOff = s.map(x => x.crs).indexOf(off);
+  if (iOff < 0) return null;
+  let iNow = p.from ? s.indexOf(p.from) : s.indexOf(p.at);
+  if (iNow < 0) iNow = 0;
+  const first = Math.min(iOn >= 0 ? iOn : iNow, iNow), stops = s.slice(first, iOff + 1);
+  return { stops: stops, on: iOn >= 0 ? s[iOn] : null, off: s[iOff], home: home || null };
+}
+
+/* ---------- the weather where you'll be ---------- */
+/** Open-Meteo's hourly temperature and chance of rain at a place, for today and tomorrow: [{ t, temp, rain }]. */
+async function loadPlaceWeather(p){
+  const j = await request('https://api.open-meteo.com/v1/forecast?latitude=' + p.lat.toFixed(3) + '&longitude=' + p.lon.toFixed(3) + '&hourly=temperature_2m,precipitation_probability&forecast_days=2&timezone=Europe%2FLondon');
+  const h = (j && j.hourly) || {}, t = h.time || [];
+  return t.map((x, i) => ({ t: +new Date(x), temp: h.temperature_2m ? h.temperature_2m[i] : null, rain: h.precipitation_probability ? h.precipitation_probability[i] : null })).filter(x => isFinite(x.t));
+}
+/** The weather at a time, in words: "In town at 17:30: 12°, rain likely (70%)". Null without an hour for it. */
+function weatherThen(hours, t, where){
+  const h = (hours || []).filter(x => x.t <= t && t < x.t + 3600e3)[0];
+  if (!h || h.temp == null) return null;
+  const r = h.rain == null ? '' : h.rain >= 60 ? ', rain likely (' + h.rain + '%)' : h.rain >= 30 ? ', might rain (' + h.rain + '%)' : ', dry';
+  return { rain: h.rain || 0, text: (where ? where + ' at ' : 'At ') + hhmm(t) + ': ' + Math.round(h.temp) + '°' + r };
+}
+
+/**
+ * Everything the journey map and its words need, the same on the phone and the TV: the stations from where the
+ * train is to where you get off (`route`), home and the walk to or from its station (`walks`), what to fit in view,
+ * where you get on (`board`) and off (`off`, with `there`: "at work by 08:51" or "home by 18:24").
+ */
+function journeyView(pos, leg, index, home){
+  if (!leg || !index) return null;
+  const at = c => index[c] ? { lat: index[c].lat, lon: index[c].lon } : null;
+  const map = pos ? journeyMap(pos, leg.from, leg.to || (pos.stops[pos.stops.length - 1] || {}).crs, home) : null;
+  const onCrs = leg.from, offCrs = leg.to || (map ? map.off.crs : '');
+  const stops = map ? map.stops : index[onCrs] && index[offCrs] ? [index[onCrs], index[offCrs]] : [];
+  const homeEnd = leg.home ? offCrs : onCrs;
+  const places = [];
+  stops.forEach(s => {
+    const p = at(s.crs); if (!p) return;
+    const ends = s.crs === onCrs || s.crs === offCrs, next = pos && pos.to && pos.to.crs === s.crs && stops.length > 2;
+    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, label: ends || next ? (index[s.crs] || s).name : '' });
+  });
+  if (home) places.push({ lat: home.lat, lon: home.lon, kind: 'home', label: 'Home', right: false });   // labelled to the left: home is a walk from the station
+  if (pos && !pos.end) places.push({ lat: pos.lat, lon: pos.lon, kind: 'train' });
+  const off = pos && offCrs ? dueAt(pos, offCrs) : null, board = pos ? pos.stops.filter(s => s.crs === onCrs)[0] || null : null;
+  return { places: places, route: stops.map(s => at(s.crs)).filter(Boolean), walks: home && at(homeEnd) ? [[home, at(homeEnd)]] : [],
+    fit: [at(onCrs), at(offCrs), home, pos && !pos.end ? pos : null].filter(Boolean), board: board, off: off,
+    there: off && (leg.work || leg.home) ? (leg.home ? 'home by ' : 'at work by ') + hhmm(off.t + (leg.after || 0) * 60e3) : '',
+    title: leg.work ? 'Your way in' : leg.home ? 'Your way home' : 'Your next train' };
+}
+/** The lines under the map: where you get on and off, and when you're there. */
+function journeyLines(j, pos){
+  if (!j) return [];
+  const out = [];
+  if (j.board && !j.board.done) out.push('Leaves ' + j.board.name + ' ' + hhmm(j.board.t) + (j.off ? ' · ' + j.off.text.replace(/^Due at /, '') : '') + (j.there ? ' · ' + j.there : ''));
+  else if (j.off) out.push(j.off.text + (j.there ? ' · ' + j.there : ''));
   return out;
 }
 /* The phone as a remote for a screen, through ntfy.sh: a free relay that needs no account and allows browser calls. */
@@ -5093,6 +5341,22 @@ function signHtml(trains, walk, now){
   if (!S.first3.length) plat = `<div class="row centre">${S.missed ? 'No more you can make' : 'No trains for now'}</div><div class="row centre dim">Please check the timetable</div>`;
   return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
 }
+
+/* ---------- the journey map (src/lib/geo.js): CARTO's dark tiles with the route, stations, home and the train ---------- */
+function mapHtml(j, w, h){
+  const v = fitView(j.fit.length ? j.fit : j.places, w, h, 60, 9, 15), pt = p => onView(v, p), xy = p => { const q = pt(p); return q.x.toFixed(1) + ',' + q.y.toFixed(1); };
+  const tiles = viewTiles(v).map(t => `<img src="${mapTile(t)}" alt="" style="left:${t.left}px;top:${t.top}px">`).join('');
+  let svg = j.walks.map(wk => `<polyline class="walk" points="${wk.map(xy).join(' ')}"/>`).join('');
+  if (j.route.length) svg += `<polyline class="glow" points="${j.route.map(xy).join(' ')}"/><polyline class="route" points="${j.route.map(xy).join(' ')}"/>`;
+  j.places.forEach(p => {
+    const q = pt(p);
+    if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
+    else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
+    else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
+  });
+  j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false; svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
+  return `<div class="jmap" style="height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg><span class="credit">${esc(MAP_CREDIT)}</span></div>`;
+}
 /* ===================== display: music on the TV (Spotify) ===================== */
 // Plain script for TV browsers (Chromium 63): no ?. or ??. The TV is signed in to Spotify from a phone (sealed with
 // the PIN, like the Octopus account) and then reads and controls Spotify itself: the Music view, a line on Today, the
@@ -5532,6 +5796,10 @@ const SRC = {
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
   // the commute turns round in the afternoon on a work day (commuteLeg): when it does, the trains are due at once
   trains:  { label: 'Trains',  every: () => legTurned() ? 0 : shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => { const leg = legNow(); return loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg: leg })); } },
+  // your journey (src/lib/geo.js): the stations once a day, the train that matters every 45 seconds while it shows
+  stations: { label: 'Stations', every: () => 24*60*MIN, need: () => !!D.set.trainFrom && /^https?:$/.test(location.protocol), run: loadStations },
+  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
+  town:    { label: 'Town weather', every: () => 30*MIN, need: () => !!townStation(), run: () => loadPlaceWeather(townStation()) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
   nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
@@ -5562,6 +5830,28 @@ async function pollMini(){
 D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
 const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
 function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
+/* ---------- your journey: the train that matters, followed once it has left, until it gets you there ---------- */
+function journeyPick(now){ D.jPick = pickTrain(SRC.trains.data, D.jPick, now); return D.jPick; }
+function journeyTurned(){ const d = SRC.service.data, p = D.jPick; return !!p && (!d || (d.d.sid || d.d.rid) !== (p.sid || p.rid) || d.d.sched !== p.sched); }
+function loadJourney(){ const d = journeyPick(Date.now()); return loadService(d).then(j => ({ d: d, stops: parseService(j, Date.now()) })); }
+function townStation(){ const T = SRC.trains.data, leg = T && T.leg, idx = SRC.stations.data; const c = leg ? (leg.home ? leg.from : leg.work ? leg.to : '') : ''; return c && idx ? idx[c] : null; }
+/** Beside the station sign when there are no trams: the map, where the train is, and when you're there. */
+function renderJourney(now){
+  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data;
+  const d = S && D.jPick && (S.d.sid || S.d.rid) === (D.jPick.sid || D.jPick.rid) ? S.d : null;
+  const on = !D.set.tramStop && !!(T && T.leg && idx && d);
+  card.hidden = !on; $('#tTrains').parentNode.classList.toggle('solo', !D.set.tramStop && !on);
+  if (!on) return;
+  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, T.leg, idx, HOME), box = $('#tJourney');
+  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = T.leg.end && (T.leg.work || now < T.leg.end) ? weatherThen(SRC.town.data, T.leg.end, 'In town') : null;
+  $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
+  // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
+  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length].join('|');
+  if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
+  if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
+  box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
+  setHtml(box.querySelector('.jl'), journeyLines(j, pos).concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
+}
 function due(s, now){
   if (!s.need() || s.busy) return false;
   const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
@@ -5619,6 +5909,7 @@ function tick(){
   if (D.chromeUntil && now > D.chromeUntil && !open() && (!$('#bar').contains(document.activeElement) || idle > 30e3)) hideChrome();
   Object.keys(SRC).forEach(k => { if (due(SRC[k], now)) runSource(k); });
   if (++D.ticks % 30 === 0) render();
+  else if (D.ticks % 5 === 0 && shown() === 'travel') renderJourney(now);   // the train moves between its live times
 }
 
 /** The station sign's clock, with seconds. */
@@ -5778,7 +6069,8 @@ function renderTravel(){
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
   const M = SRC.trams, tramPanel = $('#tTrams').parentNode;
   tramPanel.hidden = !s.tramStop;
-  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width
+  box.parentNode.classList.toggle('solo', !s.tramStop);   // with no trams, the sign takes the width, unless the journey's there
+  renderJourney(now);
   if (s.tramStop){
     let tr = null; html = '';
     if (!NET.proxy) html = '<p class="empty">Metrolink times need a small server that holds a TfGM key (see the README).</p>';
