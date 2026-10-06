@@ -83,8 +83,8 @@ The five tabs are Astro pages made of small Svelte islands ([decision 0009](docs
 - The islands share one state object. The account's data is cached in the browser, so moving between pages doesn't fetch it again.
 
 Still to do here:
-- **A full redesign of everything** (built on the `redesign` branch, previewed at `/preview/`, waiting for Kyle's go-ahead): five plain pages, phone first, with the household on the phone too ([decision 0010](docs/decisions/0010-redesign.md), plan in [docs/redesign.md](docs/redesign.md)). The wall display is left as it is for now.
-- **A comparison that remembers its last run,** so the tariffs card shows the cheapest tariff without running it again.
+- ~~A full redesign of everything~~: built and live since 06/10/2026, the phone pages ([decision 0010](docs/decisions/0010-redesign.md), plan in [docs/redesign.md](docs/redesign.md)) and the wall display ([decision 0011](docs/decisions/0011-wall-display.md)).
+- ~~A comparison that remembers its last run~~: built; the tariffs card compares itself weekly.
 
 ## 3. A small backend
 
@@ -95,6 +95,58 @@ A Cloudflare Worker on the free tier, or `server.py` grown up on the home server
   - A push alert when Agile goes negative or a Saving Session is announced.
   - A Monday "mission log" email.
   - A nightly copy of readings into a database, so history outlives Octopus's retention.
+- Would also unlock these, which block browsers (checked October 2026):
+  - **Flights overhead.** Live positions from adsb.lol or adsb.fi for the area around Stockport (both answer, but send no CORS header; OpenSky allows only its own site), with routes and aircraft from adsbdb, which browsers can already read. Stockport sits under Manchester's westerly approach, so planes pass low every few minutes. Shown as an "Overhead now" card, a TV heads-up for something notable, and real traffic in the cockpit.
+  - **Met Office weather warnings** for the North West (the regional RSS has no CORS header).
+  - **Trams (TfGM) and Google Calendar**, as above.
+  - **A shared shopping list and chores** every phone and the TV can edit (Worker storage).
+  - **setlist.fm** for the music player (key required, no CORS).
+
+## 4. A music player (proposed, October 2026)
+
+Kyle listens on the TV's app, Google speakers and Bluetooth from his phone. Qobuz has no API a site can use (its embed widget plays 30-second previews only; its keys aren't issued any more), and neither the TV's apps nor Google's speakers can be controlled by another app. Spotify can: its Web API signs in from the browser with no secret (PKCE, CORS allowed for the site, checked) and controls any Spotify device, including the TV app and Google speakers. Kyle chose Spotify. The proposal, with a working mock-up, was shared as a private page on 06/10/2026.
+
+- **The player:** a now-playing strip above the tabs on every page, tinted to the cover; tap it for the full player (cover, scrub, shuffle and repeat, like); "Play on…" with each device's volume; a Music tab (search, playlists, liked songs, albums, recently played); "Up next" (Spotify's queue is add-only for other apps).
+- **Extras:** synced lyrics from LRCLIB (free, CORS checked); the app taking the cover's colours (Spotify's cover images allow it); artist pages (Wikipedia); listening stats with a clock and heat map; a code to share the song; playlists suggested by the weather.
+- **The house:** a Music view on the TV and the cover in the cockpit; a party queue guests join by scanning a code (through the ntfy relay, no login); a sleep timer and bedtime fade with the night window; wake-up music that skips bank holidays; music fading when it's time to leave for your train; favourite playlists on the remote's number keys.
+- **Discovery, stories and play** (sources checked from the site; Spotify's own recommendations are closed to new apps):
+  - "More like this" radio from Last.fm and ListenBrainz similar artists (CORS; Last.fm needs a free key), played from their Spotify top tracks.
+  - New releases from your artists on release Friday (ListenBrainz fresh releases, Spotify artist albums).
+  - Gigs by your artists in Manchester (Ticketmaster, free key).
+  - Song story and credits: MusicBrainz (writers, producers, studio, year; CORS) and Genius (free key, CORS), with a badge for Greater Manchester artists or Strawberry Studios, Stockport.
+  - Liner notes: full covers and booklet scans from the Cover Art Archive (CORS) on the TV.
+  - This time last year, from a nightly log the TV keeps of what played (Spotify only returns the last 50).
+  - Radio in the same player, from the Radio Browser directory (CORS); played by the phone or the TV itself, not sent to the Google speakers.
+  - A house queue the TV holds and feeds to Spotify one song ahead, so songs can be reordered, removed and voted on.
+  - Neighbour mode (volume capped in the night window); a free electricity party when Agile goes negative.
+  - Rain or brown noise made on the device to match the weather, for sleep.
+  - Name that tune on the TV from your most-played songs, with Deezer's 30-second clips (no CORS, but JSONP and audio playback work) and phones as buzzers.
+  - Vinyl mode and a record shelf; who's listening (each person's own Spotify); an album wall in the screensaver.
+  - Not usable: song.link's public API is closed; setlist.fm needs the Worker; Deezer's tempo field is often 0, so it can't drive beat-matched visuals.
+- **Limits:** control needs Premium; no beat-matched visuals (Spotify stopped giving new apps audio features and analysis in November 2024); Spotify-made playlists can't be opened by new apps; phones can be a remote but not the speaker inside the site (the Web Playback SDK is desktop only).
+- **Setup:** a free Spotify developer app (development mode is fine for one household), a sign-in on the phone, and the token sent to the TV sealed with the PIN.
+- **Waiting on:** Kyle's picks, and whether Music makes a sixth tab or Screen moves into Settings.
+
+## 5. More data (ideas, checked October 2026)
+
+Each was tried from the site's address; "browser" means it answers with a CORS header, so it needs no server.
+
+| Idea | Source | Works from | Where it would show |
+| --- | --- | --- | --- |
+| The grid's live frequency, national demand, wind | Elexon BMRS (`/system/frequency`, about 30 s behind) | browser, no key | a twitching 50 Hz needle on the cockpit's dashboard |
+| Aurora alerts | AuroraWatch UK (Lancaster University), NOAA SWPC Kp | browser, no key | a heads-up when it's likely and clear; the cockpit's aurora only when real |
+| The ISS's real orbit and visible passes | CelesTrak | browser, no key | a heads-up ("crosses SW to NE at 21:14"); the cockpit's ISS on its true path |
+| Rocket launches | Launch Library 2 (The Space Devs; 15 calls an hour free) | browser, no key | a cockpit billboard with a link to watch |
+| Stargazing tonight | Open-Meteo cloud cover with the moon and planets worked out here | browser | Night and the cockpit |
+| Stockport County | TheSportsDB (County is team 134258, League One; live scores need its paid key) | browser, test key | fixtures, kick-off countdown and results on Today; a matchday heads-up |
+| The Mersey at Stockport | Environment Agency flood monitoring readings | browser, no key | a river-level graph beside the flood warnings |
+| Friday takeaway picker | Food Standards Agency ratings | browser, no key | a "spin the wheel" of 4 and 5-star places nearby |
+| Quiz night | Open Trivia DB, with phones as buzzers through the ntfy relay | browser, no key | the TV |
+| Is it the Wi-Fi or Virgin? | Cloudflare's speed test | browser, no key | the TV tests hourly and graphs the evenings |
+| On this day | Wikimedia's feed | browser, no key | the night clock or a billboard |
+| Gigs by artists you play | Ticketmaster Discovery (free key), with Spotify's top artists | needs a key | Music and Home |
+| Power cuts on your street | Electricity North West's `live_incidents` dataset | refused without an account key; not yet confirmed free | a heads-up |
+| Met Office warnings, flights overhead | see the backend, above | needs the Worker | heads-ups |
 
 ## More ideas already in the app
 
