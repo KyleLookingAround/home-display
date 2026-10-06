@@ -45,6 +45,7 @@
   .title{margin:0;font:700 22px/1.2 var(--f-display);letter-spacing:.04em;text-transform:uppercase;position:relative}
   .strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(128px,32%);gap:var(--s3);overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px;position:relative;scrollbar-width:none}
   .strip::-webkit-scrollbar{display:none}
+  @media (min-width:700px){ .strip{grid-auto-columns:160px} }
   .pl{appearance:none;border:0;background:transparent;color:inherit;display:grid;gap:6px;text-align:left;padding:0;cursor:pointer;position:relative;scroll-snap-align:start;font:inherit;min-width:0}
   .pl img,.ph{width:100%;aspect-ratio:1;object-fit:cover;border-radius:var(--radius-sm);border:1px solid var(--line);background:var(--card-2);display:grid;place-items:center;color:var(--muted)}
   .pl.on img{border-color:var(--gas);box-shadow:0 0 18px -6px var(--gas)}

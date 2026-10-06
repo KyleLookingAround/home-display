@@ -4,6 +4,10 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update** (music branch): the full design pass over the player, phone, laptop and TV.
+  - On a laptop, pages now use the full width (they shrank to fit what was on them, so the Music tab sat in a 700-pixel column). Your listening puts the clock and the calendar side by side, and the weather radio's covers are cover-sized.
+  - In the player, the lyrics and Up next glances share the row equally, so the next song's name shows; and the views' tabs now have a solid backdrop, so the words don't show through them as the page scrolls.
+  - The weather radio's moods no longer repeat the greeting ("Good morning, Kyle" above "Good morning"): Morning coffee, Evening in, Grey skies, Golden hour, Rainy day.
 - **Update**: full screen now stays on across every page, so the site feels like an app. Browsers leave full screen whenever a page changes, so the button now opens the site inside the full-screen page (one frame filling the screen) and the tabs change inside it; the page underneath rests, polling nothing. Leaving full screen, by the button or the phone's Back, opens the page you were on as itself. A fresh visit with full screen chosen goes back into it at the first tap.
 - **Creation** (music branch, stage 5): finding music, and your listening ([decision 0014](decisions/0014-finding-music.md)).
   - **More like this** (the player's More): songs people play alongside the one playing, from ListenBrainz (and Last.fm with a key), found on Spotify, with the artists fans also like. Artist pages show "Fans also like" too.

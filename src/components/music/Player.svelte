@@ -327,7 +327,7 @@
   .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 
   /* a glance at the lyrics and what's next; each opens its own view */
-  .glances{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px}
+  .glances{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .glance.ab{grid-column:1/-1;min-height:0}
   .badge-line{display:flex;align-items:center;gap:6px;color:var(--ink)}
   .badge-line :global(.ic){color:var(--gas);flex:none}
@@ -346,7 +346,7 @@
 
   /* the lyrics and Up next views, with a small player at the top */
   .subhead{position:sticky;top:calc(-1 * env(safe-area-inset-top,0px) - 6px);z-index:3;margin:0 -22px;padding:calc(env(safe-area-inset-top,0px) + 6px) 22px 10px;
-    background:linear-gradient(var(--void) 75%,transparent);display:grid;gap:8px}
+    background:var(--void);box-shadow:0 14px 16px -6px var(--void);display:grid;gap:8px}
   .mini-top{display:grid;grid-template-columns:46px 44px minmax(0,1fr) 46px;gap:10px;align-items:center;padding-top:8px;position:relative;padding-bottom:10px}
   .mini-top img{width:44px;height:44px;border-radius:var(--radius-sm);object-fit:cover}
   .mt{display:grid;min-width:0}

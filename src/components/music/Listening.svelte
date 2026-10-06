@@ -68,6 +68,7 @@
   {/if}
 {:else if !err}<div class="skel" style="height:320px"></div>{/if}
 
+<div class="pair">
 <section class="card">
   <h2 class="label">When you listen</h2>
   {#if log.length >= 5}
@@ -80,6 +81,7 @@
     <HeatMap {days} colour="79,214,255" fmt={v => v + ' min'} aria="Minutes listened each day, as a calendar" />
   </section>
 {/if}
+</div>
 {#if log.length}<p class="note">{log.length} plays kept on this phone since {since}. They stay here; nothing is sent anywhere.</p>{/if}
 
 <style>
@@ -90,4 +92,6 @@
   .list{list-style:none;margin:0;padding:0}
   .link{appearance:none;border:0;background:none;color:var(--gas);font:inherit;font-size:14px;cursor:pointer;padding:6px 0}
   .seg{align-self:start}
+  .pair{display:grid;gap:var(--s3)}
+  @media (min-width:900px){ .pair{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start} }
 </style>

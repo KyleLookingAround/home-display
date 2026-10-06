@@ -329,7 +329,7 @@
       <span class="label">Your listening</span>
       <b>{youLine}</b>
       <span class="note">Top artists and songs, when you listen, and every day as a calendar</span>
-      <Icon name="next" size={18} />
+      <Icon name="chevron" size={20} />
     </a>
   {/if}
 {/if}

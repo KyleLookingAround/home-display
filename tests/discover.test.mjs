@@ -46,7 +46,7 @@ test('gigs near home by the artists you play', () => {
 test('weather radio: the weather first, then the time of the week', () => {
   const at = s => Date.parse('2026-10-' + s);
   assert.equal(X.weatherMood({ code: 63, temp: 9 }, at('06T21:00:00')).id, 'rain-night');
-  assert.equal(X.weatherMood({ code: 63, temp: 9 }, at('06T11:00:00')).title, 'A rainy day');
+  assert.equal(X.weatherMood({ code: 63, temp: 9 }, at('06T11:00:00')).title, 'Rainy day');
   assert.equal(X.weatherMood({ code: 95, temp: 15 }, at('09T20:00:00')).id, 'storm', 'a storm beats Friday night');
   assert.equal(X.weatherMood({ code: 2, temp: 12 }, at('09T20:00:00')).title, 'Friday night');
   assert.equal(X.weatherMood({ code: 3, temp: 11 }, at('11T09:30:00')).id, 'sunday');

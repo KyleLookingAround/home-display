@@ -31,6 +31,7 @@
     album: { s: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>' },
     spark: { s: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>' },
     ticket: { s: '<path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4z"/><path d="M14 6v12" stroke-dasharray="2 2"/>' },
+    chevron: { s: '<path d="M9 6l6 6-6 6"/>' },
     check: { s: '<path d="M5 12.5l4.5 4.5L19 7.5"/>' },
     close: { s: '<path d="M6 6l12 12M18 6 6 18"/>' },
     party: { s: '<path d="M4 20.5 8.5 8l7.5 7.5z"/><path d="M14 3.5v2.2M19.5 5.5l-1.6 1.6M20.5 10.5h-2.2"/><path d="M11.5 8.6c1.2-1.2 1.2-3 0-4.2"/><path d="M15.4 12.5c1.2-1.2 3-1.2 4.2 0"/>' },

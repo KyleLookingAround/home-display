@@ -285,6 +285,7 @@ test('music: the strip on every page, and the full player', async () => {
   // Up next, full
   await sheet.locator('.vtabs button', { hasText: 'Up next' }).click();
   await until(() => sheet.locator('.queue-full ol li').count().then(n => n === 2), 'two songs up next');
+  await page.waitForTimeout(400);
   await shot(page, 'music-queue');
   await sheet.locator('button[aria-label="Back to the player"]').click();
   // double-tap the cover to like the song (already liked: stays liked); then Play on
@@ -405,6 +406,13 @@ test('music: on a laptop the player opens beside the page', async () => {
   await shot(page, 'music-laptop');
   await page.keyboard.press('Escape');
   await until(() => page.locator('.sheet.open').count().then(n => n === 0), 'Escape closes it');
+  // the Music tab and your listening, at laptop width
+  await page.goto(base + '/music.html'); await page.locator('.radio').waitFor();
+  await page.waitForTimeout(800);
+  if (SHOTS) await page.screenshot({ path: join(SHOTS, 'music-laptop-tab.png'), fullPage: true });
+  await page.goto(base + '/music.html#listening'); await page.locator('.grid li').first().waitFor();
+  await page.waitForTimeout(600);
+  if (SHOTS) await page.screenshot({ path: join(SHOTS, 'music-laptop-listening.png'), fullPage: true });
   assert.deepEqual(errors, []);
   await ctx.close();
 });

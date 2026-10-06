@@ -120,17 +120,17 @@ export function weatherMood(wx, now){
   if ((c >= 71 && c <= 77) || c === 85 || c === 86) return { id: 'snow', title: 'Snow falling', line: line('snowing'), words: ['snow day', 'cosy winter'] };
   if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return evening || night
     ? { id: 'rain-night', title: 'Rain on the windows', line: line('raining'), words: ['rainy night', 'rainy night jazz'] }
-    : { id: 'rain', title: 'A rainy day', line: line('raining'), words: ['rainy day', 'rainy day acoustic'] };
+    : { id: 'rain', title: 'Rainy day', line: line('raining'), words: ['rainy day', 'rainy day acoustic'] };
   if (c === 45 || c === 48) return { id: 'fog', title: 'Foggy out', line: line('foggy'), words: ['ambient', 'misty morning'] };
   if (night) return { id: 'late', title: 'Late night', line: line('quiet'), words: ['late night', 'chill night'] };
   if ((day === 5 || day === 6) && evening) return { id: 'weekend', title: DISC_DAYS[day] + ' night', line: line(c >= 0 && c <= 1 ? 'clear' : 'dry'), words: [DISC_DAYS[day].toLowerCase() + ' night', 'party'] };
   if (day === 0 && morning) return { id: 'sunday', title: 'Sunday morning', line: line(c >= 0 && c <= 1 ? 'bright' : 'grey'), words: ['sunday morning', 'lazy sunday'] };
   if (c >= 0 && c <= 1 && t != null && t >= 18 && !evening) return { id: 'sun', title: 'Sunshine', line: line('sunny'), words: ['summer', 'sunny day'] };
-  if (c >= 0 && c <= 1 && evening) return { id: 'golden', title: 'A clear evening', line: line('clear'), words: ['golden hour', 'evening chill'] };
+  if (c >= 0 && c <= 1 && evening) return { id: 'golden', title: 'Golden hour', line: line('clear'), words: ['golden hour', 'evening chill'] };
   if (t != null && t < 3) return { id: 'cold', title: 'Cold out there', line: t + '° outside', words: ['cosy', 'warm acoustic'] };
-  if (morning) return { id: 'morning', title: 'Good morning', line: line(c >= 0 && c <= 1 ? 'bright' : 'cloudy'), words: ['morning coffee', 'good morning'] };
-  if (evening) return { id: 'evening', title: 'An evening in', line: line('cloudy'), words: ['evening chill', 'dinner'] };
-  return { id: 'grey', title: 'A grey day', line: line('cloudy'), words: ['indie chill', 'cloudy day'] };
+  if (morning) return { id: 'morning', title: 'Morning coffee', line: line(c >= 0 && c <= 1 ? 'bright' : 'cloudy'), words: ['morning coffee', 'good morning'] };
+  if (evening) return { id: 'evening', title: 'Evening in', line: line('cloudy'), words: ['evening chill', 'dinner'] };
+  return { id: 'grey', title: 'Grey skies', line: line('cloudy'), words: ['indie chill', 'cloudy day'] };
 }
 /** Playlists from Spotify's search answers for a mood's words: no repeats, no empty ones. */
 export function radioPlaylists(answers, max){
