@@ -23,7 +23,7 @@
   <input {id} type="text" inputmode="numeric" autocomplete="off" {placeholder} {required} aria-invalid={bad} aria-describedby={bad ? id + '-bad' : undefined}
          value={text} oninput={typed} onblur={tidy}>
   <button class="cal" type="button" aria-label="Pick from a calendar" tabindex="-1" onclick={pick}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
   </button>
   <input class="native" type="date" tabindex="-1" aria-hidden="true" bind:this={picker} value={value} onchange={ev => { value = ev.target.value; text = ukDate(value); bad = false; }}>
 </span>

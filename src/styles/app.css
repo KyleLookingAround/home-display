@@ -40,6 +40,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 
 /* ---------- the shell: a bottom bar on a phone, a rail on a laptop ---------- */
 .app{position:relative;z-index:1;min-height:100vh}
+html .app{visibility:visible}      /* the layouts hide .app until this stylesheet has arrived (no flash of unstyled page) */
 .main{max-width:760px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + var(--s4)) var(--s4) calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + var(--s6))}
 /* music: room for the now-playing strip, no scrolling behind the open player, and the cover's colour glowing behind the page */
 html.has-mini .main{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 84px)}

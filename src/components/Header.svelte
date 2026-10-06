@@ -63,10 +63,10 @@
   <h1>{title}</h1>
   <span class="status {kind}" id="status" role="status"><i></i>{text}</span>
   <button class="icon-btn" class:spin={busy} type="button" aria-label="Refresh" onclick={again}>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
   </button>
   <FullScreen />
   {#if page !== 'settings'}<a class="icon-btn phone-only" href="./settings.html" aria-label="Settings">
-    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
   </a>{/if}
 </header>

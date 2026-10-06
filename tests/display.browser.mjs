@@ -712,6 +712,24 @@ test('dashboard: the pages open with no signal, once seen', async () => {
   await ctx.close();
 });
 
+test('dashboard: a page waiting for its styles shows the night sky, not a white page with huge icons', async () => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
+  const page = await ctx.newPage();
+  let release; const held = new Promise(r => { release = r; });
+  await page.route(/\.css(\?|$)/, async r => { await held; await r.continue(); });
+  await page.route(/^https:\/\//, r => r.abort());
+  await page.goto(`${base}/money.html`, { waitUntil: 'commit' });
+  await page.waitForSelector('.nav', { state: 'attached' });
+  const before = await page.evaluate(() => ({ bg: getComputedStyle(document.body).backgroundColor, app: getComputedStyle(document.querySelector('.app')).visibility,
+    icon: Math.max(...[...document.querySelectorAll('.app svg')].map(s => s.getBoundingClientRect().width)) }));
+  assert.equal(before.bg, 'rgb(4, 5, 13)', 'dark from the first moment');
+  assert.equal(before.app, 'hidden', 'nothing drawn until the styles are in');
+  assert.ok(before.icon <= 24, `icons stay icon-sized (${before.icon}px)`);
+  release();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.app')).visibility === 'visible');
+  await ctx.close();
+});
+
 test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {
   const { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, settings: { ...SETTINGS, trainWalk: 25 }, withHelper: false });
   const sign = page.locator('.dmx');
