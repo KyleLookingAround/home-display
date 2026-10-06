@@ -631,7 +631,7 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   await tv.ctx.close(); await phone.ctx.close();
 });
 
-test('dashboard: full screen on a phone, kept from page to page', async () => {
+test('dashboard: full screen on a phone, across every page', async () => {
   const { page, ctx, errors } = await open('/index.html', { width: 390, height: 844, settings: null, withHelper: false, clock: false });
   await ready(page);
   const full = () => page.evaluate(() => !!document.fullscreenElement);
@@ -641,18 +641,33 @@ test('dashboard: full screen on a phone, kept from page to page', async () => {
   assert.ok(box.width >= 44 && box.x + box.width <= head.x + head.width + 1, 'big enough to tap, and on the screen');
   await shot(page, 'phone-header');
   await btn.click();
-  await page.waitForFunction(() => !!document.fullscreenElement);
+  await page.waitForFunction(() => !!document.fullscreenElement && !!document.getElementById('app-shell'));
   assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '1', 'remembered');
-  assert.equal(await btn.getAttribute('aria-label'), 'Leave full screen');
-  // a new page leaves full screen, as browsers do; the first tap there goes back
-  await page.click('.nav a[href="./money.html"]'); await page.waitForURL(/money\.html/); await ready(page);
+  assert.equal(await page.evaluate(() => document.hidden), true, 'the page underneath rests');
+  // the tabs change inside full screen, page after page, with no tap to get back into it
+  const app = page.frameLocator('#app-shell'), frame = () => page.frame({ url: /./ }) && page.frames().find(f => f.parentFrame() === page.mainFrame());
+  await app.locator('header .fs[aria-label="Leave full screen"]').waitFor();
+  for (const [id, title] of [['money', 'Money'], ['usage', 'Usage'], ['home', 'Home'], ['settings', 'Settings']]) {
+    await app.locator(`a[href="./${id}.html"]:visible`).first().click();
+    await page.waitForFunction(id => { const f = document.getElementById('app-shell'); try { return f.contentWindow.location.pathname.endsWith('/' + id + '.html') && f.contentDocument.querySelector('astro-island'); } catch (e) { return false; } }, id);
+    assert.equal(await full(), true, `still full screen on ${title}`);
+  }
+  await page.waitForTimeout(400);
+  await shot(page, 'phone-fullscreen-settings');
+  // leaving, from inside: the page you were on, as itself
+  await app.locator('header .fs').click();
+  await page.waitForURL(/settings\.html/);
+  await ready(page);
   assert.equal(await full(), false);
-  assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '1', 'changing page doesn\'t forget it');
-  await page.click('main h2 >> nth=0');
-  await page.waitForFunction(() => !!document.fullscreenElement);
-  await page.locator('header .fs').click();
-  await page.waitForFunction(() => !document.fullscreenElement);
+  assert.equal(await page.locator('#app-shell').count(), 0);
   assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '0', 'leaving with the button forgets it');
+  // chosen, a fresh visit goes back into it at the first tap
+  await page.evaluate(() => localStorage.setItem('hse.fullscreen', '1'));
+  await page.goto(base + '/money.html'); await ready(page);
+  assert.equal(await full(), false);
+  await page.click('main h2 >> nth=0');
+  await page.waitForFunction(() => !!document.fullscreenElement && !!document.getElementById('app-shell'));
+  assert.ok(frame(), 'the shell is open');
   assert.deepEqual(errors, []);
   await ctx.close();
   // an iPhone's Safari can't: the button explains Add to Home Screen

@@ -1,15 +1,15 @@
 <script>
   /*
    * The full screen button in the header, on every page. Where the browser can (Android, laptops), it hides the
-   * browser's bars, and each page after goes back to full screen at its first tap. On an iPhone, which can't, it
+   * browser's bars for the whole site, every tab included (src/state/fullscreen.js). On an iPhone, which can't, it
    * explains Add to Home Screen instead; opened from there, the app has no bars and the button isn't shown.
    */
   import { onMount } from 'svelte';
-  import { canFull, isFull, isApp, isIos, toggleFull, keepFull } from '../state/fullscreen.js';
+  import { canFull, isFull, isApp, isIos, toggleFull, keepFull, inShell } from '../state/fullscreen.js';
   let full = $state(false), shown = $state(false), help = $state(false), able = $state(false);
   onMount(() => {
     able = canFull();
-    shown = !isApp() && (able || isIos());
+    shown = !isApp() && (able || isIos() || inShell());
     full = isFull();
     keepFull(f => { full = f; });
   });

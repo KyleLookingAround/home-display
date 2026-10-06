@@ -181,3 +181,5 @@ tr.best td{background:rgba(70,230,161,.07)}
 
 /* a heading between groups of cards */
 .section{font:600 13px/1.3 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--ink);margin:var(--s4) 0 0}
+/* full screen: the site runs in one frame filling the screen (src/state/fullscreen.js); the page holding it rests unseen */
+html.shelled body > :not(#app-shell){display:none}

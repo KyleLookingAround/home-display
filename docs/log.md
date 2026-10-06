@@ -4,6 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update**: full screen now stays on across every page, so the site feels like an app. Browsers leave full screen whenever a page changes, so the button now opens the site inside the full-screen page (one frame filling the screen) and the tabs change inside it; the page underneath rests, polling nothing. Leaving full screen, by the button or the phone's Back, opens the page you were on as itself. A fresh visit with full screen chosen goes back into it at the first tap.
 - **Creation**: full screen on a phone. A button in the header of every page hides the browser's bars. Browsers end full screen whenever the page changes, so once it's on, each page goes back to full screen at your first tap; leaving it with the button (or Back) turns that off. iPhones can't do this in Safari, so there the button explains Add to Home Screen, which opens the app with no bars, and the button isn't shown when it's opened from there. The display's own Full screen button says the same on an iPhone.
 - **Update**: the redesign is merged into `main` and live, at Kyle's word: the phone pages ([decision 0010](decisions/0010-redesign.md)), the new wall display ([decision 0011](decisions/0011-wall-display.md)) and everything built on the `redesign` branch since 2026-10-05 (the entries marked "(redesign)" below). The `redesign` branch is still published at /preview/ while it exists; it now matches the live site.
 
