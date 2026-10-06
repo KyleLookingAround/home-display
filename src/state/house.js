@@ -11,7 +11,9 @@ import { findHomeMini, liveReading } from '../lib/octopus.js';
 import { loadBankHolidays, loadNowcast, loadRadar, loadAir, loadFloods } from '../lib/outdoors.js';
 import { loadGridMix } from '../lib/carbon.js';
 import { CI_REGION } from '../lib/format.js';
-import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg } from '../lib/household.js';
+import { tv, tvSend } from './tv.svelte.js';
+import { lockSecret, canSeal, sealDetails } from '../lib/remote.js';
+import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg, cleanPlan } from '../lib/household.js';
 
 const MIN = 60e3;
 let started = null, shared = null;
@@ -21,8 +23,16 @@ export function houseSettings(){ return started || (started = loadSettings()); }
 async function loadSettings(){
   shared = null;
   try { const r = await fetch('household.json', { cache: 'no-cache' }); if (r.ok) shared = await r.json(); } catch {}
-  app.house = mergeSettings(shared, store.getJ('display', null));
+  app.house = Object.assign(mergeSettings(shared, store.getJ('display', null)), { plan: cleanPlan(store.getJ('plan', {}), Date.now()) });
   return app.house;
+}
+/** Your office days as planned on this phone: { 'YYYY-MM-DD': { in, start?, end? } }, only the days that differ from your usual week. */
+export function savePlan(plan){
+  const p = cleanPlan(plan, Date.now());
+  store.setJ('plan', p);
+  if (app.house) app.house = Object.assign({}, app.house, { plan: p });
+  loadTrains(true);
+  return p;
 }
 /**
  * Saves the household form on this device: only what differs from household.json is kept (in the same store the
@@ -35,6 +45,25 @@ export async function saveHouse(form){
   store.setJ('display', Object.assign(mine, deviceChanges(form, shared)));
   started = null; await houseSettings();
   loadTrains(true); loadEvents(true);
+  if ('workDays' in form || 'workStart' in form || 'workEnd' in form) commuteToTv(0);
+}
+/**
+ * Sends the paired TV your office days, sealed with the site's PIN: your usual week and the days that differ. They
+ * never go in household.json, which is public: they say when the house is empty. Resolves to what to tell you.
+ */
+let tvTimer = 0;
+export function commuteToTv(wait = 1200){
+  clearTimeout(tvTimer);
+  if (!tv.code || !app.house) return Promise.resolve('');
+  const secret = lockSecret();
+  if (!secret || !canSeal()) return Promise.resolve('To change the TV too, unlock the site on both with the same PIN, with Remember ticked.');
+  const s = app.house, details = { plan: s.plan || {}, week: { days: s.workDays || [], start: s.workStart, end: s.workEnd } };
+  return new Promise(done => {
+    tvTimer = setTimeout(async () => {
+      try { done(await tvSend('account', { box: await sealDetails(tv.code, secret, details) }) ? 'Sent to the TV.' : 'The TV didn\'t get it. Change a day again to retry.'); }
+      catch (e){ done('This browser couldn\'t seal it for the TV.'); }
+    }, wait);
+  });
 }
 
 async function cached(key, age, run, set, setErr, force){
@@ -52,11 +81,12 @@ export const loadFloodWarnings = force => cached('floods', 15 * MIN, loadFloods,
 export const loadGrid = force => cached('gridmix:' + app.region, 30 * MIN, () => loadGridMix(CI_REGION[app.region]), v => { app.gridMix = v; }, () => {}, force);
 export const loadCouncil = force => cached('council', 3 * 60 * MIN, loadCouncilBins, v => { app.council = v; }, () => {}, force);
 export async function loadTrains(force){
-  const s = await houseSettings();
+  await houseSettings();
+  const s = app.house;                 // as it is now, with any office day just changed (savePlan)
   if (!s.trainFrom){ app.trains = null; return null; }
   // the commute turns round in the afternoon on a work day: the way home, from where you work
   const leg = commuteLeg(s, Date.now(), app.holidays);
-  return cached('trains:' + leg.from + ':' + leg.to + ':' + leg.walk + ':' + leg.after, 2 * MIN, () => loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg })),
+  return cached('trains:' + [leg.from, leg.to, leg.walk, leg.after, leg.start || 0, leg.end || 0].join(':'), 2 * MIN, () => loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg })),
     v => { app.trains = v; }, e => { app.trainsErr = e; }, force);
 }
 export async function loadEvents(force){

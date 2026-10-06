@@ -9,9 +9,9 @@
   import { BIN_COLOURS } from '../../lib/household.js';
   import DateField from '../DateField.svelte';
   let f = $state(null), saved = $state('');
-  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'workDays', 'workWalk', 'homeFrom', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
+  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'workDays', 'workWalk', 'workStart', 'workEnd', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
   const WEEK = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
-  const HOME_TIMES = Array.from({ length: 21 }, (_, i) => String(10 + Math.floor(i / 2)).padStart(2, '0') + (i % 2 ? ':30' : ':00'));
+  const TIMES = Array.from({ length: 65 }, (_, i) => String(6 + Math.floor(i / 4)).padStart(2, '0') + ':' + String(i % 4 * 15).padStart(2, '0'));   // 06:00 to 22:00
   const toggleDay = d => { f.workDays = f.workDays.includes(d) ? f.workDays.filter(x => x !== d) : [...f.workDays, d].sort(); };
   const fill = s => {
     const o = {};
@@ -67,16 +67,19 @@
           <div class="field"><label for="hWalk">Walk (minutes)</label><input id="hWalk" type="number" min="0" max="60" bind:value={f.trainWalk}></div>
         </div>
         <p class="note">Three-letter station codes: Stockport is SPT, Manchester Piccadilly MAN.</p>
-        <div class="field"><span class="lbl" id="hDaysL">Days you go in to work</span>
+        <div class="field"><span class="lbl" id="hDaysL">Your usual days at work</span>
           <div class="days" role="group" aria-labelledby="hDaysL">
             {#each WEEK as [d, n]}<label class="day"><input type="checkbox" checked={f.workDays.includes(d)} onchange={() => toggleDay(d)}><span>{n}</span></label>{/each}
           </div>
         </div>
         <div class="inline-fields">
           <div class="field"><label for="hWorkWalk">Walk to work from there (minutes)</label><input id="hWorkWalk" type="number" min="0" max="60" bind:value={f.workWalk}></div>
-          <div class="field"><label for="hHome">Head home from</label><select id="hHome" bind:value={f.homeFrom}>{#each HOME_TIMES as t}<option>{t}</option>{/each}</select></div>
         </div>
-        <p class="note">On those days the trains go to work until then, with when you'll be in, and then turn round for the way home. On other days, and bank holidays, you see every train from your station.</p>
+        <div class="inline-fields">
+          <div class="field"><label for="hStart">Usually start</label><select id="hStart" bind:value={f.workStart}>{#each TIMES as t}<option>{t}</option>{/each}</select></div>
+          <div class="field"><label for="hEnd">Usually finish</label><select id="hEnd" bind:value={f.workEnd}>{#each TIMES as t}<option>{t}</option>{/each}</select></div>
+        </div>
+        <p class="note">On those days the trains go to work in the morning, with the one that gets you in for your start, then turn round for the way home. Change a day or its hours on Home, under the trains. On other days, and bank holidays, you see every train from your station.</p>
         <div class="inline-fields">
           <div class="field"><label for="hTram">Tram stop</label><input id="hTram" bind:value={f.tramStop} placeholder="Needs the home server"></div>
           <div class="field"><label for="hTramWalk">Walk (minutes)</label><input id="hTramWalk" type="number" min="0" max="60" bind:value={f.tramWalk}></div>

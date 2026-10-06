@@ -51,7 +51,7 @@ export const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '', wifi: null, dates: [],
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15,
-  workDays: [], workWalk: 0, homeFrom: '15:00',   // the commute: days you travel to trainTo, the walk from there, and when you head home
+  workDays: [], workWalk: 0, workStart: '09:00', workEnd: '17:30',   // the commute: your usual days at work (trainTo), the walk from there, and your hours
   musicNight: true          // fade the music out as the night window starts (the TV does it)
 };
 export function displaySettings(saved){
@@ -61,7 +61,8 @@ export function displaySettings(saved){
   s.dates = Array.isArray(s.dates) ? s.dates.filter(d => d && d.name && /^\d{4}-\d\d-\d\d$/.test(d.date)) : [];
   s.workDays = Array.isArray(s.workDays) ? s.workDays.map(Number).filter(d => d >= 0 && d <= 6) : [];
   s.workWalk = Math.max(0, +s.workWalk || 0);
-  if (!/^\d\d?:\d\d$/.test(s.homeFrom || '')) s.homeFrom = DISPLAY_DEFAULTS.homeFrom;
+  ['workStart', 'workEnd'].forEach(k => { if (!/^\d\d:\d\d$/.test(s[k] || '')) s[k] = DISPLAY_DEFAULTS[k]; });
+  delete s.homeFrom; delete s.plan;   // the plan of days is kept apart, on each device (cleanPlan)
   s.wifi = s.wifi && s.wifi.ssid ? { ssid: String(s.wifi.ssid), password: String(s.wifi.password || ''), security: s.wifi.security === 'WEP' || s.wifi.security === 'nopass' ? s.wifi.security : 'WPA', hidden: !!s.wifi.hidden } : null;
   return s;
 }
@@ -360,35 +361,82 @@ export function catchable(list, walkMin, now){
   });
   return { list: out, missed };
 }
-/* ---------- the commute: there in the morning, back in the afternoon ---------- */
-/** Is this a day you go in: one of your work days, and not a bank holiday? */
-export function workDay(s, now, holidays){
-  const d = new Date(now), key = dayKey(now);
-  if ((s.workDays || []).indexOf(d.getDay()) < 0) return false;
-  return !(holidays || []).some(h => (typeof h === 'string' ? h : h.date) === key);
+/* ---------- the commute: in for the start of the day, home after it ---------- */
+const clockMins = t => { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); };
+/** That day at "HH:MM". */
+export function atClock(now, t){ const d = new Date(now); d.setHours(0, clockMins(t), 0, 0); return +d; }
+export const PLAN_DAYS = 14;
+/** Keeps a plan of office days tidy: well-formed days from today to two weeks ahead, each { in, start?, end? }. */
+export function cleanPlan(plan, now){
+  const out = {}, from = dayKey(now), to = dayKey(+addDays(startOfDay(new Date(now)), PLAN_DAYS));
+  Object.keys(plan || {}).forEach(k => {
+    const p = plan[k];
+    if (!/^\d{4}-\d\d-\d\d$/.test(k) || k < from || k > to || !p || typeof p.in !== 'boolean') return;
+    const o = { in: p.in };
+    if (p.in && /^\d\d:\d\d$/.test(p.start || '')) o.start = p.start;
+    if (p.in && /^\d\d:\d\d$/.test(p.end || '')) o.end = p.end;
+    out[k] = o;
+  });
+  return out;
 }
 /**
- * Which way the trains run now. With work days set, `trainTo` is where you work: on a work day the trains go there
- * (with `workWalk` at the far end) until `homeFrom`, then turn round, from there back to your station, walking
- * `workWalk` to it; on other days it's every train from your station. With no work days, `trainTo` only picks the
- * trains that call there. `walk` is the walk to the train, `after` the walk once off it.
+ * A day at work: in the office or not, and from when to when. Your usual week (workDays, workStart and workEnd, but
+ * not bank holidays), unless the plan for that day (s.plan, kept on each device) says otherwise; `changed` when it does.
+ */
+export function officeDay(s, now, holidays){
+  const key = dayKey(now), p = (s.plan || {})[key];
+  const usual = (s.workDays || []).indexOf(new Date(now).getDay()) >= 0 && !(holidays || []).some(h => (typeof h === 'string' ? h : h.date) === key);
+  return { key: key, in: p ? !!p.in : usual, usual: usual, start: (p && p.start) || s.workStart || '09:00', end: (p && p.end) || s.workEnd || '17:30', changed: !!p };
+}
+/** Is this a day you go in? */
+export const workDay = (s, now, holidays) => officeDay(s, now, holidays).in;
+/**
+ * Which way the trains run now. With work days (or a plan), `trainTo` is where you work: on a day in, the trains go
+ * there (with `workWalk` at the far end) until halfway through your day, then turn round, from there back to your
+ * station, walking `workWalk` to it; on other days it's every train from your station. With neither, `trainTo` only
+ * picks the trains that call there. `walk` is the walk to the train, `after` the walk once off it; on a day in,
+ * `start` and `end` are when your day starts and ends.
  */
 export function commuteLeg(s, now, holidays){
-  const to = String(s.trainTo || ''), commuting = !!to && (s.workDays || []).length > 0, work = commuting && workDay(s, now, holidays);
-  const leg = { from: s.trainFrom, to: commuting && !work ? '' : to, walk: +s.trainWalk || 0, after: 0, work: false, home: false };
-  if (!work) return leg;
-  const p = String(s.homeFrom || '15:00').split(':'), d = new Date(now);
-  if (d.getHours() * 60 + d.getMinutes() >= (+p[0] || 0) * 60 + (+p[1] || 0))
-    return { from: to, to: s.trainFrom, walk: +s.workWalk || 0, after: +s.trainWalk || 0, work: false, home: true };
-  return Object.assign(leg, { after: +s.workWalk || 0, work: true });
+  const to = String(s.trainTo || ''), commuting = !!to && ((s.workDays || []).length > 0 || Object.keys(s.plan || {}).length > 0);
+  const day = commuting ? officeDay(s, now, holidays) : null;
+  const leg = { from: s.trainFrom, to: day && !day.in ? '' : to, walk: +s.trainWalk || 0, after: 0, work: false, home: false };
+  if (!day || !day.in) return leg;
+  const start = atClock(now, day.start), end = atClock(now, day.end);
+  if (now >= start + Math.max(0, end - start) / 2) return { from: to, to: s.trainFrom, walk: +s.workWalk || 0, after: +s.trainWalk || 0, work: false, home: true, start: start, end: end };
+  return Object.assign(leg, { after: +s.workWalk || 0, work: true, start: start, end: end });
 }
 /** The walk to the train for the trains on show: the commute's when they came with one, else your station's. */
 export const trainWalkOf = (trains, s) => trains && trains.leg ? trains.leg.walk : +(s && s.trainWalk) || 0;
-/** Where a train gets you: "At work by 08:49", "Home by 18:31", or "Arrives 08:24" off a work day. Null if not known. */
+/** Where a train gets you: "At work by 08:49" (`late` after your start), "Home by 18:31", or "Arrives 08:24". Null if not known. */
 export function arriveBy(d, leg){
   if (!d || !leg || d.cancelled || !d.arr) return null;
-  if (leg.work || leg.home){ const t = d.arr + (leg.after || 0) * 60e3; return { t: t, text: (leg.home ? 'Home by ' : 'At work by ') + hhmm(t) }; }
-  return { t: d.arr, text: 'Arrives ' + hhmm(d.arr) };
+  if (leg.work || leg.home){
+    const t = d.arr + (leg.after || 0) * 60e3;
+    return { t: t, late: !!(leg.work && leg.start && t > leg.start), text: (leg.home ? 'Home by ' : 'At work by ') + hhmm(t) };
+  }
+  return { t: d.arr, late: false, text: 'Arrives ' + hhmm(d.arr) };
+}
+/**
+ * The train that matters now. Going in: the last you can make that gets you to work by your start (`on`), or the
+ * first you can make if none can (`late`); `next` if it's too early to tell (every train listed so far is in time)
+ * or the day has started. Going home: the first you can make once you finish (`after`), else the next (`next`).
+ */
+export function commuteTrain(trains, now){
+  const leg = trains && trains.leg;
+  if (!leg || !leg.to) return null;
+  const list = catchable((trains.list || []).filter(x => !x.cancelled && x.arr), leg.walk, now).list;
+  if (!list.length) return null;
+  if (leg.work && leg.start && now < leg.start){
+    const on = list.filter(d => !arriveBy(d, leg).late);
+    if (!on.length) return { d: list[0], kind: 'late' };
+    if (on.length < list.length) return { d: on[on.length - 1], kind: 'on' };
+  }
+  if (leg.home && leg.end && now + leg.walk * 60e3 < leg.end){
+    const d = list.filter(x => (x.exp || x.sched) >= leg.end + leg.walk * 60e3)[0];
+    if (d) return { d: d, kind: 'after' };
+  }
+  return { d: list[0], kind: 'next' };
 }
 /** The trains card's title: "Trains to work", "Trains home", or "Trains from Stockport" (to Manchester Piccadilly). */
 export function trainsTitle(trains, s){
@@ -397,15 +445,21 @@ export function trainsTitle(trains, s){
   if (leg && (leg.work || leg.home)) return leg.home ? 'Trains home' : 'Trains to work';
   return 'Trains from ' + from + (to ? ' to ' + to : '');
 }
-/** A line under the board: "The 08:03 is at Manchester Piccadilly 08:24, then a 25 minute walk: at work by 08:49." */
+/**
+ * A line under the board, for the train that matters (commuteTrain):
+ * "For 09:00, the 08:17: Manchester Piccadilly 08:27, at work by 08:52. Leave home by 08:02."
+ * "Finishing at 17:30, the 17:57: Stockport 18:06, home by 18:21. Leave work by 17:32."
+ */
 export function commuteLine(trains, now){
-  const leg = trains && trains.leg;
-  if (!leg || !leg.to) return '';
-  const d = catchable((trains.list || []).filter(x => !x.cancelled && x.arr), leg.walk, now).list[0], a = arriveBy(d, leg);
-  if (!a) return '';
-  const at = trains.toName || leg.to;
-  if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + '.';
-  return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + (leg.after ? ', then a ' + leg.after + ' minute walk' : '') + ': ' + a.text.charAt(0).toLowerCase() + a.text.slice(1) + '.';
+  const c = commuteTrain(trains, now);
+  if (!c) return '';
+  const leg = trains.leg, d = c.d, a = arriveBy(d, leg), at = (trains.toName || leg.to) + ' ' + hhmm(d.arr), go = hhmm((d.exp || d.sched) - leg.walk * 60e3);
+  if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at.replace(/ (\d\d:\d\d)$/, ' at $1') + '.';
+  const ride = 'the ' + hhmm(d.sched) + ': ' + at + ', ' + a.text.charAt(0).toLowerCase() + a.text.slice(1);
+  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave home by ' + go + '.';
+  if (c.kind === 'late') return 'Nothing gets you in by ' + hhmm(leg.start) + ' now. The next is ' + ride + '.';
+  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave work by ' + go + '.';
+  return ride.charAt(0).toUpperCase() + ride.slice(1) + '.';
 }
 /* ---------- the station sign: its words, the same on the phone and the TV ---------- */
 export const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
@@ -486,8 +540,10 @@ export function countdownText(c){
 export function headsUp(o, now){
   const out = [], hour = new Date(now).getHours();
   const trains = o.trains && o.trains.list ? o.trains.list : [], walk = o.trains && o.trains.leg ? o.trains.leg.walk : +o.walk || 0;
-  for (let i = 0; i < trains.length; i++){
-    const tr = trains[i]; if (tr.cancelled) continue;
+  // on a day at work, the train that gets you in on time, or home once you finish (commuteTrain)
+  const pick = commuteTrain(o.trains, now), only = pick && pick.kind !== 'next' ? [pick.d] : trains;
+  for (let i = 0; i < only.length; i++){
+    const tr = only[i]; if (tr.cancelled) continue;
     const l = leaveBy(tr.exp || tr.sched, walk, now);
     if (l.mins < 0) continue;
     const leg = o.trains.leg, a = leg && (leg.work || leg.home) ? arriveBy(tr, leg) : null;
@@ -610,6 +666,7 @@ export async function loadTrainsLive(from, to){
 /** Defaults, then the household file, then this device's own changes. */
 export function mergeSettings(household, device){
   const h = Object.assign({}, household || {}); delete h.ical; delete h.wifi; delete h.dates;   // secrets and family dates never come from a public file
+  delete h.workDays; delete h.workStart; delete h.workEnd;   // nor when you're out at work (the house is empty): each device, sent sealed
   const s = displaySettings(Object.assign({}, h, device || {}));
   if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
   return s;

@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update**: the commute follows your office days and hours, which change from week to week.
+  - Your usual week (Settings, Household: `workDays`, `workStart`, `workEnd`) stays on each device and goes to the TV sealed, like guest Wi-Fi: it says when the house is empty, so it never goes in household.json, which is public, and `mergeSettings` ignores it there. The Monday-to-Friday guess published earlier today is gone. `homeFrom` is gone too: the trains turn round halfway through your day.
+  - Going in, the trains pick out the last one that gets you to work for your start ("For 09:00, the 08:12: Manchester Piccadilly 08:23, at work by 08:48. Leave home by 07:57."), and the leave-now heads-up is for that train. If none can, it says so and gives the next. Going home, it's the first you can make once you finish, with when to leave work (`commuteTrain`, `commuteLine`).
+  - Office days on Home, under the trains: the next seven days, each in or off, with that day's start and finish. A change is for that day only, kept on the phone (`hse.plan`: `cleanPlan`, `officeDay`) and sent to the paired TV sealed with the site PIN, so its trains follow too. "Back to your usual" undoes it.
+  - Fixed on the way: after changing settings, the phone's trains could reload with the settings from before the change.
 - **Update**: the trains know the commute: Stockport to Manchester Piccadilly, then a walk to work.
   - Settings, Household has the days you go in, the walk from the station to work, and when you head home. household.json now has Piccadilly (MAN), Monday to Friday, a 25 minute walk and home from 15:00 (`workDays`, `workWalk`, `homeFrom`).
   - On a work day the trains are the ones that call at Piccadilly, each with when you'll be at work ("At work by 08:49": the arrival at Piccadilly from Darwin's calling points, plus the walk). From 15:00 they turn round: trains home from Piccadilly, leaving the office in time to catch them, and when you'll be home. Days off and bank holidays show every train from Stockport, as before (`commuteLeg`, `arriveBy`, `commuteLine` in household.js).

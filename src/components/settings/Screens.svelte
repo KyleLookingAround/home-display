@@ -11,7 +11,7 @@
   let mode = $state('screensaver'), detail = $state('auto'), out = $state(''), copied = $state(false);
   onMount(async () => { const s = await houseSettings(); mode = s.mode || 'screensaver'; detail = s.detail || 'auto'; });
   const b64 = s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'workDays', 'workWalk', 'homeFrom', 'tramStop', 'tramWalk', 'ical'];
+  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'workDays', 'workWalk', 'workStart', 'workEnd', 'tramStop', 'tramWalk', 'ical'];
   async function copy(){
     const s = await houseSettings(), o = { mode, detail, region: app.region };
     KEYS.forEach(k => { o[k] = s[k]; });

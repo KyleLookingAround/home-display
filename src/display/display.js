@@ -54,8 +54,10 @@ async function pollMini(){
   if (fresh) r.todayAt = Date.now(); else { r.today = prev.today; r.rows = prev.rows; r.todayAt = prev.todayAt; }
   return r;
 }
-const legNow = () => commuteLeg(D.set, Date.now(), SRC.holidays.data);
-function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && (d.leg.from !== l.from || d.leg.to !== l.to); }
+// your office days as planned on your phone (sent sealed; cleanPlan), on top of your usual week
+D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
+const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
+function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
 function due(s, now){
   if (!s.need() || s.busy) return false;
   const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
@@ -212,7 +214,7 @@ function renderToday(){
   else if (T){
     const caught = catchable(T.list, walk, now), rows = caught.list.slice(0, 3);
     tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, walk, now), late = d.exp && d.exp - d.sched >= 60e3, a = arriveBy(d, T.leg);
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -386,6 +388,8 @@ async function takeDetails(box){
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
   if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
+  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; }
+  if (d.plan || d.week){ if (d.plan){ D.plan = d.plan; store.setJ('plan', d.plan); } SRC.trains.last = 0; got.push('your office days'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
   toast(`From your phone: ${list}.`, 6000);
@@ -543,7 +547,7 @@ function applySettings(s, regionCode){
   const old = D.set; D.set = s; store.setJ('display', deviceChanges(s, D.household));
   if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
   if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
-  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo || old.trainWalk !== s.trainWalk || old.workWalk !== s.workWalk || old.homeFrom !== s.homeFrom || String(old.workDays) !== String(s.workDays)){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
+  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo || old.trainWalk !== s.trainWalk || old.workWalk !== s.workWalk || old.workStart !== s.workStart || old.workEnd !== s.workEnd || String(old.workDays) !== String(s.workDays)){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
   if (old.tramStop !== s.tramStop){ SRC.trams.data = null; SRC.trams.err = null; SRC.trams.last = 0; }
   D.rotateAt = Date.now() + s.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), s.reloadAt, Math.random()*10);

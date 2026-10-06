@@ -77,6 +77,7 @@ h1,h2,h3{margin:0;font-weight:600}
 .rows .sub{display:block;font-size:.9rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rows .side{font:500 1rem/1.3 var(--f-mono);text-align:right;white-space:nowrap}
 .rows .side .sub{font:400 .9rem/1.3 var(--f-body)}
+.rows .side .sub.late{color:var(--warn)}
 .empty,.note{font-size:.9rem;color:var(--muted)}
 .dots{display:inline-flex;margin-left:.6rem}
 .dots.lead{margin:0 .6rem 0 0}
@@ -1575,7 +1576,7 @@ const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '', wifi: null, dates: [],
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15,
-  workDays: [], workWalk: 0, homeFrom: '15:00',   // the commute: days you travel to trainTo, the walk from there, and when you head home
+  workDays: [], workWalk: 0, workStart: '09:00', workEnd: '17:30',   // the commute: your usual days at work (trainTo), the walk from there, and your hours
   musicNight: true          // fade the music out as the night window starts (the TV does it)
 };
 function displaySettings(saved){
@@ -1585,7 +1586,8 @@ function displaySettings(saved){
   s.dates = Array.isArray(s.dates) ? s.dates.filter(d => d && d.name && /^\d{4}-\d\d-\d\d$/.test(d.date)) : [];
   s.workDays = Array.isArray(s.workDays) ? s.workDays.map(Number).filter(d => d >= 0 && d <= 6) : [];
   s.workWalk = Math.max(0, +s.workWalk || 0);
-  if (!/^\d\d?:\d\d$/.test(s.homeFrom || '')) s.homeFrom = DISPLAY_DEFAULTS.homeFrom;
+  ['workStart', 'workEnd'].forEach(k => { if (!/^\d\d:\d\d$/.test(s[k] || '')) s[k] = DISPLAY_DEFAULTS[k]; });
+  delete s.homeFrom; delete s.plan;   // the plan of days is kept apart, on each device (cleanPlan)
   s.wifi = s.wifi && s.wifi.ssid ? { ssid: String(s.wifi.ssid), password: String(s.wifi.password || ''), security: s.wifi.security === 'WEP' || s.wifi.security === 'nopass' ? s.wifi.security : 'WPA', hidden: !!s.wifi.hidden } : null;
   return s;
 }
@@ -1884,35 +1886,82 @@ function catchable(list, walkMin, now){
   });
   return { list: out, missed };
 }
-/* ---------- the commute: there in the morning, back in the afternoon ---------- */
-/** Is this a day you go in: one of your work days, and not a bank holiday? */
-function workDay(s, now, holidays){
-  const d = new Date(now), key = dayKey(now);
-  if ((s.workDays || []).indexOf(d.getDay()) < 0) return false;
-  return !(holidays || []).some(h => (typeof h === 'string' ? h : h.date) === key);
+/* ---------- the commute: in for the start of the day, home after it ---------- */
+const clockMins = t => { const p = String(t || '').split(':'); return (+p[0] || 0) * 60 + (+p[1] || 0); };
+/** That day at "HH:MM". */
+function atClock(now, t){ const d = new Date(now); d.setHours(0, clockMins(t), 0, 0); return +d; }
+const PLAN_DAYS = 14;
+/** Keeps a plan of office days tidy: well-formed days from today to two weeks ahead, each { in, start?, end? }. */
+function cleanPlan(plan, now){
+  const out = {}, from = dayKey(now), to = dayKey(+addDays(startOfDay(new Date(now)), PLAN_DAYS));
+  Object.keys(plan || {}).forEach(k => {
+    const p = plan[k];
+    if (!/^\d{4}-\d\d-\d\d$/.test(k) || k < from || k > to || !p || typeof p.in !== 'boolean') return;
+    const o = { in: p.in };
+    if (p.in && /^\d\d:\d\d$/.test(p.start || '')) o.start = p.start;
+    if (p.in && /^\d\d:\d\d$/.test(p.end || '')) o.end = p.end;
+    out[k] = o;
+  });
+  return out;
 }
 /**
- * Which way the trains run now. With work days set, `trainTo` is where you work: on a work day the trains go there
- * (with `workWalk` at the far end) until `homeFrom`, then turn round, from there back to your station, walking
- * `workWalk` to it; on other days it's every train from your station. With no work days, `trainTo` only picks the
- * trains that call there. `walk` is the walk to the train, `after` the walk once off it.
+ * A day at work: in the office or not, and from when to when. Your usual week (workDays, workStart and workEnd, but
+ * not bank holidays), unless the plan for that day (s.plan, kept on each device) says otherwise; `changed` when it does.
+ */
+function officeDay(s, now, holidays){
+  const key = dayKey(now), p = (s.plan || {})[key];
+  const usual = (s.workDays || []).indexOf(new Date(now).getDay()) >= 0 && !(holidays || []).some(h => (typeof h === 'string' ? h : h.date) === key);
+  return { key: key, in: p ? !!p.in : usual, usual: usual, start: (p && p.start) || s.workStart || '09:00', end: (p && p.end) || s.workEnd || '17:30', changed: !!p };
+}
+/** Is this a day you go in? */
+const workDay = (s, now, holidays) => officeDay(s, now, holidays).in;
+/**
+ * Which way the trains run now. With work days (or a plan), `trainTo` is where you work: on a day in, the trains go
+ * there (with `workWalk` at the far end) until halfway through your day, then turn round, from there back to your
+ * station, walking `workWalk` to it; on other days it's every train from your station. With neither, `trainTo` only
+ * picks the trains that call there. `walk` is the walk to the train, `after` the walk once off it; on a day in,
+ * `start` and `end` are when your day starts and ends.
  */
 function commuteLeg(s, now, holidays){
-  const to = String(s.trainTo || ''), commuting = !!to && (s.workDays || []).length > 0, work = commuting && workDay(s, now, holidays);
-  const leg = { from: s.trainFrom, to: commuting && !work ? '' : to, walk: +s.trainWalk || 0, after: 0, work: false, home: false };
-  if (!work) return leg;
-  const p = String(s.homeFrom || '15:00').split(':'), d = new Date(now);
-  if (d.getHours() * 60 + d.getMinutes() >= (+p[0] || 0) * 60 + (+p[1] || 0))
-    return { from: to, to: s.trainFrom, walk: +s.workWalk || 0, after: +s.trainWalk || 0, work: false, home: true };
-  return Object.assign(leg, { after: +s.workWalk || 0, work: true });
+  const to = String(s.trainTo || ''), commuting = !!to && ((s.workDays || []).length > 0 || Object.keys(s.plan || {}).length > 0);
+  const day = commuting ? officeDay(s, now, holidays) : null;
+  const leg = { from: s.trainFrom, to: day && !day.in ? '' : to, walk: +s.trainWalk || 0, after: 0, work: false, home: false };
+  if (!day || !day.in) return leg;
+  const start = atClock(now, day.start), end = atClock(now, day.end);
+  if (now >= start + Math.max(0, end - start) / 2) return { from: to, to: s.trainFrom, walk: +s.workWalk || 0, after: +s.trainWalk || 0, work: false, home: true, start: start, end: end };
+  return Object.assign(leg, { after: +s.workWalk || 0, work: true, start: start, end: end });
 }
 /** The walk to the train for the trains on show: the commute's when they came with one, else your station's. */
 const trainWalkOf = (trains, s) => trains && trains.leg ? trains.leg.walk : +(s && s.trainWalk) || 0;
-/** Where a train gets you: "At work by 08:49", "Home by 18:31", or "Arrives 08:24" off a work day. Null if not known. */
+/** Where a train gets you: "At work by 08:49" (`late` after your start), "Home by 18:31", or "Arrives 08:24". Null if not known. */
 function arriveBy(d, leg){
   if (!d || !leg || d.cancelled || !d.arr) return null;
-  if (leg.work || leg.home){ const t = d.arr + (leg.after || 0) * 60e3; return { t: t, text: (leg.home ? 'Home by ' : 'At work by ') + hhmm(t) }; }
-  return { t: d.arr, text: 'Arrives ' + hhmm(d.arr) };
+  if (leg.work || leg.home){
+    const t = d.arr + (leg.after || 0) * 60e3;
+    return { t: t, late: !!(leg.work && leg.start && t > leg.start), text: (leg.home ? 'Home by ' : 'At work by ') + hhmm(t) };
+  }
+  return { t: d.arr, late: false, text: 'Arrives ' + hhmm(d.arr) };
+}
+/**
+ * The train that matters now. Going in: the last you can make that gets you to work by your start (`on`), or the
+ * first you can make if none can (`late`); `next` if it's too early to tell (every train listed so far is in time)
+ * or the day has started. Going home: the first you can make once you finish (`after`), else the next (`next`).
+ */
+function commuteTrain(trains, now){
+  const leg = trains && trains.leg;
+  if (!leg || !leg.to) return null;
+  const list = catchable((trains.list || []).filter(x => !x.cancelled && x.arr), leg.walk, now).list;
+  if (!list.length) return null;
+  if (leg.work && leg.start && now < leg.start){
+    const on = list.filter(d => !arriveBy(d, leg).late);
+    if (!on.length) return { d: list[0], kind: 'late' };
+    if (on.length < list.length) return { d: on[on.length - 1], kind: 'on' };
+  }
+  if (leg.home && leg.end && now + leg.walk * 60e3 < leg.end){
+    const d = list.filter(x => (x.exp || x.sched) >= leg.end + leg.walk * 60e3)[0];
+    if (d) return { d: d, kind: 'after' };
+  }
+  return { d: list[0], kind: 'next' };
 }
 /** The trains card's title: "Trains to work", "Trains home", or "Trains from Stockport" (to Manchester Piccadilly). */
 function trainsTitle(trains, s){
@@ -1921,15 +1970,21 @@ function trainsTitle(trains, s){
   if (leg && (leg.work || leg.home)) return leg.home ? 'Trains home' : 'Trains to work';
   return 'Trains from ' + from + (to ? ' to ' + to : '');
 }
-/** A line under the board: "The 08:03 is at Manchester Piccadilly 08:24, then a 25 minute walk: at work by 08:49." */
+/**
+ * A line under the board, for the train that matters (commuteTrain):
+ * "For 09:00, the 08:17: Manchester Piccadilly 08:27, at work by 08:52. Leave home by 08:02."
+ * "Finishing at 17:30, the 17:57: Stockport 18:06, home by 18:21. Leave work by 17:32."
+ */
 function commuteLine(trains, now){
-  const leg = trains && trains.leg;
-  if (!leg || !leg.to) return '';
-  const d = catchable((trains.list || []).filter(x => !x.cancelled && x.arr), leg.walk, now).list[0], a = arriveBy(d, leg);
-  if (!a) return '';
-  const at = trains.toName || leg.to;
-  if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + '.';
-  return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + (leg.after ? ', then a ' + leg.after + ' minute walk' : '') + ': ' + a.text.charAt(0).toLowerCase() + a.text.slice(1) + '.';
+  const c = commuteTrain(trains, now);
+  if (!c) return '';
+  const leg = trains.leg, d = c.d, a = arriveBy(d, leg), at = (trains.toName || leg.to) + ' ' + hhmm(d.arr), go = hhmm((d.exp || d.sched) - leg.walk * 60e3);
+  if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at.replace(/ (\d\d:\d\d)$/, ' at $1') + '.';
+  const ride = 'the ' + hhmm(d.sched) + ': ' + at + ', ' + a.text.charAt(0).toLowerCase() + a.text.slice(1);
+  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave home by ' + go + '.';
+  if (c.kind === 'late') return 'Nothing gets you in by ' + hhmm(leg.start) + ' now. The next is ' + ride + '.';
+  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave work by ' + go + '.';
+  return ride.charAt(0).toUpperCase() + ride.slice(1) + '.';
 }
 /* ---------- the station sign: its words, the same on the phone and the TV ---------- */
 const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
@@ -2010,8 +2065,10 @@ function countdownText(c){
 function headsUp(o, now){
   const out = [], hour = new Date(now).getHours();
   const trains = o.trains && o.trains.list ? o.trains.list : [], walk = o.trains && o.trains.leg ? o.trains.leg.walk : +o.walk || 0;
-  for (let i = 0; i < trains.length; i++){
-    const tr = trains[i]; if (tr.cancelled) continue;
+  // on a day at work, the train that gets you in on time, or home once you finish (commuteTrain)
+  const pick = commuteTrain(o.trains, now), only = pick && pick.kind !== 'next' ? [pick.d] : trains;
+  for (let i = 0; i < only.length; i++){
+    const tr = only[i]; if (tr.cancelled) continue;
     const l = leaveBy(tr.exp || tr.sched, walk, now);
     if (l.mins < 0) continue;
     const leg = o.trains.leg, a = leg && (leg.work || leg.home) ? arriveBy(tr, leg) : null;
@@ -2134,6 +2191,7 @@ async function loadTrainsLive(from, to){
 /** Defaults, then the household file, then this device's own changes. */
 function mergeSettings(household, device){
   const h = Object.assign({}, household || {}); delete h.ical; delete h.wifi; delete h.dates;   // secrets and family dates never come from a public file
+  delete h.workDays; delete h.workStart; delete h.workEnd;   // nor when you're out at work (the house is empty): each device, sent sealed
   const s = displaySettings(Object.assign({}, h, device || {}));
   if ((!device || !device.bins || !device.bins.length) && h.bins) s.bins = displaySettings({ bins: h.bins }).bins;
   return s;
@@ -2242,7 +2300,8 @@ function boxKey(code, secret){
 }
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
- * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp } }.
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp },
+ * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [2, 4], start: '09:00', end: '17:30' } }.
  */
 async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -2263,6 +2322,12 @@ async function openDetails(code, secret, box){
   if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
   if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  // your office days as planned on the phone (the days that differ from your usual week); {} clears them
+  if (d.plan && typeof d.plan === 'object' && !Array.isArray(d.plan)) out.plan = cleanPlan(d.plan, Date.now());
+  // and your usual week at work: the days, and when you start and finish
+  const w = d.week;
+  if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))
+    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end };
   // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
@@ -5493,8 +5558,10 @@ async function pollMini(){
   if (fresh) r.todayAt = Date.now(); else { r.today = prev.today; r.rows = prev.rows; r.todayAt = prev.todayAt; }
   return r;
 }
-const legNow = () => commuteLeg(D.set, Date.now(), SRC.holidays.data);
-function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && (d.leg.from !== l.from || d.leg.to !== l.to); }
+// your office days as planned on your phone (sent sealed; cleanPlan), on top of your usual week
+D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
+const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
+function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
 function due(s, now){
   if (!s.need() || s.busy) return false;
   const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
@@ -5651,7 +5718,7 @@ function renderToday(){
   else if (T){
     const caught = catchable(T.list, walk, now), rows = caught.list.slice(0, 3);
     tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, walk, now), late = d.exp && d.exp - d.sched >= 60e3, a = arriveBy(d, T.leg);
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -5825,6 +5892,8 @@ async function takeDetails(box){
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
   if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
+  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; }
+  if (d.plan || d.week){ if (d.plan){ D.plan = d.plan; store.setJ('plan', d.plan); } SRC.trains.last = 0; got.push('your office days'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
   toast(`From your phone: ${list}.`, 6000);
@@ -5982,7 +6051,7 @@ function applySettings(s, regionCode){
   const old = D.set; D.set = s; store.setJ('display', deviceChanges(s, D.household));
   if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
   if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
-  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo || old.trainWalk !== s.trainWalk || old.workWalk !== s.workWalk || old.homeFrom !== s.homeFrom || String(old.workDays) !== String(s.workDays)){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
+  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo || old.trainWalk !== s.trainWalk || old.workWalk !== s.workWalk || old.workStart !== s.workStart || old.workEnd !== s.workEnd || String(old.workDays) !== String(s.workDays)){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
   if (old.tramStop !== s.tramStop){ SRC.trams.data = null; SRC.trams.err = null; SRC.trams.last = 0; }
   D.rotateAt = Date.now() + s.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), s.reloadAt, Math.random()*10);

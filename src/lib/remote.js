@@ -7,7 +7,7 @@
 // screen's answer pass through the relay: no prices, readings or settings. The one exception is the Octopus account,
 // and the household's private settings (guest Wi-Fi, family dates, the calendar address), which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
 // was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
-import { MODES } from './household.js';
+import { MODES, cleanPlan } from './household.js';
 import { readWire } from './queue.js';
 
 export const RELAY = 'https://ntfy.sh';
@@ -98,7 +98,8 @@ function boxKey(code, secret){
 }
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
- * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp } }.
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp },
+ * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [2, 4], start: '09:00', end: '17:30' } }.
  */
 export async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -119,6 +120,12 @@ export async function openDetails(code, secret, box){
   if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
   if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  // your office days as planned on the phone (the days that differ from your usual week); {} clears them
+  if (d.plan && typeof d.plan === 'object' && !Array.isArray(d.plan)) out.plan = cleanPlan(d.plan, Date.now());
+  // and your usual week at work: the days, and when you start and finish
+  const w = d.week;
+  if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))
+    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end };
   // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)

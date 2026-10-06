@@ -39,7 +39,7 @@
   // What the TV needs from this phone, sealed with the site's PIN, so none of it is typed with a remote: your Octopus
   // account, guest Wi-Fi, dates and calendar address.
   let house = $state.raw(null);
-  const parts = $derived([mine && 'your Octopus account', house && house.wifi && 'guest Wi-Fi', house && house.dates.length && `${house.dates.length} date${house.dates.length === 1 ? '' : 's'}`, house && house.ical && 'your calendar address'].filter(Boolean));
+  const parts = $derived([mine && 'your Octopus account', house && house.wifi && 'guest Wi-Fi', house && house.dates.length && `${house.dates.length} date${house.dates.length === 1 ? '' : 's'}`, house && house.ical && 'your calendar address', house && house.workDays && house.workDays.length && 'your office days'].filter(Boolean));
   async function sendDetails(){
     const secret = lockSecret();
     if (!code || !parts.length || !secret || !canSeal()) return;
@@ -50,6 +50,7 @@
       if (house && house.wifi) details.wifi = house.wifi;
       if (house && house.dates.length) details.dates = house.dates;
       if (house && house.ical) details.ical = house.ical;
+      if (house && house.workDays && house.workDays.length) Object.assign(details, { plan: house.plan || {}, week: { days: house.workDays, start: house.workStart, end: house.workEnd } });
       const box = await sealDetails(code, secret, details);
       asked = Date.now(); quiet = false;
       const ok = await tvSend('account', { box });

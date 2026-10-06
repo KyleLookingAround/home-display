@@ -162,7 +162,8 @@ after(async () => { await browser.close(); server.close(); });
 const SETTINGS = { trainFrom: 'SPT', trainWalk: 12, tramStop: 'East Didsbury', tramWalk: 8, ical: 'https://calendar.google.com/calendar/ical/x%40group.calendar.google.com/private-0/basic.ics',
   bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Paper and card', colour: 'blue', date: '2026-10-13', every: 2 }, { name: 'Garden waste', colour: 'brown', date: '2026-10-08', every: 2 }],
   trainTo: '', workDays: [] };                  // every train from Stockport; the commute has tests of its own
-const COMMUTE = { ...SETTINGS, trainTo: 'MAN', trainWalk: 15, workDays: [1, 2, 3, 4, 5], workWalk: 25, homeFrom: '15:00' };
+const COMMUTE = { ...SETTINGS, trainTo: 'MAN', trainWalk: 5, workDays: [1, 2, 3, 4, 5], workWalk: 25, workStart: '08:30', workEnd: '17:30' };
+const TUESDAY_EARLY = new Date('2026-10-06T07:35:00+01:00');
 
 async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false } = {}){
   helper = withHelper;
@@ -745,32 +746,74 @@ test('dashboard: a page waiting for its styles shows the night sky, not a white 
   await ctx.close();
 });
 
-test('the commute: trains to work with when you\'ll be in, then the way home on the phone and the TV', async () => {
-  // Monday 14:10: to work. The 14:19 is too soon with a 15 minute walk; the 14:56 is at Piccadilly 15:06, at work 15:31.
-  let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, settings: COMMUTE, withHelper: false });
+test('the commute: the train that gets you in, then the way home, on the phone and the TV', async () => {
+  // Tuesday 07:35, in for 08:30: the 07:44 gets to Piccadilly at 07:55, at work by 08:20; the 08:21 would be late
+  let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false });
   const card = page.locator('.card', { hasText: 'Trains to work' });
   await card.locator('.dmx').waitFor(); await ready(page);
-  assert.match(await card.locator('.commute').textContent(), /^The 14:56 is at Manchester Piccadilly at 15:06, then a 25 minute walk: at work by 15:31\.$/);
+  assert.equal(await card.locator('.commute').textContent(), 'For 08:30, the 07:44: Manchester Piccadilly 07:55, at work by 08:20. Leave home by 07:39.');
   assert.doesNotMatch(await card.locator('.dmx').textContent(), /Buxton|Euston/, 'only trains that call at Piccadilly');
-  await card.scrollIntoViewIfNeeded(); await shot(page, 'home-commute');
+  await card.locator('.office').scrollIntoViewIfNeeded(); await shot(page, 'home-commute');
   assert.deepEqual(errors, []);
   await ctx.close();
-  // 17:30: the way home, from Piccadilly with the walk from work; on the TV too
+  // Monday 17:30: the way home, from Piccadilly with the walk from work; on the TV too
   const evening = new Date('2026-10-05T17:30:00+01:00');
   ({ page, ctx, errors } = await open('/display.html#travel', { at: evening, settings: COMMUTE }));
   await page.waitForFunction(() => /Trains home/.test(document.getElementById('tTrainTitle').textContent));
-  assert.match(await page.textContent('#tCommute'), /^The 17:50 is at Stockport at 17:58, then a 15 minute walk: home by 18:13\.$/);
+  assert.equal(await page.textContent('#tCommute'), 'The 17:50: Stockport 17:58, home by 18:03.');
   assert.match(await page.textContent('#tBoard'), /Crewe/);
   await shot(page, 'tv-travel-home');
   await page.evaluate(() => { location.hash = 'today'; }); await page.waitForTimeout(500);
   await page.evaluate(() => document.body.classList.remove('chrome-on'));
   assert.equal(await page.textContent('#dTrainsH'), 'Trains home');
-  assert.match(await page.textContent('#dTrains'), /17:50 Crewe[\s\S]*Run for it\s*Home by 18:13/);
+  assert.match(await page.textContent('#dTrains'), /17:50 Crewe[\s\S]*Run for it\s*Home by 18:03/);
   const l = await layout(page);
   assert.ok(l.sh <= l.ih, `Today still fits (${l.sh})`); assert.deepEqual(l.small, []);
   await shot(page, 'tv-today-home');
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+test('the commute: a day changed on the phone changes the trains there and on the TV', async () => {
+  const LOCK = 'a1b2c3-hashed-pin';
+  const tv = await open('/display.html#today', { at: TUESDAY_EARLY, settings: COMMUTE });
+  let toTv = [];
+  await relay(tv.page, () => toTv);
+  await tv.page.addInitScript(s => { try { localStorage.setItem('staticrypt_passphrase', s); } catch (e) {} }, LOCK);
+  await tv.page.reload(); await tv.page.waitForFunction(() => document.getElementById('dTrainsH').textContent === 'Trains to work');
+  const code = await tv.page.evaluate(() => localStorage.getItem('hse.remote'));
+  const phone = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false });
+  const phoneSent = await relay(phone.page, () => []);
+  await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); } catch (e) {} }, [LOCK, code]);
+  await phone.page.reload(); await ready(phone.page);
+  const office = phone.page.locator('.office');
+  await office.waitFor();
+  assert.match(await office.textContent(), /Today: in the office/);
+  assert.equal(await office.locator('select').first().inputValue(), '08:30', 'your usual start');
+  // working from home today: the trains go back to every train from Stockport
+  await office.locator('input[type=checkbox]').click();
+  await phone.page.waitForFunction(() => [...document.querySelectorAll('.card h2')].some(h => h.textContent === 'Trains from Stockport'));
+  assert.match(await phone.page.locator('.card', { hasText: 'Trains from Stockport' }).locator('.dmx').textContent(), /Buxton|Euston/);
+  assert.deepEqual(await phone.page.evaluate(() => JSON.parse(localStorage.getItem('hse.plan'))), { '2026-10-06': { in: false } });
+  assert.match(await office.textContent(), /Back to your usual Tuesday/);
+  // sent to the TV, sealed
+  for (let i = 0; i < 40 && !phoneSent.some(s => s.msg.cmd === 'account'); i++) await phone.page.waitForTimeout(100);
+  const sealed = phoneSent.filter(s => s.msg.cmd === 'account')[0];
+  assert.ok(sealed, 'the phone sent the change');
+  assert.doesNotMatch(JSON.stringify(sealed.msg), /2026-10-06|"in"/, 'the relay sees only the sealed box');
+  await phone.page.waitForFunction(() => /Sent to the TV/.test(document.querySelector('.office').textContent));
+  toTv = [sealed.msg];
+  await tv.page.reload();
+  await tv.page.waitForFunction(() => /Trains from Stockport/.test(document.getElementById('dTrainsH').textContent), null, { timeout: 10000 });
+  // back to the usual day, and a later start: 08:45
+  await office.getByRole('button', { name: /Back to your usual/ }).click();
+  await phone.page.waitForFunction(() => [...document.querySelectorAll('.card h2')].some(h => h.textContent === 'Trains to work'));
+  await office.locator('select').first().selectOption('08:45');
+  await phone.page.waitForFunction(() => /^For 08:45, the 07:44/.test((document.querySelector('.commute') || {}).textContent || ''));
+  assert.deepEqual(await phone.page.evaluate(() => JSON.parse(localStorage.getItem('hse.plan'))), { '2026-10-06': { in: true, start: '08:45', end: '17:30' } });
+  await office.scrollIntoViewIfNeeded(); await shot(phone.page, 'home-office-days');
+  assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
+  await tv.ctx.close(); await phone.ctx.close();
 });
 
 test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {

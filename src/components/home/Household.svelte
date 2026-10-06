@@ -7,6 +7,7 @@
   import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
   import Radar from '../charts/Radar.svelte';
   import DepartureBoard from './DepartureBoard.svelte';
+  import OfficeWeek from './OfficeWeek.svelte';
   import { qrSvg, wifiCode } from '../../lib/qr.js';
   import { cleanCode, sendRemote } from '../../lib/remote.js';
   import { store } from '../../lib/browser.js';
@@ -108,6 +109,7 @@
     {:else if app.trainsErr}<p class="note">Departures didn't load: {errorText(app.trainsErr)[0]}</p>
     {:else if app.house && !app.house.trainFrom}<p class="note">Choose your station <a href="./settings.html#household">in Settings</a>.</p>
     {:else}<div class="skel" style="height:96px"></div>{/if}
+    {#if app.house && app.house.trainTo}<OfficeWeek />{/if}
   </section>
   <section class="card">
     <h2 class="label">Coming up</h2>
