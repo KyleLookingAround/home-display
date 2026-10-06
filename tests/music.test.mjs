@@ -76,3 +76,45 @@ test('signing in proves the verifier without ever sending it early', async () =>
   assert.match(S.spotifyErrorText({ code: 'PREMIUM' })[0], /Premium/);
   assert.equal(S.SPOTIFY_SCOPES.includes('user-modify-playback-state'), true);
 });
+
+const D = await import('../src/lib/musicdata.js');
+// shaped like MusicBrainz's real answers (checked against Oasis's "Wonderwall", October 2026)
+const REC = { id: 'r1', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'mba1', name: 'The Stockport Satellites' } }],
+  releases: [{ id: 'rel1', title: 'Region G', date: '2026-09-04', status: 'Official' }, { id: 'rel2', title: 'Region G (promo)', status: 'Promotion' }],
+  relations: [
+    { type: 'vocal', attributes: ['lead vocals'], artist: { id: 'p1', name: 'Sam Rivers' } },
+    { type: 'instrument', attributes: ['acoustic guitar'], artist: { id: 'p1', name: 'Sam Rivers' } },
+    { type: 'instrument', attributes: ['drums (drum set)'], artist: { id: 'p2', name: 'Jo Platt' } },
+    { type: 'instrument', attributes: ['guest', 'piano'], artist: { id: 'p3', name: 'Ann Moss' } },
+    { type: 'producer', attributes: [], artist: { id: 'p4', name: 'Martin Hannett' } },
+    { type: 'producer', attributes: [], artist: { id: 'p4', name: 'Martin Hannett' } },
+    { type: 'mix', attributes: [], artist: { id: 'p5', name: 'Chris Nagle' } },
+    { type: 'recorded at', place: { id: 'pl1', name: 'Strawberry Studios' } },
+    { type: 'free streaming', url: { resource: 'https://open.spotify.com/track/t1' } },
+    { type: 'performance', work: { id: 'w1', title: 'Harold Street' } },
+    { type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q42' } } ] };
+
+test('a recording\'s credits, read from MusicBrainz', () => {
+  const c = D.creditsOf(REC);
+  assert.deepEqual(c.performers.map(p => [p.name, p.roles.join(', ')]), [['Sam Rivers', 'lead vocals, acoustic guitar'], ['Jo Platt', 'drums (drum set)'], ['Ann Moss', 'piano']]);
+  assert.deepEqual(c.producers, ['Martin Hannett'], 'each person once');
+  assert.deepEqual(c.engineers, ['Chris Nagle']);
+  assert.deepEqual(c.places.map(p => p.name), ['Strawberry Studios']);
+  assert.equal(c.work.id, 'w1'); assert.equal(c.released, '2026-09-04');
+  assert.deepEqual(c.releases.map(r => r.id), ['rel1'], 'official releases only');
+  assert.equal(D.rolesText(['drums (drum set)', 'percussion']), 'Drums, percussion');
+  assert.equal(D.wikidataOf(REC), 'Q42');
+  assert.equal(D.creditsOf(null), null);
+});
+
+test('songwriters, where artists are from, and the Greater Manchester badge', () => {
+  const w = D.writersOf({ relations: [{ type: 'composer', artist: { id: 'x', name: 'Sam Rivers' } }, { type: 'lyricist', artist: { id: 'x', name: 'Sam Rivers' } }, { type: 'lyricist', artist: { id: 'y', name: 'Jo Platt' } }, { type: 'arranger', artist: { id: 'z', name: 'Nobody' } }] });
+  assert.deepEqual(w.map(x => [x.name, x.roles.join('+')]), [['Sam Rivers', 'composer+lyricist'], ['Jo Platt', 'lyricist']]);
+  for (const n of ['Manchester', 'Stockport', 'Salford', 'Chorlton-cum-Hardy', 'Ashton-under-Lyne', 'Heaton Moor', 'Greater Manchester']) assert.ok(D.isGreaterManchester(n), n);
+  for (const n of ['Liverpool', 'Sheffield', 'Dublin', '', null]) assert.ok(!D.isGreaterManchester(n), String(n));
+  const oasis = D.homeOf({ name: 'Oasis', type: 'Group', country: 'GB', area: { name: 'United Kingdom' }, 'begin-area': { name: 'Manchester' }, 'life-span': { begin: '1991', end: '2009-08-28', ended: true } });
+  assert.deepEqual(oasis, { from: 'Manchester', country: 'GB', gm: true, formed: '1991', ended: '2009', group: true });
+  assert.equal(D.localBadge(oasis, []).text, 'Made in Greater Manchester · from Manchester');
+  assert.equal(D.localBadge(D.homeOf({ 'begin-area': { name: 'Dublin' } }), [{ name: 'Strawberry Studios', area: 'Stockport', gm: true }]).text, 'Recorded at Strawberry Studios, Stockport', 'a studio here wins');
+  assert.equal(D.localBadge(D.homeOf({ 'begin-area': { name: 'Dublin' } }), [{ name: 'Rockfield Studios', area: 'Monmouth', gm: false }]), null);
+});

@@ -4,6 +4,15 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation** (music branch, stage 2): the stories behind the music, with no new keys.
+  - **About this song**: the story (its Wikipedia article), the credits (who wrote it, who sang and played what, who produced and engineered it, where and when it was recorded) and the artist. Credits come from MusicBrainz by the song's ISRC.
+  - **The local badge**: "Made in Greater Manchester", or "Recorded at Strawberry Studios, Stockport", when MusicBrainz says so.
+  - **Liner notes**: the sleeve and booklet from the Cover Art Archive.
+  - **Vinyl mode**: the cover as a record turning on a turntable, with the arm moving through the song.
+  - **Share**: a code a friend's camera opens in Spotify, read back in the tests.
+  - **Artist pages**: their story and where they're from.
+  - **The record shelf**: your albums to flip through, at `music.html#shelf`.
+  - What's looked up is kept on the phone for a month.
 - **Creation** (music branch): a music player, on Spotify ([decision 0012](decisions/0012-music-player.md)).
   - Connect Spotify in Settings. It signs in at Spotify with PKCE, so there's no secret, and the sign-in stays on the phone.
   - A now-playing strip sits above the tabs on every page, tinted to the cover. Swipe it to skip; tap it for the full player.

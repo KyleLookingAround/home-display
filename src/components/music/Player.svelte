@@ -11,6 +11,10 @@
   import { music, toggle, next, previous, seek, setShuffle, setRepeat, like, loadDevices, transfer, volume, setView, closePlayer, haptic } from '../../state/music.svelte.js';
   import { artUrl, fmtDur, lyricAt, nextRepeat, deviceKind } from '../../lib/music.js';
   import Icon from './Icon.svelte';
+  import Turntable from './Turntable.svelte';
+  import About from './About.svelte';
+  import LinerNotes from './LinerNotes.svelte';
+  import Sheets from './Sheets.svelte';
 
   const t = $derived(music.track);
   const m = $derived(music.player);
@@ -29,7 +33,7 @@
   });
   const onKey = e => {
     if (!music.open) return;
-    if (e.key === 'Escape'){ if (music.picker) music.picker = false; else if (music.view !== 'player') setView('player'); else closePlayer(); }
+    if (e.key === 'Escape'){ if (music.over) music.over = ''; else if (music.picker) music.picker = false; else if (music.view !== 'player') setView('player'); else closePlayer(); }
   };
 
   /* ---------- touch: drag the player down to close it; swipe the cover to skip; double-tap it to like ---------- */
@@ -101,13 +105,14 @@
       <button class="ib" type="button" bind:this={closeBtn} aria-label="Close the player" onclick={closePlayer}><Icon name="down" size={28} /></button>
       {#if ctxHref && music.ctxName}<a class="from" href={ctxHref} onclick={() => closePlayer()}><span class="label">Playing from</span><b>{music.ctxName}</b></a>
       {:else}<div class="from"><span class="label">{music.ctxName ? 'Playing from' : 'Now playing'}</span>{#if music.ctxName}<b>{music.ctxName}</b>{/if}</div>{/if}
-      <span class="ib-space"></span>
+      <button class="ib" type="button" aria-label="More" aria-haspopup="dialog" onclick={() => { music.over = 'more'; }}><Icon name="more" size={22} /></button>
     </header>
 
     {#if t}
       <div class="stage" style={dx ? `transform:translateX(${dx}px) rotate(${dx / 40}deg)` : ''} class:out-left={slide === 'out-left'} class:out-right={slide === 'out-right'}>
         {#key t.id}
-          {#if t.images.length}<img class="cover" class:paused={!m.playing} src={artUrl(t.images, 640)} alt="Cover of {t.album.name || t.name}" draggable="false">
+          {#if music.vinyl}<Turntable src={artUrl(t.images, 300)} playing={m.playing} fraction={pct / 100} />
+          {:else if t.images.length}<img class="cover" class:paused={!m.playing} src={artUrl(t.images, 640)} alt="Cover of {t.album.name || t.name}" draggable="false">
           {:else}<div class="cover blank" class:paused={!m.playing}><Icon name="music" size={64} /></div>{/if}
         {/key}
         {#key burst}{#if burst}<span class="burst" aria-hidden="true"><Icon name="heart" size={96} /></span>{/if}{/key}
@@ -160,12 +165,22 @@
           {#if nextUp}<span class="nxrow">{#if nextUp.images.length}<img src={artUrl(nextUp.images, 64)} alt="" width="36" height="36">{/if}<span class="nt"><b>{nextUp.name}</b><span>{nextUp.artist}</span></span></span>
           {:else}<span class="gl">{music.queue ? 'Nothing queued' : 'Reading…'}</span>{/if}
         </button>
+        {#if !t.episode}
+          <button class="glance ab" type="button" onclick={() => setView('about')} aria-label="About this song">
+            <span class="gh"><span class="label">About this song</span><Icon name="info" size={16} /></span>
+            {#if music.story && music.storyFor === t.id && music.story.badge}<span class="gl now badge-line"><Icon name="pin" size={15} />{music.story.badge.text}</span>
+            {:else if music.story && music.storyFor === t.id && music.story.story}<span class="gl now">{music.story.story.text.split('. ')[0]}.</span>
+            {:else if music.story && music.storyFor === t.id && music.story.credits && music.story.writers && music.story.writers.length}<span class="gl now">Written by {music.story.writers.map(w => w.name).join(' and ')}</span>
+            {:else}<span class="gl">The story, who played on it, and where it was recorded</span>{/if}
+          </button>
+        {/if}
       </div>
     {:else if music.checked}
       <div class="idle"><Icon name="music" size={44} /><p class="it">Nothing's playing</p><p class="note">Play something from the Music tab, or on any of your Spotify devices.</p>
         <a class="btn primary" href="./music.html" onclick={() => closePlayer()}>Open Music</a></div>
     {/if}
   {:else}
+    <div class="subhead">
     <header class="mini-top">
       <button class="ib" type="button" bind:this={closeBtn} aria-label="Back to the player" onclick={() => setView('player')}><Icon name="down" size={26} /></button>
       {#if t.images.length}<img src={artUrl(t.images, 64)} alt="" width="44" height="44">{:else}<span></span>{/if}
@@ -176,6 +191,9 @@
     <div class="vtabs" role="tablist" aria-label="Player views">
       <button role="tab" type="button" aria-selected={music.view === 'lyrics'} onclick={() => setView('lyrics')}>Lyrics</button>
       <button role="tab" type="button" aria-selected={music.view === 'queue'} onclick={() => setView('queue')}>Up next</button>
+      {#if !t.episode}<button role="tab" type="button" aria-selected={music.view === 'about'} onclick={() => setView('about')}>About</button>
+      <button role="tab" type="button" aria-selected={music.view === 'notes'} onclick={() => setView('notes')}>Liner notes</button>{/if}
+    </div>
     </div>
     {#if music.view === 'lyrics'}
       {#if lines}
@@ -185,6 +203,8 @@
         </div>
       {:else if music.lyrics && music.lyrics.plain}<div class="lyrics-full plain">{#each music.lyrics.plain as l}<p>{l || ' '}</p>{/each}<p class="credit">These lyrics aren't timed to the song. From LRCLIB.</p></div>
       {:else}<div class="empty-view"><Icon name="lyrics" size={40} /><p>{music.lyrics && music.lyrics.instrumental ? 'An instrumental.' : music.lyricsFor !== t.id && !music.lyrics ? 'Looking for the lyrics…' : 'LRCLIB, the free lyrics library, doesn\'t have this one yet.'}</p></div>{/if}
+    {:else if music.view === 'about'}<About />
+    {:else if music.view === 'notes'}<LinerNotes />
     {:else}
       <div class="queue-full">
         <span class="label">Now playing</span>
@@ -212,6 +232,7 @@
       <p class="note">Google speakers sometimes only appear after they've been played to once from the Spotify app.</p>
     </div>
   {/if}
+  <Sheets />
   {#if music.err && music.open}<p class="err" role="alert"><b>{music.err.title}</b> {music.err.body}</p>{/if}
 </div>
 
@@ -300,6 +321,9 @@
 
   /* a glance at the lyrics and what's next; each opens its own view */
   .glances{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:10px}
+  .glance.ab{grid-column:1/-1;min-height:0}
+  .badge-line{display:flex;align-items:center;gap:6px;color:var(--ink)}
+  .badge-line :global(.ic){color:var(--tint,var(--gas));flex:none}
   .glance{appearance:none;display:grid;gap:4px;align-content:start;text-align:left;padding:12px 14px 14px;border-radius:16px;cursor:pointer;color:var(--ink);font:inherit;min-width:0;min-height:96px;
     border:1px solid rgba(255,255,255,.08);background:color-mix(in srgb,var(--tint,var(--gas)) 14%,rgba(255,255,255,.04));transition:background .2s,transform .12s}
   .glance:hover{background:color-mix(in srgb,var(--tint,var(--gas)) 20%,rgba(255,255,255,.06))}
@@ -314,6 +338,8 @@
   .nt span{font-size:12px;color:rgba(233,236,255,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* the lyrics and Up next views, with a small player at the top */
+  .subhead{position:sticky;top:calc(-1 * env(safe-area-inset-top,0px) - 6px);z-index:3;margin:0 -22px;padding:calc(env(safe-area-inset-top,0px) + 6px) 22px 10px;
+    background:linear-gradient(var(--void) 75%,transparent);display:grid;gap:8px}
   .mini-top{display:grid;grid-template-columns:46px 44px minmax(0,1fr) 46px;gap:10px;align-items:center;padding-top:8px;position:relative;padding-bottom:10px}
   .mini-top img{width:44px;height:44px;border-radius:7px;object-fit:cover}
   .mt{display:grid;min-width:0}
@@ -323,7 +349,9 @@
   .small-play:hover{background:var(--tint,var(--ink));filter:brightness(1.08)}
   .mbar{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
   .mbar i{display:block;height:100%;background:var(--tint,var(--ink))}
-  .vtabs{display:flex;gap:6px}
+  .vtabs{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -22px;padding:0 22px}
+  .vtabs::-webkit-scrollbar{display:none}
+  .vtabs button{white-space:nowrap;flex:none}
   .vtabs button{appearance:none;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(233,236,255,.7);font:600 13px var(--f-body);border-radius:999px;padding:8px 14px;cursor:pointer;min-height:36px}
   .vtabs button[aria-selected="true"]{background:var(--ink);color:#06071a;border-color:var(--ink)}
   .lyrics-full{flex:1;overflow-y:auto;display:grid;align-content:start;gap:10px;padding:10vh 4px 40vh;margin:0 -4px;

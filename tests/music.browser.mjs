@@ -34,7 +34,7 @@ const ALBUMS = {
   al2: { id: 'al2', uri: 'spotify:album:al2', name: 'Half-Hourly', release_date: '2025-03-01', images: img('violet'), artists: [{ id: 'a2', name: 'Agile Hearts' }] },
   al3: { id: 'al3', uri: 'spotify:album:al3', name: 'Platform 3', release_date: '2024-05-17', images: img('cyan'), artists: [{ id: 'a3', name: 'Viaduct' }] }
 };
-const tr = (id, name, al, artist, ms) => ({ id, uri: 'spotify:track:' + id, name, duration_ms: ms, explicit: false, is_playable: true, type: 'track', album: ALBUMS[al], artists: [{ id: artist[0], name: artist[1], uri: 'spotify:artist:' + artist[0] }] });
+const tr = (id, name, al, artist, ms) => ({ id, uri: 'spotify:track:' + id, name, duration_ms: ms, explicit: false, is_playable: true, type: 'track', album: ALBUMS[al], external_ids: { isrc: 'GBTEST26000' + id.slice(1) }, artists: [{ id: artist[0], name: artist[1], uri: 'spotify:artist:' + artist[0] }] });
 const TRACKS = [
   tr('t1', 'Harold Street', 'al1', ['a1', 'The Stockport Satellites'], 204000),
   tr('t2', 'Negative Pricing', 'al2', ['a2', 'Agile Hearts'], 178000),
@@ -46,6 +46,28 @@ const DEVICES = [
   { id: 'tv', name: 'Living room TV', type: 'TV', is_active: false, volume_percent: 20, supports_volume: true },
   { id: 'phone', name: 'Kyle\'s phone', type: 'Smartphone', is_active: false, volume_percent: 100, supports_volume: false }
 ];
+/* ---------- the pretend open music libraries: MusicBrainz, Wikidata, Wikipedia, the Cover Art Archive ---------- */
+const MBX = {
+  '/isrc/GBTEST260001': { recordings: [{ id: 'r1', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'mba1', name: 'The Stockport Satellites' } }] }] },
+  '/recording/r1': { id: 'r1', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'mba1', name: 'The Stockport Satellites' } }],
+    releases: [{ id: 'rel1', title: 'Region G', date: '2026-09-04', status: 'Official' }],
+    relations: [{ type: 'vocal', attributes: ['lead vocals'], artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'instrument', attributes: ['electric guitar'], artist: { id: 'p2', name: 'Jo Platt' } },
+      { type: 'producer', attributes: [], artist: { id: 'p4', name: 'Martin Hannett' } }, { type: 'recorded at', place: { id: 'pl1', name: 'Strawberry Studios' } }, { type: 'performance', work: { id: 'w1', title: 'Harold Street' } }] },
+  '/work/w1': { id: 'w1', relations: [{ type: 'composer', artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'lyricist', artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q100' } }] },
+  '/place/pl1': { id: 'pl1', name: 'Strawberry Studios', area: { name: 'Stockport' } },
+  '/artist/mba1': { id: 'mba1', name: 'The Stockport Satellites', type: 'Group', 'begin-area': { name: 'Stockport' }, 'life-span': { begin: '2019' }, relations: [{ type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q200' } }] },
+  '/artist': { artists: [{ id: 'mba1', name: 'The Stockport Satellites', score: 100 }] }
+};
+const WIKI = { Q100: 'Harold Street (song)', Q200: 'The Stockport Satellites' };
+const SUMMARY = { 'Harold_Street_(song)': '"Harold Street" is a song by the Stockport Satellites, written about the street where the band rehearsed. It was recorded at Strawberry Studios in Stockport in a single night.',
+  The_Stockport_Satellites: 'The Stockport Satellites are a band from Stockport, formed in 2019. Their songs are about trains, bins and the price of electricity.' };
+const CORS = { 'Access-Control-Allow-Origin': '*' };
+async function openLibraries(page){
+  await page.route(/^https:\/\/musicbrainz\.org\/ws\/2\//, r => { const u = new URL(r.request().url()), k = u.pathname.replace('/ws/2', ''); return MBX[k] ? r.fulfill({ json: MBX[k], headers: CORS }) : r.fulfill({ status: 404, json: { error: 'Not Found' }, headers: CORS }); });
+  await page.route(/^https:\/\/www\.wikidata\.org\/w\/api\.php/, r => { const id = new URL(r.request().url()).searchParams.get('ids'); return r.fulfill({ json: { entities: { [id]: { sitelinks: WIKI[id] ? { enwiki: { title: WIKI[id] } } : {} } } }, headers: CORS }); });
+  await page.route(/^https:\/\/en\.wikipedia\.org\/api\/rest_v1\/page\/summary\//, r => { const t = decodeURIComponent(r.request().url().split('/summary/')[1]); return SUMMARY[t] ? r.fulfill({ json: { type: 'standard', title: t.replace(/_/g, ' '), extract: SUMMARY[t], content_urls: { mobile: { page: 'https://en.m.wikipedia.org/wiki/' + t } } }, headers: CORS }) : r.fulfill({ status: 404, json: {}, headers: CORS }); });
+  await page.route(/^https:\/\/coverartarchive\.org\/release\/rel1$/, r => r.fulfill({ json: { images: [['Back', 'violet'], ['Front', 'amber'], ['Booklet', 'cyan']].map(([t, c]) => ({ types: [t], front: t === 'Front', image: `https://i.scdn.co/image/${c}-640`, thumbnails: { 500: `https://i.scdn.co/image/${c}-300` } })) }, headers: CORS }));
+}
 const LRC = '[00:00.50]Streetlights hum along the viaduct\n[00:08.00]Kettle on at half past nine\n[00:16.00]The meter ticks, the prices drop\n[00:24.00]We wait for cheaper time\n[00:32.00]Harold Street, Harold Street\n[00:40.00]Stars above the chimney pots';
 
 function spotify(opts = {}){
@@ -145,6 +167,7 @@ async function open(path, { width = 390, height = 844, sp = spotify(), signedIn 
     const ok = f.grant_type === 'authorization_code' ? f.code === 'good-code' && f.client_id === 'test-client' && f.code_verifier : f.grant_type === 'refresh_token' && f.refresh_token === 'ref1';
     return r.fulfill({ status: ok ? 200 : 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(ok ? { access_token: f.grant_type === 'refresh_token' ? 'acc2' : 'acc1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'ref1', scope: 'user-read-playback-state' } : { error: 'invalid_grant' }) });
   });
+  await openLibraries(page);
   await page.addInitScript(([s, a]) => { try { localStorage.setItem('hse.display', s); if (a) localStorage.setItem('hse.spotify', a); } catch (e) {} }, [JSON.stringify(settings), signedIn ? JSON.stringify(ACCOUNT(account)) : null]);
   await page.goto(base + path);
   await page.waitForTimeout(600);
@@ -355,6 +378,74 @@ test('music: on a laptop the player opens beside the page', async () => {
   await shot(page, 'music-laptop');
   await page.keyboard.press('Escape');
   await until(() => page.locator('.sheet.open').count().then(n => n === 0), 'Escape closes it');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('music: about this song, liner notes, vinyl mode and sharing', async () => {
+  const { page, ctx, errors } = await open('/index.html', { sp: spotify() });
+  await page.locator('.mini').click({ position: { x: 120, y: 20 } });
+  const sheet = page.locator('.sheet.open');
+  await sheet.waitFor();
+  // the glance fills in once MusicBrainz has answered (a request a second)
+  await until(() => sheet.locator('.glance.ab').textContent().then(t => /Recorded at Strawberry Studios, Stockport/.test(t)), 'the local badge', 12000);
+  await sheet.locator('.glance.ab').click();
+  const about = sheet.locator('.about');
+  assert.match(await about.textContent(), /The story.*recorded at Strawberry Studios in Stockport in a single night/s);
+  assert.match(await about.textContent(), /Words and music\s*Sam Rivers.*Lead vocals\s*Sam Rivers.*Electric guitar\s*Jo Platt.*Produced by\s*Martin Hannett.*Recorded at\s*Strawberry Studios, Stockport.*First released\s*4 Sep 2026.*Album\s*Region G/s);
+  assert.match(await about.locator('.acard').textContent(), /From Stockport, formed 2019/);
+  await page.waitForTimeout(300);
+  await shot(page, 'music-about');
+  // liner notes: the front cover first
+  await sheet.locator('.vtabs button', { hasText: 'Liner notes' }).click();
+  await until(() => sheet.locator('.notes figure').count().then(n => n === 3), 'three pages');
+  assert.match(await sheet.locator('.notes figcaption').first().textContent(), /Front cover/);
+  assert.match(await sheet.locator('.notes .count').textContent(), /1 of 3/);
+  await page.waitForTimeout(400);
+  await shot(page, 'music-liner-notes');
+  // vinyl mode, from More
+  await sheet.locator('button[aria-label="Back to the player"]').click();
+  await sheet.locator('button[aria-label="More"]').click();
+  await page.locator('.sheet-panel .opt', { hasText: 'Vinyl mode' }).click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.musicVinyl')), '1', 'remembered');
+  await page.keyboard.press('Escape');
+  await sheet.locator('.tt.playing').waitFor();
+  assert.equal(await sheet.locator('.tt .record').evaluate(e => getComputedStyle(e).animationPlayState), 'running', 'the record turns while it plays');
+  await page.waitForTimeout(1300);
+  await shot(page, 'music-vinyl');
+  // sharing: a code that scans back to the song's link
+  await sheet.locator('button[aria-label="More"]').click();
+  await page.locator('.sheet-panel .opt', { hasText: 'Share this song' }).click();
+  await page.locator('.share .qr svg').waitFor();
+  const { data, w, h } = await page.evaluate(async () => {
+    const svg = document.querySelector('.share .qr svg'), xml = new XMLSerializer().serializeToString(svg);
+    const img = new Image(); img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml); await img.decode();
+    const c = document.createElement('canvas'); c.width = c.height = 400; const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 400, 400); x.drawImage(img, 0, 0, 400, 400);
+    return { data: Array.from(x.getImageData(0, 0, 400, 400).data), w: 400, h: 400 };
+  });
+  const jsQR = (await import('jsqr')).default;
+  const read = jsQR(new Uint8ClampedArray(data), w, h);
+  assert.equal(read && read.data, 'https://open.spotify.com/track/t1', 'the code opens the song in Spotify');
+  await shot(page, 'music-share');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('music: an artist\'s story, and the record shelf', async () => {
+  const sp = spotify();
+  const { page, ctx, errors } = await open('/music.html#artist/a1', { sp });
+  await until(() => page.locator('.bio').textContent().then(t => /Made in Greater Manchester · from Stockport.*Formed 2019.*trains, bins and the price of electricity/s.test(t)).catch(() => false), 'the artist\'s story', 12000);
+  await page.waitForTimeout(300);
+  await shot(page, 'music-artist');
+  await page.goto(base + '/music.html#shelf');
+  await until(() => page.locator('.sleeve').count().then(n => n === 3), 'the albums on the shelf');
+  assert.match(await page.locator('.shelf .ct').textContent(), /Region G/);
+  await page.locator('button[aria-label="Next album"]').click();
+  await until(() => page.locator('.shelf .ct').textContent().then(t => /Half-Hourly/.test(t)), 'flipped to the next');
+  await page.waitForTimeout(500);
+  await shot(page, 'music-shelf');
+  await page.locator('.shelf .playbig').click();
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:album:al2'), 'played from the shelf');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

@@ -24,7 +24,7 @@ export function trackOf(t){
     id: t.id || idOf(t.uri), uri: t.uri, name: t.name || '', episode: ep,
     artists: artists, artist: artists.map(a => a.name).join(', '),
     album: { id: album.id || '', name: album.name || '', uri: album.uri || '', year: String(album.release_date || '').slice(0, 4) },
-    images: (ep ? t.images : album.images) || [], dur: t.duration_ms || 0, explicit: !!t.explicit, playable: t.is_playable !== false
+    images: (ep ? t.images : album.images) || [], isrc: (t.external_ids && t.external_ids.isrc) || '', dur: t.duration_ms || 0, explicit: !!t.explicit, playable: t.is_playable !== false
   };
 }
 /** Spotify's player state (null when nothing has played lately) as the player's model. `at` is when it was read. */

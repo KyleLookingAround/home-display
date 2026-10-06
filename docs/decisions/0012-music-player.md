@@ -30,6 +30,7 @@
   - Spotify's queue can only be added to by other apps.
   - Spotify-made playlists can't be opened (they still play and show).
   - Control needs Premium.
+- **How it's built:** in five stages. Each one ends with a design pass, the screenshots looked at and refined before it's pushed, and a full design pass over the whole player follows the last.
 
 **Consequences.**
 - Everything is tested against a pretend Spotify (`tests/music.browser.mjs`) that answers as the real one does, including Spotify's newer row shape (`item` for `track`) and the endpoints it has moved, which `apiFirst` tries in turn.

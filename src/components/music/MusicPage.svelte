@@ -15,12 +15,15 @@
   import TrackRow from './TrackRow.svelte';
   import Tile from './Tile.svelte';
   import Row from './Row.svelte';
+  import Shelf from './Shelf.svelte';
+  import { artistStory } from '../../lib/musicdata.js';
+  import { cacheGet, cacheSet } from '../../state/cache.js';
 
   /* ---------- where we are: #playlist/<id>, #album/<id>, #artist/<id>, or a whole list (#liked, #recent, #playlists, #albums, #artists) ---------- */
   let route = $state({ kind: '', id: '' }), clientId = $state('');
   const readRoute = () => {
     const h = location.hash.slice(1), m = /^(playlist|album|artist)\/([A-Za-z0-9]+)$/.exec(h);
-    route = m ? { kind: m[1], id: m[2] } : /^(liked|recent|playlists|albums|artists)$/.test(h) ? { kind: 'list', id: h } : { kind: '', id: '' };
+    route = m ? { kind: m[1], id: m[2] } : /^(liked|recent|playlists|albums|artists|shelf)$/.test(h) ? { kind: 'list', id: h } : { kind: '', id: '' };
     window.scrollTo(0, 0);
   };
   onMount(async () => {
@@ -79,7 +82,7 @@
     if (!acc) return;
     untrack(() => {
       if (r.kind === '') ['recent', 'playlists', 'artists', 'albums'].forEach(w => load(w));
-      if (r.kind === 'list') load(r.id);
+      if (r.kind === 'list') load(r.id === 'shelf' ? 'albums' : r.id);
     });
   });
   const hour = new Date().getHours();
@@ -116,10 +119,10 @@
   const ask = text => { q = text; onSearch(); };
 
   /* ---------- a playlist, album or artist, lit by its own cover ---------- */
-  let detail = $state.raw(null), dErr = $state.raw(null), dTint = $state.raw(null);
+  let detail = $state.raw(null), dErr = $state.raw(null), dTint = $state.raw(null), aStory = $state.raw(null), bioMore = $state(false);
   $effect(() => { const r = route, acc = music.acc; untrack(() => { if (acc && r.kind && r.kind !== 'list') openDetail(r); else { detail = null; dTint = null; } }); });
   async function openDetail(r){
-    detail = null; dErr = null; dTint = null;
+    detail = null; dErr = null; dTint = null; aStory = null; bioMore = false;
     try {
       if (r.kind === 'playlist'){
         const p = await sp().playlist(r.id);
@@ -135,7 +138,15 @@
           tracks: ((top && top.tracks) || []).map(trackOf).filter(Boolean).slice(0, 10), albums: page(al).items.filter(Boolean) };
       }
       colourOf(artUrl(detail.images, 300)).then(c => { dTint = c; });
+      if (detail.kind === 'artist') loadArtistStory(r.id, detail.title);
     } catch (e){ dErr = e; }
+  }
+  async function loadArtistStory(id, name){
+    const key = 'artist:' + id;
+    let s = null;
+    try { const c = await cacheGet(key, 30 * 24 * 3600e3); if (c) s = c.value; } catch (e){}
+    if (!s){ s = (await artistStory(name)) || { none: true }; cacheSet(key, s); }
+    if (route.kind === 'artist' && route.id === id) aStory = s;
   }
   const total = d => { const ms = d.tracks.reduce((s, t) => s + t.dur, 0), m = Math.round(ms / 60e3); return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min'; };
   const playIn = (d, t) => { haptic(); return d.kind === 'artist' ? play({ uris: d.tracks.map(x => x.uri), offset: t ? d.tracks.indexOf(t) : 0 }) : play({ context: d.uri, offset: t ? t.uri : 0 }); };
@@ -143,7 +154,7 @@
   const playList = (list, i) => { haptic(); return play({ uris: list.slice(i, i + 100).map(x => x.uri) }); };
   const isPlayingFrom = d => music.player && music.player.context && d && music.player.context.uri === d.uri;
   const connect = () => beginSignIn(clientId, location.href).catch(() => { location.href = './settings.html#music'; });
-  const LISTS = { liked: 'Liked songs', recent: 'Recently played', playlists: 'Your playlists', albums: 'Your albums', artists: 'Your top artists' };
+  const LISTS = { liked: 'Liked songs', recent: 'Recently played', playlists: 'Your playlists', albums: 'Your albums', artists: 'Your top artists', shelf: 'Your record shelf' };
 </script>
 
 {#if !music.acc}
@@ -161,7 +172,9 @@
     <a class="back" href="./music.html" onclick={back}><Icon name="back" size={18} />Music</a>
     <h2 class="ptitle">{LISTS[route.id]}</h2>
     {#if libErr}<p class="note">{spotifyErrorText(libErr).join(' ')}</p>{/if}
-    {#if !lib[route.id]}<div class="skel" style="height:260px"></div>
+    {#if route.id === 'shelf'}
+      {#if lib.albums && lib.albums.length}<Shelf albums={lib.albums} />{:else if lib.albums}<p class="note">No saved albums yet. Save some in Spotify and they'll be here to flip through.</p>{:else}<div class="skel" style="height:300px"></div>{/if}
+    {:else if !lib[route.id]}<div class="skel" style="height:260px"></div>
     {:else if route.id === 'playlists' || route.id === 'albums' || route.id === 'artists'}
       <div class="grid">
         {#each lib[route.id] as x (x.id)}
@@ -177,7 +190,7 @@
         {/each}
       </ul>
     {/if}
-    {#if lib[route.id] && !lib[route.id].length}<p class="note">{route.id === 'liked' ? 'No liked songs yet. Tap the heart in the player, or double-tap a cover.' : 'Nothing here yet.'}</p>{/if}
+    {#if route.id !== 'shelf' && lib[route.id] && !lib[route.id].length}<p class="note">{route.id === 'liked' ? 'No liked songs yet. Tap the heart in the player, or double-tap a cover.' : 'Nothing here yet.'}</p>{/if}
     {#if more[route.id]}<div class="actions"><button class="btn" type="button" disabled={loading === route.id} onclick={() => load(route.id, true)}>{loading === route.id ? 'Loading…' : 'Show more'}</button></div>{/if}
   </section>
 
@@ -201,6 +214,14 @@
         </div>
       {/if}
       {#if detail.about}<p class="note about">{detail.about}</p>{/if}
+      {#if detail.kind === 'artist' && aStory && !aStory.none}
+        <section class="bio">
+          {#if aStory.badge}<div class="badge"><Icon name="pin" size={18} /><span>{aStory.badge.text}</span></div>{/if}
+          {#if aStory.home && (aStory.home.from || aStory.home.formed)}{@const from = aStory.home.from && !aStory.badge ? 'From ' + aStory.home.from : ''}<p class="home">{from}{aStory.home.formed ? (from ? ' · ' : '') + (aStory.home.group ? 'Formed ' : 'Born ') + aStory.home.formed : ''}{aStory.home.ended ? ' · until ' + aStory.home.ended : ''}</p>{/if}
+          {#if aStory.bio}<p class="btext" class:clamp={!bioMore}>{aStory.bio.text}</p>
+            <div class="blinks">{#if !bioMore && aStory.bio.text.length > 300}<button type="button" class="link" onclick={() => { bioMore = true; }}>Read more</button>{/if}{#if aStory.bio.url}<a href={aStory.bio.url} target="_blank" rel="noopener">From Wikipedia</a>{/if}</div>{/if}
+        </section>
+      {/if}
       {#if detail.kind === 'artist'}<h3 class="sec">Popular</h3>{/if}
       <ul class="list">{#each detail.tracks as t, i (t.id + i)}<TrackRow {t} num={detail.numbered || detail.kind === 'artist' ? i + 1 : null} onplay={() => playIn(detail, t)} />{/each}</ul>
       {#if !detail.tracks.length}<p class="note">{detail.kind === 'playlist' ? 'Spotify didn\'t share this playlist\'s songs. It may be one Spotify makes, which other apps can\'t open: play it from the Spotify app and it\'ll show here.' : 'No songs.'}</p>{/if}
@@ -258,7 +279,7 @@
     {#if lib.playlists}<Row title="Your playlists" all="#playlists">{#each lib.playlists.slice(0, 12) as p (p.id)}<Tile images={p.images} title={p.name} sub={(p.tracks || p.items) && (p.tracks || p.items).total != null ? (p.tracks || p.items).total + ' songs' : ''} href="#playlist/{p.id}" />{/each}</Row>
     {:else}<div class="skel" style="height:200px"></div>{/if}
     {#if lib.artists && lib.artists.length}<Row title="Your top artists" all="#artists">{#each lib.artists.slice(0, 12) as a (a.id)}<Tile images={a.images} title={a.name} round href="#artist/{a.id}" />{/each}</Row>{/if}
-    {#if lib.albums && lib.albums.length}<Row title="Your albums" all="#albums">{#each lib.albums.slice(0, 12) as a (a.id)}<Tile images={a.images} title={a.name} sub={(a.artists || []).map(x => x.name).join(', ')} href="#album/{a.id}" />{/each}</Row>{/if}
+    {#if lib.albums && lib.albums.length}<Row title="Your albums" all="#albums" alt={{ href: '#shelf', label: 'Shelf' }}>{#each lib.albums.slice(0, 12) as a (a.id)}<Tile images={a.images} title={a.name} sub={(a.artists || []).map(x => x.name).join(', ')} href="#album/{a.id}" />{/each}</Row>{/if}
     {#if lib.recent && lib.recent.length}
       <section class="recent">
         <header><h3>Played lately</h3><a href="#recent">Show all</a></header>
@@ -346,6 +367,16 @@
     .dt h2{font-size:40px}
   }
   .about{margin:0}
+  .bio{display:grid;gap:10px;padding:16px;border-radius:16px;background:rgba(233,236,255,.05);border:1px solid rgba(255,255,255,.06)}
+  .badge{display:flex;align-items:center;gap:8px;font:700 14.5px var(--f-body);color:#fff;padding:10px 12px;border-radius:12px;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--dt,var(--gas)) 35%,transparent),color-mix(in srgb,var(--dt,var(--gas)) 10%,transparent));border:1px solid color-mix(in srgb,var(--dt,var(--gas)) 45%,transparent)}
+  .badge :global(.ic){color:var(--dt,var(--gas))}
+  .home{margin:0;font:600 14px var(--f-body);color:rgba(233,236,255,.8)}
+  .btext{margin:0;font-size:15px;line-height:1.6;color:rgba(233,236,255,.85)}
+  .btext.clamp{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden}
+  .blinks{display:flex;gap:16px}
+  .blinks a,.link{font:600 13.5px var(--f-body);color:rgba(233,236,255,.7);text-decoration:none;background:none;border:0;padding:4px 0;cursor:pointer}
+  .link{color:var(--ink)}
   .actions{display:flex;align-items:center;gap:12px}
   .playbig{appearance:none;border:0;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;cursor:pointer;background:var(--dt,var(--tint,var(--gas)));color:var(--dt-ink,var(--tint-ink,#04101a));
     box-shadow:0 10px 30px color-mix(in srgb,var(--dt,var(--tint,var(--gas))) 40%,transparent);transition:transform .12s,filter .2s}

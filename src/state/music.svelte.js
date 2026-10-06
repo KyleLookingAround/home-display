@@ -7,6 +7,8 @@
 import { store } from '../lib/browser.js';
 import { spotify, spotifyStore, activeAccount, forgetAccount, spotifyErrorText } from '../lib/spotify.js';
 import { playerModel, progressAt, playOn, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
+import { songStory, linerNotes } from '../lib/musicdata.js';
+import { cacheGet, cacheSet } from './cache.js';
 
 const SEC = 1000;
 
@@ -23,7 +25,13 @@ class Music {
   ctxName = $state('');             // the playlist or album it's playing from
   open = $state(false);             // the full player is showing
   picker = $state(false);           // "Play on" is showing
-  view = $state('player');          // what the full player shows: player | lyrics | queue
+  view = $state('player');          // what the full player shows: player | lyrics | queue | about | notes
+  over = $state('');                // a sheet over the player: '' | more | share
+  vinyl = $state(store.get('musicVinyl') === '1');   // the cover as a record on a turntable
+  story = $state.raw(null);         // the song's story and credits (songStory), or null while looking
+  storyFor = $state('');            // the song that story is for
+  notes = $state.raw(null);         // liner notes: [{ src, thumb, types }]
+  notesFor = $state('');
   err = $state.raw(null);           // { title, body, code } from the last thing that went wrong
   toast = $state('');
   now = $state(Date.now());         // moves on while a song plays, for the progress bar
@@ -89,7 +97,9 @@ function setPlayer(m){
   if (c !== lastCtx){ lastCtx = c; contextChanged(m && m.context); }
 }
 async function trackChanged(t){
-  music.lyrics = null; music.lyricsFor = ''; music.liked = false;
+  music.lyrics = null; music.lyricsFor = ''; music.liked = false; music.story = null; music.storyFor = ''; music.notes = null; music.notesFor = '';
+  clearTimeout(storyTimer);
+  if (t && !t.episode) storyTimer = setTimeout(() => loadStory(), music.open ? 600 : 4000);   // a moment in, so skipping through costs nothing
   if (!t){ applyColours(null); return; }
   findColours(artUrl(t.images, 300));
   loadQueue();
@@ -231,16 +241,49 @@ export async function loadQueue(){
   try { const q = await sp().queue(); music.queue = ((q && q.queue) || []).map(trackOf).filter(Boolean).slice(0, 30); }
   catch (e){ fail(e, true); }
 }
-/** The player's own views: the player, the lyrics, or Up next. */
-export function setView(v){ music.view = v; if (v === 'queue') loadQueue(); }
+/** The player's own views: the player, the lyrics, Up next, the song's story, or its liner notes. */
+export function setView(v){
+  music.view = v; music.over = '';
+  if (v === 'queue') loadQueue();
+  if (v === 'about') loadStory();
+  if (v === 'notes') loadNotes();
+}
+export function setVinyl(on){ music.vinyl = on; store.set('musicVinyl', on ? '1' : '0'); haptic(); }
+
+/* ---------- the story behind the song, kept on the phone for a month ---------- */
+let storyTimer = 0;
+const MONTH = 30 * 24 * 3600e3;
+export async function loadStory(){
+  const t = music.track;
+  if (!t || t.episode || music.storyFor === t.id) return music.story;
+  music.storyFor = t.id;
+  const key = 'story:' + (t.isrc || t.id);
+  let s = null;
+  try { const c = await cacheGet(key, MONTH); if (c) s = c.value; } catch (e){}
+  if (!s){ try { s = await songStory(t); if (s) cacheSet(key, s); } catch (e){ s = { credits: null }; } }
+  if (music.track && music.track.id === t.id) music.story = s;
+  return s;
+}
+export async function loadNotes(){
+  const t = music.track;
+  if (!t || music.notesFor === t.id) return;
+  music.notesFor = t.id;
+  const s = await loadStory();
+  const key = 'notes:' + (t.isrc || t.id);
+  let n = null;
+  try { const c = await cacheGet(key, MONTH); if (c) n = c.value; } catch (e){}
+  if (!n){ n = s && s.credits ? await linerNotes(s.credits.releases) : []; cacheSet(key, n); }
+  if (music.track && music.track.id === t.id) music.notes = n;
+}
 
 /* ---------- the full player opens over any page; the phone's Back closes it ---------- */
 export function openPlayer(view){
-  music.view = view || 'player';
+  music.view = view || 'player'; music.over = '';
   if (music.open) return;
   music.open = true; music.picker = false;
   try { history.pushState({ player: 1 }, ''); } catch (e){}
   loadQueue();
+  setTimeout(loadStory, 400);
   soon(50);
 }
 export function closePlayer(){

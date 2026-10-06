@@ -125,7 +125,14 @@ Kyle listens on the TV's app, Google speakers and Bluetooth from his phone. Qobu
   - Not usable: song.link's public API is closed; setlist.fm needs the Worker; Deezer's tempo field is often 0, so it can't drive beat-matched visuals.
 - **Limits:** control needs Premium; no beat-matched visuals (Spotify stopped giving new apps audio features and analysis in November 2024); Spotify-made playlists can't be opened by new apps; phones can be a remote but not the speaker inside the site (the Web Playback SDK is desktop only).
 - **Setup:** a free Spotify developer app (development mode is fine for one household), a sign-in on the phone, and the token sent to the TV sealed with the PIN.
-- **Waiting on:** Kyle's picks, and whether Music makes a sixth tab or Screen moves into Settings.
+- **Kyle's picks (06/10/2026), built in five stages on the `music` branch:**
+  1. the player: the strip, the full player, Play on, the Music tab, Up next, Now's controls, cover colours, synced lyrics (built);
+  2. the artist page, the song's story and credits with a Made in Greater Manchester badge, a code to share the song, liner notes, vinyl mode and a record shelf (built);
+  3. the TV: the sign-in sent sealed, a Music view, Today's strip, the cover and an album wall in the cockpit, favourites on the number keys, a sleep timer and bedtime fade;
+  4. the house queue (reorder, remove, vote), the party queue, and who's listening;
+  5. More like this, new releases, gigs, weather radio, and your listening (top artists and tracks, a listening clock and heat map).
+- **Design, at Kyle's request:** the UI and UX must be exceptional. Each stage ends with its own design pass (screenshots looked at and refined before it's pushed), and a full design pass over the whole player follows the last stage ([decision 0012](docs/decisions/0012-music-player.md) has the principles).
+- Music is a sixth tab, between Home and Screen.
 
 ## 5. More data (ideas, checked October 2026)
 

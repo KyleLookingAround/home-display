@@ -33,6 +33,11 @@ Kyle has given standing permission to develop, test and push to `main` without c
       - `api` (retries once after a refreshed token or a "slow down", and names `PREMIUM`, `NO_DEVICE`, `AUTH`), with `apiFirst` for endpoints Spotify has moved;
       - `spotify(acc, clientId)`: every call the player makes.
     - `music.js`: the player's logic, no DOM: `trackOf`, `playerModel`, `progressAt`, `playOn` and `deviceKind`, `page` (Spotify's lists; newer answers say `item` for `track`), `fmtDur`, `artUrl`, synced lyrics (`parseLrc`, `lyricAt`, `loadLyrics` from LRCLIB) and `coverColours` (a cover's colours from its pixels).
+    - `musicdata.js`: the stories behind the music, with no keys:
+      - MusicBrainz (`mbGet`, a request a second; `recordingFor` by ISRC, then title and artist; `artistFor`), read by `creditsOf`, `writersOf` and `homeOf`;
+      - `isGreaterManchester` and `localBadge` ("Made in Greater Manchester", or "Recorded at Strawberry Studios, Stockport");
+      - Wikipedia through Wikidata (`wikiTitle`, `wikiSummary`), and the Cover Art Archive (`linerNotes`);
+      - `songStory` and `artistStory` put it together.
     - `remote.js`: the phone as a remote for a screen, through ntfy.sh. A screen makes an eight-letter code (`newRemoteCode`) and listens on `hse-screen-<code>`; a paired phone asks it to change view, wake or start afresh, and asks what it shows. `readRemote` lets through only those requests and the screen's answer. The account, guest Wi-Fi, dates and calendar address can go too, sealed (`sealDetails`, `openDetails`: AES-GCM, key from PBKDF2 over the lock's remembered PIN hash, `staticrypt_passphrase`, salted with the code).
     - `analysis.js`: pure functions with no DOM. `compareGas` (a usual year of gas on each tariff at today's rates), `priceVerdict` and `priceTone` (the answer to "use power now?", worded the same on the phone and the TV), example data, the period roll-up (`buildModel(raw, days, endDay)`, so the period before can be rolled up too), spikes, weather regression, projections, tariff comparison, battery and solar simulators, `MEASURES` with rough costs, and `cheapestWindow`.
     - `household.js`: the household's data for both: settings defaults and merging (`mergeSettings`, `deviceChanges`), modes (`MODES`; `MODE_ALIASES` sends old `#home` links to Today) and the night window, bins (`nextCollections(bins, now, holidays)` moves a repeat a day later in a bank holiday week, marked `moved`, and marks Christmas `check`; `councilBins`, `mergeBins`), weather, the iCal parser and `RRULE` expansion, `countdowns` and `countdownText` (birthdays with ages, anniversaries, one-off dates, Christmas, the next bank holiday), public Darwin boards for trains (`TRAIN_BOARDS`: Huxley2, its mirror, Huxley2's staff board, tried in turn), Realtime Trains and TfGM parsing (each train with its calling points, `calls`, and `coaches`), `leaveBy`, `catchable` (the trains you can still make with your walk), the station sign's words for the phone and the TV (`signTrains`, `signStatus`, `signExpected`, `signGo`, `signLine`, `ordinal`), `headsUp`, `todayCost`, nightly reload and staleness.
@@ -46,9 +51,10 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `now/HeadsUp.svelte`: leave for your train, bins out tonight, flood warnings, rain soon (`headsUp` in `household.js`), as on the TV.
     - `music/`: the player ([decision 0012](docs/decisions/0012-music-player.md)):
       - `MiniPlayer` is the now-playing strip on every page (in `App.astro`). Swipe it to skip; tap it for `Player`.
-      - `Player` is the full player: the cover as a blurred nebula, drag down to close, swipe the cover to skip, double-tap to like, and the views player, lyrics and Up next.
+      - `Player` is the full player: the cover as a blurred nebula, drag down to close, swipe the cover to skip, double-tap to like, More (⋯), and the views player, lyrics, Up next, about and liner notes.
       - `MusicPage` is the Music tab: a greeting, shortcuts, `Row`s to scroll, search with a top result, and playlist, album and artist pages at `#album/<id>` and the like.
-      - `TrackRow`, `Tile`, `Icon`.
+      - `About` (the song's story, credits and artist), `LinerNotes` (the sleeve and booklet), `Turntable` (vinyl mode), `Sheets` (More, and Share with a code to scan) and `Shelf` (the record shelf at `music.html#shelf`).
+      - `TrackRow`, `Tile`, `Row`, `Icon`.
       - `now/MusicNow.svelte` shows what's playing on Now; `settings/Music.svelte` connects Spotify (`#music`).
     - `screen/Screen.svelte`: a live picture of the wall display (`display.html#<view>&embed=1` in a scaled frame), pairing with a screen's code, and buttons that change what it shows.
     - `home/Upgrade.svelte`: the shape every upgrade shares: a year's saving, a rough cost, the payback, and the simulator folded under "Work it out".

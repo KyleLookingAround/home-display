@@ -1,6 +1,6 @@
 <script>
   // A row of covers to scroll sideways, with its title and "Show all". Snaps to each cover; arrows on a laptop.
-  let { title, all = null, children } = $props();
+  let { title, all = null, alt = null, children } = $props();
   let strip = $state(null);
   const by = d => strip && strip.scrollBy({ left: d * strip.clientWidth * .8, behavior: 'smooth' });
 </script>
@@ -9,7 +9,7 @@
   <header><h3>{title}</h3>
     <span class="act">
       <button class="arr" type="button" aria-label="Scroll {title} back" onclick={() => by(-1)}>‹</button><button class="arr" type="button" aria-label="Scroll {title} on" onclick={() => by(1)}>›</button>
-      {#if all}<a href={all}>Show all</a>{/if}
+      {#if alt}<a href={alt.href}>{alt.label}</a>{/if}{#if all}<a href={all}>Show all</a>{/if}
     </span>
   </header>
   <div class="strip" bind:this={strip}>{@render children()}</div>
