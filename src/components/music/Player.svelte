@@ -15,6 +15,8 @@
   import About from './About.svelte';
   import LinerNotes from './LinerNotes.svelte';
   import Sheets from './Sheets.svelte';
+  import HouseQueue from './HouseQueue.svelte';
+  import { tv } from '../../state/tv.svelte.js';
 
   const t = $derived(music.track);
   const m = $derived(music.player);
@@ -81,7 +83,7 @@
     if (el) box.scrollTo({ top: el.offsetTop - box.clientHeight * .38, behavior: still ? 'auto' : 'smooth' });
   });
 
-  const nextUp = $derived(music.queue && music.queue.length ? music.queue[0] : null);
+  const nextUp = $derived(music.nextUp);
   const repeatLabel = r => r === 'off' ? 'Repeat is off' : r === 'context' ? 'Repeating all' : 'Repeating this song';
   const press = fn => () => { haptic(); fn(); };
   const ctxHref = $derived(m && m.context && /^(playlist|album|artist)$/.test(m.context.type) ? `./music.html#${m.context.type}/${m.context.uri.split(':').pop()}` : null);
@@ -161,8 +163,8 @@
           {:else}<span class="gl">No lyrics for this one</span>{/if}
         </button>
         <button class="glance nx" type="button" onclick={() => setView('queue')} aria-label="Up next">
-          <span class="gh"><span class="label">Up next</span><Icon name="queue" size={16} /></span>
-          {#if nextUp}<span class="nxrow">{#if nextUp.images.length}<img src={artUrl(nextUp.images, 64)} alt="" width="36" height="36">{/if}<span class="nt"><b>{nextUp.name}</b><span>{nextUp.artist}</span></span></span>
+          <span class="gh"><span class="label">{nextUp && nextUp.house ? 'Up next · the house' : 'Up next'}</span><Icon name="queue" size={16} /></span>
+          {#if nextUp}<span class="nxrow">{#if nextUp.images.length}<img src={artUrl(nextUp.images, 64)} alt="" width="36" height="36">{/if}<span class="nt"><b>{nextUp.name}</b><span>{nextUp.artist}{nextUp.by ? ' · ' + nextUp.by : ''}</span></span></span>
           {:else}<span class="gl">{music.queue ? 'Nothing queued' : 'Reading…'}</span>{/if}
         </button>
         {#if !t.episode}
@@ -209,10 +211,11 @@
       <div class="queue-full">
         <span class="label">Now playing</span>
         <div class="qrow now">{#if t.images.length}<img src={artUrl(t.images, 64)} alt="" width="44" height="44">{:else}<span class="ph"></span>{/if}<span class="qt"><b>{t.name}</b><span>{t.artist}</span></span><span class="eq" aria-hidden="true" class:paused={!m.playing}><i></i><i></i><i></i></span></div>
+        {#if tv.house}<HouseQueue />{/if}
         {#if music.queue && music.queue.length}
-          <span class="label">Next{music.ctxName ? ' from ' + music.ctxName : ''}</span>
+          <span class="label">{tv.house ? 'Then' : 'Next'}{music.ctxName ? ' from ' + music.ctxName : ''}</span>
           <ol>{#each music.queue as q, i (q.uri + i)}<li class="qrow">{#if q.images.length}<img src={artUrl(q.images, 64)} alt="" width="44" height="44" loading="lazy">{:else}<span class="ph"></span>{/if}<span class="qt"><b>{q.name}</b><span>{q.artist}</span></span><span class="mono dur">{fmtDur(q.dur)}</span></li>{/each}</ol>
-          <p class="note">Add songs with + anywhere in Music. Spotify doesn't let other apps reorder or remove them.</p>
+          <p class="note">{tv.house ? 'Spotify\'s own queue, as Spotify will play it after the house queue.' : 'Add songs with + anywhere in Music. Spotify doesn\'t let other apps reorder or remove them. Pair the TV (Screen) for a house queue you can reorder.'}</p>
         {:else if music.queue}<div class="empty-view"><Icon name="queue" size={40} /><p>Nothing up next. Add songs with + anywhere in Music.</p></div>
         {:else}<p class="note">Reading what's up next…</p>{/if}
       </div>

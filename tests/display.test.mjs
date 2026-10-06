@@ -71,7 +71,7 @@ test('the TV gets its own Spotify sign-in sealed, and takes only a sleep timer a
   const box = await R.sealDetails('ABCDEFGH', 'hashed-pin', { spotify });
   assert.doesNotMatch(JSON.stringify(box), /refresh-token|BQ-access/, 'nothing readable in the box');
   const got = await R.openDetails('ABCDEFGH', 'hashed-pin', box);
-  assert.deepEqual(got.spotify, Object.assign({}, spotify, { scope: '' }));
+  assert.deepEqual(got.spotify, Object.assign({}, spotify, { scope: '', img: '' }));
   const bad = await R.sealDetails('ABCDEFGH', 'hashed-pin', { spotify: Object.assign({}, spotify, { client: 'not-a-client-id' }) });
   assert.equal(await R.openDetails('ABCDEFGH', 'hashed-pin', bad), null, 'a malformed sign-in is dropped');
   const msg = m => R.readRemote(JSON.stringify({ event: 'message', message: JSON.stringify(m) }));
@@ -522,7 +522,7 @@ test('the built display matches the source', () => {
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music', 'musicdata', 'queue']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

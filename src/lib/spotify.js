@@ -84,14 +84,14 @@ export function forgetAccount(id){
 
 /* ---------- signing in ---------- */
 /** Sends you to Spotify to sign in. `back` is where to land afterwards. */
-export async function beginSignIn(clientId, back, forTv){
+export async function beginSignIn(clientId, back, forTv, ask){
   if (!clientId) throw new SpotifyError('NOCLIENT');
   const verifier = randomText(64), state = randomText(16);
   store.setJ('spotifyAuth', { verifier: verifier, state: state, back: back || location.href, at: Date.now(), forTv: !!forTv });
   const q = new URLSearchParams({ response_type: 'code', client_id: clientId, scope: SPOTIFY_SCOPES.join(' '), redirect_uri: redirectUri(),
     state: state, code_challenge_method: 'S256', code_challenge: await pkceChallenge(verifier) });
   // For the TV, Spotify asks again, so the TV can have a different account from this phone.
-  if (forTv) q.set('show_dialog', 'true');
+  if (forTv || ask) q.set('show_dialog', 'true');
   location.assign(SPOTIFY_AUTH + '/authorize?' + q.toString());
 }
 /** True when this page is Spotify sending you back (?code= or ?error=, with our state). */
@@ -113,6 +113,8 @@ export async function finishSignIn(clientId, search){
   const acc = { id: '', name: '', product: '', client: clientId, refresh: t.refresh_token, access: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000, scope: t.scope || '' };
   const me = await api(acc, clientId, 'GET', '/me');
   acc.id = me.id; acc.name = me.display_name || me.id; acc.product = me.product || '';
+  const pic = (me.images || []).slice().sort((a, b) => (a.width || 0) - (b.width || 0))[0];
+  acc.img = pic && /^https:\/\//.test(pic.url) ? pic.url : '';
   if (!pending.forTv) rememberAccount(acc);
   return { account: acc, back: pending.back, forTv: !!pending.forTv };
 }
@@ -216,6 +218,7 @@ export function spotify(acc, clientId){
     playlistTracks: (id, off) => apiFirst(acc, clientId, 'GET', ['/playlists/' + encodeURIComponent(id) + '/items' + qs({ limit: 50, offset: off || 0, market: 'from_token' }),
       '/playlists/' + encodeURIComponent(id) + '/tracks' + qs({ limit: 50, offset: off || 0, market: 'from_token' })]),
     album: id => call('GET', '/albums/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
+    track: id => call('GET', '/tracks/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
     artist: id => call('GET', '/artists/' + encodeURIComponent(id)),
     artistTop: id => call('GET', '/artists/' + encodeURIComponent(id) + '/top-tracks' + qs({ market: 'from_token' })),
     artistAlbums: (id, off) => call('GET', '/artists/' + encodeURIComponent(id) + '/albums' + qs({ include_groups: 'album,single', limit: 20, offset: off || 0, market: 'from_token' })),

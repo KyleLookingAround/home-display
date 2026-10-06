@@ -15,7 +15,10 @@ touch "$out/.nojekyll"
 if [ -n "${SITE_PASSWORD:-}" ]; then
   # One fixed salt keeps "Remember this screen" working across pages and across deploys. A salt isn't secret:
   # StatiCrypt writes it into every page.
-  STATICRYPT_PASSWORD="$SITE_PASSWORD" npx --yes staticrypt@3.5.4 "$out"/*.html \
+  # Every page but the party page, which guests open from a code on the TV without the PIN. It holds nothing private:
+  # it only talks to the party's own relay topic, which can add songs and vote (src/lib/queue.js).
+  pages=(); for f in "$out"/*.html; do [ "$(basename "$f")" = party.html ] || pages+=("$f"); done
+  STATICRYPT_PASSWORD="$SITE_PASSWORD" npx --yes staticrypt@3.5.4 "${pages[@]}" \
     --directory "$out" --salt 921212f355e6f70b7bf75a95b5bae2aa --remember 365 --short --config false \
     --template lock/template.html --template-title "Locked" \
     --template-instructions "Enter the household PIN to open the dashboard and display." \

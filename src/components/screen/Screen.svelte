@@ -6,33 +6,25 @@
   import { onMount } from 'svelte';
   import { store } from '../../lib/browser.js';
   import { MODES } from '../../lib/household.js';
-  import { cleanCode, showCode, sendRemote, listenRemote, lockSecret, canSeal, sealDetails } from '../../lib/remote.js';
+  import { cleanCode, showCode, lockSecret, canSeal, sealDetails } from '../../lib/remote.js';
   import { houseSettings } from '../../state/house.js';
+  import { tv as link, watchTv, onTv, pairTv, unpairTv, tvSend } from '../../state/tv.svelte.js';
   import { hhmm } from '../../lib/format.js';
   import TvMusic from './TvMusic.svelte';
+  import HouseQueue from '../music/HouseQueue.svelte';
 
-  let code = $state(null), typed = $state(''), bad = $state(false);
-  let view = $state('today'), tv = $state(null), asked = $state(0), quiet = $state(false), sent = $state('');
+  let typed = $state(''), bad = $state(false);
+  let view = $state('today'), asked = $state(0), quiet = $state(false), sent = $state('');
   let width = $state(360);
   let mine = $state(null), locked = $state(false), sending = $state(''), sentAt = $state(0);
-  let stop = () => {};
   const scale = $derived(width / 1920);
+  const code = $derived(link.code);
+  const tv = $derived(link.heard ? link.state : null);
 
-  function listen(){
-    stop();
-    if (!code) return;
-    stop = listenRemote(code, r => {
-      if (r.from !== 'screen') return;
-      tv = r.state; view = r.state.shown; quiet = false;
-      if (sentAt && r.state.at >= sentAt - 1000) sending = /^Received/.test(r.state.note) ? 'Done. The TV has ' + r.state.note.replace(/^Received /, '') + '.' : r.state.note || sending;
-    });
-    // give the stream a moment to open, then ask the screen what it's showing
-    setTimeout(() => ask('hello'), 800);
-  }
   async function ask(cmd, mode){
     if (!code) return;
     asked = Date.now(); quiet = false;
-    const ok = await sendRemote(code, { from: 'phone', cmd, mode });
+    const ok = await tvSend(cmd, mode ? { mode } : null);
     sent = ok ? '' : 'The relay didn\'t take that. Check your connection and try again.';
     setTimeout(() => { if (asked && (!tv || tv.at < asked - 1000)) quiet = true; }, 10000);
   }
@@ -41,9 +33,9 @@
     ev.preventDefault();
     const c = cleanCode(typed);
     bad = !c; if (!c) return;
-    code = c; store.set('remoteTV', c); typed = ''; tv = null; listen();
+    typed = ''; pairTv(c);
   }
-  function unpair(){ stop(); store.del('remoteTV'); code = null; tv = null; quiet = false; }
+  function unpair(){ unpairTv(); quiet = false; }
   // What the TV needs from this phone, sealed with the site's PIN, so none of it is typed with a remote: your Octopus
   // account, guest Wi-Fi, dates and calendar address.
   let house = $state.raw(null);
@@ -60,7 +52,7 @@
       if (house && house.ical) details.ical = house.ical;
       const box = await sealDetails(code, secret, details);
       asked = Date.now(); quiet = false;
-      const ok = await sendRemote(code, { from: 'phone', cmd: 'account', box });
+      const ok = await tvSend('account', { box });
       sentAt = Date.now();
       sending = ok ? 'Sent. Waiting for the TV…' : 'The relay didn\'t take it. Try again.';
     } catch (e){ sending = 'This browser couldn\'t seal it.'; }
@@ -70,9 +62,11 @@
     mine = a && k ? { account: a, key: k, gasUnit: store.get('gasUnit') || 'm3', pay: store.get('pay') || 'DIRECT_DEBIT' } : null;
     locked = !!lockSecret();
     houseSettings().then(h => { house = h; });
-    code = cleanCode(store.get('remoteTV'));
-    listen();
-    return () => stop();
+    watchTv();
+    return onTv(st => {
+      view = st.shown; quiet = false;
+      if (sentAt && st.at >= sentAt - 1000) sending = /^Received/.test(st.note) ? 'Done. The TV has ' + st.note.replace(/^Received /, '') + '.' : st.note || sending;
+    });
   });
 </script>
 
@@ -112,6 +106,7 @@
 {/if}
 
 {#if code}<TvMusic {code} {tv} />{/if}
+{#if code && link.house}<section class="card" id="house"><HouseQueue compact /></section>{/if}
 
 <section class="card" id="pair">
   <h2 class="label">Pairing</h2>

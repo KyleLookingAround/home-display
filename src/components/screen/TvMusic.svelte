@@ -14,6 +14,7 @@
   import { music, sp, watchMusic } from '../../state/music.svelte.js';
   import { houseSettings } from '../../state/house.js';
   import Icon from '../music/Icon.svelte';
+  import { tvSend } from '../../state/tv.svelte.js';
 
   let { code, tv } = $props();
   let clientId = $state(''), note = $state(''), busy = $state(false);
@@ -72,6 +73,10 @@
     const ok = await sendRemote(code, { from: 'phone', cmd: 'sleep', mins: v === 'song' ? 0 : v, song: v === 'song' });
     note = ok ? '' : 'The relay didn\'t take that. Try again.';
   }
+  let picked = $state('');
+  async function listenAs(p){ picked = p.id; await tvSend('listen', { id: p.id }); }
+  $effect(() => { if (tv && tv.listening === picked) picked = ''; });
+  const initials = n => String(n || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const sleeping = $derived(tv && tv.sleepSong ? 'Stops at the end of this song' : tv && tv.sleepAt > Date.now() ? `Fades out at ${hhmm(tv.sleepAt)}` : '');
 </script>
 
@@ -79,11 +84,16 @@
   <div class="card-head"><h2 class="label">Spotify on the TV</h2>{#if tv && tv.spotify}<span class="small cheap">{tv.spotify}</span>{/if}</div>
   {#if tv && tv.spotify}
     <p class="line">The TV plays as <b>{tv.spotify}</b>. Its Music view shows the song, the words and the liner notes, and Today and the screensaver show what's on.</p>
+    {#if tv.people && tv.people.length > 1}
+      <div class="people" role="group" aria-label="Who's listening on the TV">
+        {#each tv.people as p (p.id)}<button type="button" class="face" class:on={tv.listening === p.id} aria-pressed={tv.listening === p.id} disabled={picked === p.id} onclick={() => listenAs(p)}><span class="av">{initials(p.name)}</span>{p.name.split(' ')[0]}</button>{/each}
+      </div>
+    {/if}
   {:else}
     <p class="note">Sign the TV in to Spotify from here. It's sealed with your site PIN on the way, like the Octopus account, and the TV keeps its own sign-in, separate from this phone's.</p>
   {/if}
   <div class="actions">
-    <button class="btn {tv && tv.spotify ? '' : 'primary'} small" type="button" onclick={connect} disabled={!clientId || busy}>{busy ? 'Going to Spotify…' : tv && tv.spotify ? 'Change account' : 'Connect Spotify on the TV'}</button>
+    <button class="btn {tv && tv.spotify ? '' : 'primary'} small" type="button" onclick={connect} disabled={!clientId || busy}>{busy ? 'Going to Spotify…' : tv && tv.spotify ? 'Add someone to the TV' : 'Connect Spotify on the TV'}</button>
   </div>
   {#if !clientId}<p class="note">The household's Spotify app isn't set up yet: <a href="./settings.html#music">Settings, then Music</a>.</p>{/if}
   {#if note}<p class="note" role="status">{note}</p>{/if}
@@ -112,6 +122,11 @@
 
 <style>
   .line{font-size:16px}
+  .people{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}
+  .face{appearance:none;border:1px solid var(--line);background:var(--card-2);color:var(--muted);display:inline-flex;align-items:center;gap:8px;padding:3px 12px 3px 3px;border-radius:24px;cursor:pointer;font:500 14px var(--f-body);min-height:44px}
+  .face.on{border-color:var(--gas);color:var(--ink);box-shadow:0 0 16px -6px var(--gas)}
+  .av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:color-mix(in srgb,var(--neg) 35%,var(--card));color:var(--ink);font:600 13px var(--f-mono)}
+  .on .av{background:var(--gas);color:#04101a}
   .sub{margin-top:var(--s4);margin-bottom:var(--s2)}
   .seg{display:flex;flex-wrap:wrap}
   .note :global(.ic){display:inline-block;vertical-align:-2px;color:var(--gas)}

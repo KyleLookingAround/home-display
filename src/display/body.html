@@ -123,6 +123,7 @@
   <section class="mode music-mode" data-mode="music" aria-label="Music" hidden>
     <div class="msky" aria-hidden="true"><img id="mNeb" alt=""></div>
     <div class="m-empty" id="mEmpty"></div>
+    <aside class="m-party" id="mParty" hidden></aside>
     <div class="m-main" id="mMain" hidden>
       <div class="m-cover"><img id="mCover" alt=""></div>
       <div class="m-info">
@@ -164,6 +165,11 @@
     <p class="pair">Code <b class="code" id="pairCode">----</b></p>
     <p class="help">On your phone, open Screen and enter this code. Then the phone can change what this screen shows. Only those requests pass through ntfy.sh, a free relay; nothing else does.</p>
     <div class="actions"><button class="btn" type="button" id="newCode">New code</button></div></section>
+
+    <section class="card"><h3 class="label">Music</h3>
+    <div class="fields" id="listenRow"><div class="field solo"><label for="fListen">Listening as</label><select id="fListen"></select></div></div>
+    <div class="actions"><button class="btn" type="button" id="partyBtn">Start a party</button></div>
+    <p class="help" id="musicHelp"></p></section>
 
     <section class="card"><h3 class="label">Energy</h3>
     <div class="fields"><div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div></div>

@@ -9,6 +9,7 @@
   import { beginSignIn, finishSignIn, isSignInReturn, redirectUri, spotifyErrorText, activeAccount } from '../../lib/spotify.js';
   import { music, reloadAccount, signOut } from '../../state/music.svelte.js';
   import { houseSettings } from '../../state/house.js';
+  import People from '../music/People.svelte';
 
   let fromFile = $state(''), mine = $state(store.get('spotifyClient') || ''), msg = $state(''), err = $state(''), busy = $state(false);
   const clientId = $derived(mine.trim() || fromFile);
@@ -34,9 +35,9 @@
     }
   });
   function saveClient(ev){ ev.preventDefault(); store.set('spotifyClient', mine.trim()); msg = mine.trim() ? 'Client ID saved on this device.' : 'Using the household\'s Client ID.'; }
-  async function connect(){
+  async function connect(another){
     err = ''; busy = true;
-    try { await beginSignIn(clientId, location.href.replace(/#.*$/, '') + '#music'); }
+    try { await beginSignIn(clientId, location.href.replace(/#.*$/, '') + '#music', false, another === true); }
     catch (e){ err = spotifyErrorText(e).join(' '); busy = false; }
   }
   function disconnect(){ signOut(); msg = 'Spotify is disconnected on this device.'; }
@@ -47,7 +48,9 @@
   {#if acc}
     <div class="who"><span class="dot"></span><div><b>{acc.name}</b><span class="note">Spotify{acc.product === 'premium' ? ' Premium' : acc.product ? ', ' + acc.product : ''} · connected on this device</span></div></div>
     {#if acc.product && acc.product !== 'premium'}<p class="note warn">Spotify only lets Premium accounts be played, paused and skipped from another app, so the player will show what's on but not control it.</p>{/if}
-    <div class="actions"><a class="btn" href="./music.html">Open Music</a><button class="btn" type="button" onclick={disconnect}>Disconnect</button></div>
+    <People />
+    <div class="actions"><a class="btn" href="./music.html">Open Music</a><button class="btn" type="button" onclick={() => connect(true)} disabled={!clientId || busy}>Add someone</button><button class="btn" type="button" onclick={disconnect}>Disconnect {acc.name.split(' ')[0]}</button></div>
+    <p class="note">Everyone can listen as themselves: "Add someone" signs in another Spotify on this phone, and the Music tab then shows who's listening. While the household's Spotify app is in development mode, add each person's Spotify email under User Management in Spotify's developer dashboard first.</p>
   {:else}
     <p class="note">Connect Spotify to play, pause and skip from any page, on the TV, the Google speakers or your phone. You sign in at Spotify; this site never sees your password, and the sign-in stays on this device.</p>
     <div class="actions"><button class="btn primary" type="button" onclick={connect} disabled={!clientId || busy}>{busy ? 'Connecting…' : 'Connect Spotify'}</button></div>

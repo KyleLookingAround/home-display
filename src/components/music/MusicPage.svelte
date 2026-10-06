@@ -16,6 +16,7 @@
   import Tile from './Tile.svelte';
   import Row from './Row.svelte';
   import Shelf from './Shelf.svelte';
+  import People from './People.svelte';
   import { artistStory } from '../../lib/musicdata.js';
   import { cacheGet, cacheSet } from '../../state/cache.js';
 
@@ -77,10 +78,12 @@
     store.setJ(CTX, known);
     lib = Object.assign({}, lib, { jump: out });
   }
+  let libFor = '';
   $effect(() => {
     const acc = music.acc, r = route;
     if (!acc) return;
     untrack(() => {
+      if (libFor !== acc.id){ libFor = acc.id; lib = {}; more = {}; libErr = null; }     // someone else listening: their music
       if (r.kind === '') ['recent', 'playlists', 'artists', 'albums'].forEach(w => load(w));
       if (r.kind === 'list') load(r.id === 'shelf' ? 'albums' : r.id);
     });
@@ -237,6 +240,7 @@
   {:else}<div class="skel" style="height:300px"></div>{/if}
 
 {:else}
+  <People />
   <button class="answer now-answer" type="button" onclick={() => music.track ? openPlayer() : null} aria-label={music.track ? 'Open the player' : 'Nothing playing'}>
     <span class="label">{greeting}{music.acc.name ? ', ' + music.acc.name.split(' ')[0] : ''}{music.player && music.player.device ? ' · ' + (music.player.playing ? 'Playing on ' : 'Paused on ') + music.player.device.name : ''}</span>
     {#if music.track}

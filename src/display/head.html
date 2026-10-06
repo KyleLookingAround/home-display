@@ -346,6 +346,28 @@ body.night #stars{opacity:.12}
 .note-page .label{margin-top:.6rem}
 .m-next{margin-top:1rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m-next .label{margin-right:.5rem}
+/* the house queue (tvqueue.js): the next few, who chose them and their votes; and the party's code to scan */
+.m-next p.label{margin:0}
+.hq{list-style:none;margin:.3rem 0 0;padding:0;counter-reset:hq}
+.hq li{display:flex;align-items:baseline;padding:.14rem 0;counter-increment:hq}
+.hq li::before{content:counter(hq);-webkit-box-flex:0;flex:none;width:1.6rem;font:500 .95rem var(--f-mono);color:var(--gas)}
+.hq .t{-webkit-box-flex:1;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hq .by,.hq .votes{flex:none;white-space:nowrap}
+.hq b{font-weight:600}
+.hq .by{margin-left:.7rem;font:500 .9rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--neg)}
+.hq .votes{margin-left:.7rem;font:500 .95rem/1 var(--f-mono);color:var(--cal)}
+.m-party{width:19rem;text-align:center;background:var(--card);border:1px solid var(--line-hot);border-radius:var(--radius);padding:1rem 1.1rem 1.1rem;box-shadow:0 0 2.4rem -.6rem rgba(184,146,255,.45)}
+#mParty{position:absolute;right:.5rem;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%)}
+.pqr{width:13rem;height:13rem;margin:.7rem auto .5rem;border-radius:var(--radius-sm);overflow:hidden}
+.pqr svg{display:block;width:100%;height:100%}
+.pcode{font-size:1.5rem;letter-spacing:.14em;color:var(--gas)}
+.m-party .note{margin-top:.35rem;font-size:.95rem;line-height:1.4}
+.party-on .m-main{padding-right:21rem}
+.party-on .m-cover{width:19rem;height:19rem;margin-right:2rem}
+.music-mode > .m-empty.with-party{display:flex;align-items:center;max-width:none;width:100%}
+.m-empty.with-party .m-idle{flex:1 1 auto;min-width:0;padding-right:3rem}
+.m-empty.with-party .m-party{flex:none;text-align:center}
+.m-idle .m-next{margin:1.4rem auto 0;display:inline-block;text-align:left;max-width:100%}
 /* Today: what's playing, under the date */
 .date + .np{margin-top:.35rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34rem}
 .np:empty{display:none}

@@ -8,6 +8,7 @@
 // and the household's private settings (guest Wi-Fi, family dates, the calendar address), which a phone can send sealed (AES-GCM) with a key made from the site's PIN, as the lock keeps it on each device that
 // was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
 import { MODES } from './household.js';
+import { readWire } from './queue.js';
 
 export const RELAY = 'https://ntfy.sh';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I/L, for reading off a TV
@@ -26,7 +27,8 @@ export const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 export const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs'];
+export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs', 'queue', 'party', 'listen', 'skip'];
+const QUEUE_OPS = ['add', 'move', 'remove', 'vote'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 export function readRemote(data){
   let m, c;
@@ -43,25 +45,44 @@ export function readRemote(data){
       if (!Array.isArray(c.favs) || c.favs.length > 9) return null;
       out.favs = c.favs.filter(f => f && /^spotify:(playlist|album|artist):[A-Za-z0-9]{1,40}$/.test(f.uri) && typeof f.name === 'string').map(f => ({ uri: f.uri, name: f.name.slice(0, 80) }));
     }
+    // the house queue (src/lib/queue.js): add a song, move, remove or vote for one; `who` is the phone that asked
+    if (c.cmd === 'queue'){
+      if (QUEUE_OPS.indexOf(c.op) < 0 || !c.who || !/^[a-z0-9]{6,16}$/.test(c.who.id)) return null;
+      if (c.op === 'add' && !/^spotify:track:[A-Za-z0-9]{1,40}$/.test(c.uri)) return null;
+      if (c.op !== 'add' && !/^[a-z0-9]{4,12}$/.test(c.id)) return null;
+      out.op = c.op; out.who = { id: c.who.id, name: String(c.who.name || '').slice(0, 24) };
+      if (c.op === 'add') out.uri = c.uri; else out.id = c.id;
+      if (c.op === 'move'){ const to = Math.round(+c.to); if (!(to >= 0 && to <= 60)) return null; out.to = to; }
+    }
+    if (c.cmd === 'party') out.on = !!c.on;
+    // who's listening on the TV: one of the Spotify accounts it has
+    if (c.cmd === 'listen'){ if (!/^[\w.-]{1,64}$/.test(String(c.id))) return null; out.id = String(c.id); }
     return out;
   }
   if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
     return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account,
-      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80) } };
+      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80),
+      queue: readWire(c.state.queue), more: Math.max(0, Math.min(99, +c.state.more || 0)), party: cleanCode(c.state.party) || '',
+      people: (Array.isArray(c.state.people) ? c.state.people : []).slice(0, 8).filter(p => p && /^[\w.-]{1,64}$/.test(String(p.id))).map(p => ({ id: String(p.id), name: String(p.name || p.id).slice(0, 40) })),
+      listening: /^[\w.-]{1,64}$/.test(String(c.state.listening || '')) ? String(c.state.listening) : '' } };
   }
   return null;
 }
-export function sendRemote(code, msg){
-  try { return fetch(RELAY + '/' + remoteTopic(code), { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
+/** Sends a message on a relay topic. Resolves true if the relay took it. */
+export function sendTopic(topic, msg){
+  try { return fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
   catch(e){ return Promise.resolve(false); }
 }
-/** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
-export function listenRemote(code, onMsg){
+/** Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function. */
+export function listenTopic(topic, read, onMsg){
   if (typeof EventSource === 'undefined') return () => {};
-  const es = new EventSource(RELAY + '/' + remoteTopic(code) + '/sse');
-  es.onmessage = e => { const r = readRemote(e.data); if (r) onMsg(r); };
+  const es = new EventSource(RELAY + '/' + topic + '/sse');
+  es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
   return () => { try { es.close(); } catch(e){} };
 }
+export const sendRemote = (code, msg) => sendTopic(remoteTopic(code), msg);
+/** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
+export const listenRemote = (code, onMsg) => listenTopic(remoteTopic(code), readRemote, onMsg);
 
 /* ---------- the account, sealed with the site's PIN ---------- */
 /** What the lock keeps on a device unlocked with "Remember this screen": the PIN, hashed. Null when there's no lock. */
@@ -102,6 +123,7 @@ export async function openDetails(code, secret, box){
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
     out.spotify = { id: String(sp.id), name: String(sp.name || sp.id).slice(0, 64), product: String(sp.product || '').slice(0, 20), client: sp.client, refresh: sp.refresh,
-      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '' };
+      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '',
+      img: /^https:\/\/[\w.-]+\/[^\s"'<>]{1,280}$/.test(String(sp.img || '')) ? sp.img : '' };
   return Object.keys(out).length ? out : null;
 }

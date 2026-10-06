@@ -16,8 +16,8 @@ from pathlib import Path
 here = Path(__file__).parent
 src = here / 'src'
 
-SHARED = ('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'spotify', 'music', 'musicdata', 'voyage')   # what the display needs from src/lib/
-DISPLAY = ('scenery', 'cockpit', 'board', 'tvmusic', 'display')
+SHARED = ('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'spotify', 'music', 'musicdata', 'queue', 'voyage')   # what the display needs from src/lib/
+DISPLAY = ('scenery', 'cockpit', 'board', 'tvmusic', 'tvqueue', 'display')
 
 
 def plain(name, text):

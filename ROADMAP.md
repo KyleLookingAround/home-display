@@ -129,7 +129,7 @@ Kyle listens on the TV's app, Google speakers and Bluetooth from his phone. Qobu
   1. the player: the strip, the full player, Play on, the Music tab, Up next, Now's controls, cover colours, synced lyrics (built);
   2. the artist page, the song's story and credits with a Made in Greater Manchester badge, a code to share the song, liner notes, vinyl mode and a record shelf (built);
   3. the TV: the sign-in sent sealed, a Music view, Today's strip, the cover and an album wall in the cockpit, favourites on the number keys, a sleep timer and bedtime fade (built);
-  4. the house queue (reorder, remove, vote), the party queue, and who's listening;
+  4. the house queue (reorder, remove, vote), the party queue, and who's listening (built; [decision 0013](docs/decisions/0013-house-queue.md));
   5. More like this, new releases, gigs, weather radio, and your listening (top artists and tracks, a listening clock and heat map).
 - **Design, at Kyle's request:** the UI and UX must be exceptional. Each stage ends with its own design pass (screenshots looked at and refined before it's pushed), and a full design pass over the whole player follows the last stage ([decision 0012](docs/decisions/0012-music-player.md) has the principles).
 - Music is a sixth tab, between Home and Screen.

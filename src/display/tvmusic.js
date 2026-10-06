@@ -47,7 +47,7 @@ function tmToggle(){
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
   return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
 }
-const tmNext = () => tmAct(sp => sp.next(tmDevice()), 600);
+const tmNext = () => tmAct(sp => hqSkip(sp, tmDevice()), 600);
 const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
 /** A favourite from the number keys: a playlist or album, from the top. */
 function tmFavourite(i){
@@ -116,8 +116,9 @@ function tmTick(now){
   }
   const night = D.set.night && inWindow(now, D.set.nightFrom, D.set.nightTo);
   // only as the window starts: a screen that wakes up or reloads in the night (the fresh start is at 03:30) leaves it be
-  if (night && TM.wasNight === false && D.set.musicNight !== false && m && m.playing) tmFade(60);
+  if (night && TM.wasNight === false && D.set.musicNight !== false && !HQ.party && m && m.playing) tmFade(60);
   TM.wasNight = night;
+  hqTick(now);
   if (shown() === 'music') tmTickView(now);
 }
 
@@ -140,7 +141,9 @@ function tmLyricsHtml(lines, i){
 function renderMusic(){
   const sec = $('section[data-mode="music"]');
   const m = tmModel(), t = tmTrack();
-  sec.className = 'mode music-mode view-' + TM.view;
+  sec.className = 'mode music-mode view-' + TM.view + (HQ.party ? ' party-on' : '');
+  $('#mParty').hidden = !HQ.party || !(TM.acc && t);
+  if (HQ.party) setHtml($('#mParty'), hqPartyHtml());
   $('#mEmpty').hidden = !!(TM.acc && t);
   $('#mMain').hidden = !(TM.acc && t);
   if (!TM.acc){
@@ -149,7 +152,11 @@ function renderMusic(){
   }
   if (!t){
     const e = SRC.music.err;
-    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.')) + '</p>' + tmFavsHtml() + tmWallHtml();
+    const waiting = HQ.q.filter(x => !x.fed).length;
+    setHtml($('#mEmpty'), '<div class="m-idle"><p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) + ' ' : '') + (waiting ? 'Press OK to play the house queue' + (tmFavs().length ? ', or a number for a favourite.' : '.')
+      : tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.') + '</p>'
+      + (waiting ? '<div class="m-next">' + hqNextHtml() + '</div>' : tmFavsHtml() + tmWallHtml()) + '</div>' + (HQ.party ? '<aside class="m-party">' + hqPartyHtml() + '</aside>' : ''));
+    $('#mEmpty').className = 'm-empty' + (HQ.party ? ' with-party' : '');
     $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
   }
   const art = artUrl(t.images, 640);
@@ -160,7 +167,7 @@ function renderMusic(){
   $('#mState').className = 'mstate ' + (m.playing ? 'on' : 'off');
   if (!$('#mState').firstChild) $('#mState').innerHTML = '<i></i><i></i><i></i>';
   const q = TM.queue && TM.queue.length ? TM.queue[0] : null;
-  $('#mNext').innerHTML = q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
+  $('#mNext').innerHTML = HQ.q.length ? hqNextHtml() : q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
   const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
   if (TM.view === 'notes') tmNotesHtml();
   else if (lines){ TM.shownLine = -2; tmTickView(Date.now()); }
@@ -194,6 +201,7 @@ function tmNotesHtml(){
 function tmKey(e){
   if (!TM.acc) return false;
   if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
+  if (!tmTrack() && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
   if (!tmTrack()) return false;
   if (e.key === 'Enter'){ tmToggle(); return true; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
@@ -222,7 +230,7 @@ function tmTodayHtml(){
 }
 /** From the phone, sealed: this screen's own Spotify sign-in. */
 function tmTake(acc){
-  saveSpotifyStore({ accounts: [acc], active: acc.id });
+  rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
 }

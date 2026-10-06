@@ -1,0 +1,31 @@
+---
+/*
+ * A page for guests: the app's look (its fonts, colours, starfield and corners) with none of the household's pages
+ * around it. It isn't locked with the PIN (lock/publish.sh leaves it open), so it holds nothing private.
+ */
+import '../styles/app.css';
+interface Props { title: string }
+const { title } = Astro.props;
+---
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>{title}</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#04050d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2304050d'/%3E%3Ccircle cx='32' cy='32' r='15' fill='none' stroke='%234fd6ff' stroke-width='3'/%3E%3Cpath d='M35 14 24 35h9l-4 15 12-22h-9z' fill='%23ffb547'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Exo+2:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<script is:inline>try { if (localStorage.getItem('hse.corners') === 'sharp') document.documentElement.dataset.corners = 'sharp'; } catch (e) {}</script>
+</head>
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="app guest">
+  <main class="page"><slot /></main>
+</div>
+<script>import '../starfield.js';</script>
+</body>
+</html>

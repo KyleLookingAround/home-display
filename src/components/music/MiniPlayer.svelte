@@ -10,13 +10,15 @@
   import { artUrl, deviceKind } from '../../lib/music.js';
   import Icon from './Icon.svelte';
   import Player from './Player.svelte';
-  onMount(() => { watchMusic(); });
+  import { watchTv } from '../../state/tv.svelte.js';
+
+  onMount(() => { watchMusic(); watchTv(); });
 
   const t = $derived(music.track);
   const m = $derived(music.player);
   const pct = $derived(t && t.dur ? Math.min(100, music.progress / t.dur * 100) : 0);
   const where = $derived(m && m.device ? m.device.name : '');
-  const upNext = $derived(music.queue && music.queue.length ? music.queue[0] : null);
+  const upNext = $derived(music.nextUp);
 
   // a swipe skips; a tap opens
   let x0 = 0, y0 = 0, dx = $state(0), down = false, gone = $state('');

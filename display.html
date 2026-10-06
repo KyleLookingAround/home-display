@@ -346,6 +346,28 @@ body.night #stars{opacity:.12}
 .note-page .label{margin-top:.6rem}
 .m-next{margin-top:1rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .m-next .label{margin-right:.5rem}
+/* the house queue (tvqueue.js): the next few, who chose them and their votes; and the party's code to scan */
+.m-next p.label{margin:0}
+.hq{list-style:none;margin:.3rem 0 0;padding:0;counter-reset:hq}
+.hq li{display:flex;align-items:baseline;padding:.14rem 0;counter-increment:hq}
+.hq li::before{content:counter(hq);-webkit-box-flex:0;flex:none;width:1.6rem;font:500 .95rem var(--f-mono);color:var(--gas)}
+.hq .t{-webkit-box-flex:1;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hq .by,.hq .votes{flex:none;white-space:nowrap}
+.hq b{font-weight:600}
+.hq .by{margin-left:.7rem;font:500 .9rem/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--neg)}
+.hq .votes{margin-left:.7rem;font:500 .95rem/1 var(--f-mono);color:var(--cal)}
+.m-party{width:19rem;text-align:center;background:var(--card);border:1px solid var(--line-hot);border-radius:var(--radius);padding:1rem 1.1rem 1.1rem;box-shadow:0 0 2.4rem -.6rem rgba(184,146,255,.45)}
+#mParty{position:absolute;right:.5rem;top:50%;-webkit-transform:translateY(-50%);transform:translateY(-50%)}
+.pqr{width:13rem;height:13rem;margin:.7rem auto .5rem;border-radius:var(--radius-sm);overflow:hidden}
+.pqr svg{display:block;width:100%;height:100%}
+.pcode{font-size:1.5rem;letter-spacing:.14em;color:var(--gas)}
+.m-party .note{margin-top:.35rem;font-size:.95rem;line-height:1.4}
+.party-on .m-main{padding-right:21rem}
+.party-on .m-cover{width:19rem;height:19rem;margin-right:2rem}
+.music-mode > .m-empty.with-party{display:flex;align-items:center;max-width:none;width:100%}
+.m-empty.with-party .m-idle{flex:1 1 auto;min-width:0;padding-right:3rem}
+.m-empty.with-party .m-party{flex:none;text-align:center}
+.m-idle .m-next{margin:1.4rem auto 0;display:inline-block;text-align:left;max-width:100%}
 /* Today: what's playing, under the date */
 .date + .np{margin-top:.35rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34rem}
 .np:empty{display:none}
@@ -525,6 +547,7 @@ body.embed .bar,body.embed .toast{display:none!important}
   <section class="mode music-mode" data-mode="music" aria-label="Music" hidden>
     <div class="msky" aria-hidden="true"><img id="mNeb" alt=""></div>
     <div class="m-empty" id="mEmpty"></div>
+    <aside class="m-party" id="mParty" hidden></aside>
     <div class="m-main" id="mMain" hidden>
       <div class="m-cover"><img id="mCover" alt=""></div>
       <div class="m-info">
@@ -566,6 +589,11 @@ body.embed .bar,body.embed .toast{display:none!important}
     <p class="pair">Code <b class="code" id="pairCode">----</b></p>
     <p class="help">On your phone, open Screen and enter this code. Then the phone can change what this screen shows. Only those requests pass through ntfy.sh, a free relay; nothing else does.</p>
     <div class="actions"><button class="btn" type="button" id="newCode">New code</button></div></section>
+
+    <section class="card"><h3 class="label">Music</h3>
+    <div class="fields" id="listenRow"><div class="field solo"><label for="fListen">Listening as</label><select id="fListen"></select></div></div>
+    <div class="actions"><button class="btn" type="button" id="partyBtn">Start a party</button></div>
+    <p class="help" id="musicHelp"></p></section>
 
     <section class="card"><h3 class="label">Energy</h3>
     <div class="fields"><div class="field"><label for="fRegion">Agile region</label><select id="fRegion"></select></div></div>
@@ -2071,7 +2099,8 @@ const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs'];
+const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs', 'queue', 'party', 'listen', 'skip'];
+const QUEUE_OPS = ['add', 'move', 'remove', 'vote'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 function readRemote(data){
   let m, c;
@@ -2088,25 +2117,44 @@ function readRemote(data){
       if (!Array.isArray(c.favs) || c.favs.length > 9) return null;
       out.favs = c.favs.filter(f => f && /^spotify:(playlist|album|artist):[A-Za-z0-9]{1,40}$/.test(f.uri) && typeof f.name === 'string').map(f => ({ uri: f.uri, name: f.name.slice(0, 80) }));
     }
+    // the house queue (src/lib/queue.js): add a song, move, remove or vote for one; `who` is the phone that asked
+    if (c.cmd === 'queue'){
+      if (QUEUE_OPS.indexOf(c.op) < 0 || !c.who || !/^[a-z0-9]{6,16}$/.test(c.who.id)) return null;
+      if (c.op === 'add' && !/^spotify:track:[A-Za-z0-9]{1,40}$/.test(c.uri)) return null;
+      if (c.op !== 'add' && !/^[a-z0-9]{4,12}$/.test(c.id)) return null;
+      out.op = c.op; out.who = { id: c.who.id, name: String(c.who.name || '').slice(0, 24) };
+      if (c.op === 'add') out.uri = c.uri; else out.id = c.id;
+      if (c.op === 'move'){ const to = Math.round(+c.to); if (!(to >= 0 && to <= 60)) return null; out.to = to; }
+    }
+    if (c.cmd === 'party') out.on = !!c.on;
+    // who's listening on the TV: one of the Spotify accounts it has
+    if (c.cmd === 'listen'){ if (!/^[\w.-]{1,64}$/.test(String(c.id))) return null; out.id = String(c.id); }
     return out;
   }
   if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
     return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account,
-      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80) } };
+      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80),
+      queue: readWire(c.state.queue), more: Math.max(0, Math.min(99, +c.state.more || 0)), party: cleanCode(c.state.party) || '',
+      people: (Array.isArray(c.state.people) ? c.state.people : []).slice(0, 8).filter(p => p && /^[\w.-]{1,64}$/.test(String(p.id))).map(p => ({ id: String(p.id), name: String(p.name || p.id).slice(0, 40) })),
+      listening: /^[\w.-]{1,64}$/.test(String(c.state.listening || '')) ? String(c.state.listening) : '' } };
   }
   return null;
 }
-function sendRemote(code, msg){
-  try { return fetch(RELAY + '/' + remoteTopic(code), { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
+/** Sends a message on a relay topic. Resolves true if the relay took it. */
+function sendTopic(topic, msg){
+  try { return fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
   catch(e){ return Promise.resolve(false); }
 }
-/** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
-function listenRemote(code, onMsg){
+/** Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function. */
+function listenTopic(topic, read, onMsg){
   if (typeof EventSource === 'undefined') return () => {};
-  const es = new EventSource(RELAY + '/' + remoteTopic(code) + '/sse');
-  es.onmessage = e => { const r = readRemote(e.data); if (r) onMsg(r); };
+  const es = new EventSource(RELAY + '/' + topic + '/sse');
+  es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
   return () => { try { es.close(); } catch(e){} };
 }
+const sendRemote = (code, msg) => sendTopic(remoteTopic(code), msg);
+/** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
+const listenRemote = (code, onMsg) => listenTopic(remoteTopic(code), readRemote, onMsg);
 
 /* ---------- the account, sealed with the site's PIN ---------- */
 /** What the lock keeps on a device unlocked with "Remember this screen": the PIN, hashed. Null when there's no lock. */
@@ -2147,7 +2195,8 @@ async function openDetails(code, secret, box){
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
     out.spotify = { id: String(sp.id), name: String(sp.name || sp.id).slice(0, 64), product: String(sp.product || '').slice(0, 20), client: sp.client, refresh: sp.refresh,
-      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '' };
+      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '',
+      img: /^https:\/\/[\w.-]+\/[^\s"'<>]{1,280}$/.test(String(sp.img || '')) ? sp.img : '' };
   return Object.keys(out).length ? out : null;
 }
 /* QR codes, made here so nothing has to be loaded: byte mode, medium error correction, the smallest version that fits. */
@@ -2377,14 +2426,14 @@ function forgetAccount(id){
 
 /* ---------- signing in ---------- */
 /** Sends you to Spotify to sign in. `back` is where to land afterwards. */
-async function beginSignIn(clientId, back, forTv){
+async function beginSignIn(clientId, back, forTv, ask){
   if (!clientId) throw new SpotifyError('NOCLIENT');
   const verifier = randomText(64), state = randomText(16);
   store.setJ('spotifyAuth', { verifier: verifier, state: state, back: back || location.href, at: Date.now(), forTv: !!forTv });
   const q = new URLSearchParams({ response_type: 'code', client_id: clientId, scope: SPOTIFY_SCOPES.join(' '), redirect_uri: redirectUri(),
     state: state, code_challenge_method: 'S256', code_challenge: await pkceChallenge(verifier) });
   // For the TV, Spotify asks again, so the TV can have a different account from this phone.
-  if (forTv) q.set('show_dialog', 'true');
+  if (forTv || ask) q.set('show_dialog', 'true');
   location.assign(SPOTIFY_AUTH + '/authorize?' + q.toString());
 }
 /** True when this page is Spotify sending you back (?code= or ?error=, with our state). */
@@ -2406,6 +2455,8 @@ async function finishSignIn(clientId, search){
   const acc = { id: '', name: '', product: '', client: clientId, refresh: t.refresh_token, access: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000, scope: t.scope || '' };
   const me = await api(acc, clientId, 'GET', '/me');
   acc.id = me.id; acc.name = me.display_name || me.id; acc.product = me.product || '';
+  const pic = (me.images || []).slice().sort((a, b) => (a.width || 0) - (b.width || 0))[0];
+  acc.img = pic && /^https:\/\//.test(pic.url) ? pic.url : '';
   if (!pending.forTv) rememberAccount(acc);
   return { account: acc, back: pending.back, forTv: !!pending.forTv };
 }
@@ -2509,6 +2560,7 @@ function spotify(acc, clientId){
     playlistTracks: (id, off) => apiFirst(acc, clientId, 'GET', ['/playlists/' + encodeURIComponent(id) + '/items' + qs({ limit: 50, offset: off || 0, market: 'from_token' }),
       '/playlists/' + encodeURIComponent(id) + '/tracks' + qs({ limit: 50, offset: off || 0, market: 'from_token' })]),
     album: id => call('GET', '/albums/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
+    track: id => call('GET', '/tracks/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
     artist: id => call('GET', '/artists/' + encodeURIComponent(id)),
     artistTop: id => call('GET', '/artists/' + encodeURIComponent(id) + '/top-tracks' + qs({ market: 'from_token' })),
     artistAlbums: (id, off) => call('GET', '/artists/' + encodeURIComponent(id) + '/albums' + qs({ include_groups: 'album,single', limit: 20, offset: off || 0, market: 'from_token' })),
@@ -2892,6 +2944,149 @@ async function artistStory(name){
   if (!a) return null;
   const home = homeOf(a);
   return { home: home, badge: localBadge(home, []), bio: await wikiSummary(await wikiTitle(wikidataOf(a))) };
+}
+/* The house queue and parties: the logic the TV, the phones and guests' phones share. No DOM, no network. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+//
+// Spotify lets other apps add to its queue but not reorder or remove, so the TV keeps the house's own queue and
+// hands Spotify one song at a time, just before the song playing ends ("fed"). Until then a song can be moved,
+// removed or voted up. A vote lifts a song above every song with fewer votes; the order is otherwise as people set it.
+
+const QUEUE_MAX = 40;          // songs waiting
+const GUEST_MAX = 3;           // songs one guest may have waiting at once
+const FEED_AHEAD = 25e3;       // hand the next song to Spotify this long before the song playing ends
+const FED_FORGET = 20 * 60e3;  // a song handed over that never played (something else was played) is dropped
+const WIRE_MAX = 10;           // songs sent through the relay at once (a message is at most 4 KB)
+
+const ID_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
+function shortId(rand, n){
+  const r = rand || Math.random;
+  let s = '';
+  for (let i = 0; i < (n || 6); i++) s += ID_CHARS[Math.floor(r() * ID_CHARS.length)];
+  return s;
+}
+/** A Spotify cover's address as its 40-character id, which is all that travels; and back. */
+function coverId(url){ const m = /^https:\/\/i\.scdn\.co\/image\/([0-9a-f]{40})$/.exec(String(url || '')); return m ? m[1] : ''; }
+const coverUrl = id => /^[0-9a-f]{40}$/.test(String(id || '')) ? 'https://i.scdn.co/image/' + id : '';
+/** A song's Spotify address from what a guest pastes: a share link, or the uri. */
+function trackUri(text){
+  const s = String(text || '');
+  let m = /open\.spotify\.com\/(?:intl-[a-z]{2}\/)?track\/([A-Za-z0-9]{10,40})/.exec(s);
+  if (m) return 'spotify:track:' + m[1];
+  m = /spotify:track:([A-Za-z0-9]{10,40})/.exec(s);
+  return m ? 'spotify:track:' + m[1] : null;
+}
+
+/** A song for the queue, from a song as the player knows it (trackOf). `by` is { id, name }. */
+function queueItem(t, by, now, id){
+  const img = (t.images || []).slice().sort((a, b) => (a.width || 0) - (b.width || 0)).filter(x => (x.width || 300) >= 200)[0] || (t.images || [])[0];
+  return { id: id || shortId(), uri: t.uri, name: String(t.name || '').slice(0, 80), artist: String(t.artist || '').slice(0, 60), img: coverId(img && img.url), dur: +t.dur || 0,
+    by: { id: String(by && by.id || ''), name: String(by && by.name || '').slice(0, 24) }, at: now || Date.now(), votes: [], fed: 0 };
+}
+const qWaiting = q => q.filter(x => !x.fed);
+/** Adds a song at the end. Says why not: DUP (already waiting), FULL, or LIMIT (that guest has enough waiting). */
+function queueAdd(q, item, opts){
+  opts = opts || {};
+  if (q.some(x => x.uri === item.uri)) return { q: q, err: 'DUP' };
+  if (q.length >= QUEUE_MAX) return { q: q, err: 'FULL' };
+  if (opts.guest && qWaiting(q).filter(x => x.by.id === item.by.id).length >= GUEST_MAX) return { q: q, err: 'LIMIT' };
+  return { q: q.concat([item]), err: null };
+}
+/** The first place a song can move to: below a song already handed to Spotify. */
+const qFirstFree = q => { let i = 0; while (i < q.length && q[i].fed) i++; return i; };
+function queueMove(q, id, to){
+  const i = q.map(x => x.id).indexOf(id);
+  if (i < 0 || q[i].fed) return q;
+  const out = q.slice(), it = out.splice(i, 1)[0], lo = qFirstFree(out);
+  out.splice(Math.max(lo, Math.min(out.length, Math.round(+to) || 0)), 0, it);
+  return out;
+}
+function queueRemove(q, id){ return q.filter(x => x.id !== id || x.fed); }
+/** Votes for a song, or takes the vote back; the song rises above songs with fewer votes, or sinks below songs with more. */
+function queueVote(q, id, who){
+  const i = q.map(x => x.id).indexOf(id);
+  if (i < 0 || !who) return q;
+  const out = q.slice(), it = Object.assign({}, out[i]);
+  const had = it.votes.indexOf(who) >= 0;
+  it.votes = had ? it.votes.filter(v => v !== who) : it.votes.concat([who]).slice(-50);
+  out[i] = it;
+  let j = i;
+  if (!it.fed){
+    const lo = qFirstFree(out);
+    if (!had) while (j > lo && out[j - 1].votes.length < it.votes.length){ out[j] = out[j - 1]; out[j - 1] = it; j--; }
+    else while (j < out.length - 1 && out[j + 1].votes.length > it.votes.length){ out[j] = out[j + 1]; out[j + 1] = it; j++; }
+  }
+  return out;
+}
+/**
+ * Once a second on the TV, with what's playing (playerModel): drops songs that have started playing, and says which
+ * song to hand to Spotify now (`feed`), if the song playing is nearly over. Returns { q, feed, played }.
+ */
+function queueStep(q, m, now){
+  const uri = m && m.track ? m.track.uri : '';
+  let played = null;
+  const out = q.filter(x => {
+    if (uri && x.uri === uri && (x.fed || x === q[qFirstFree(q)])){ played = x; return false; }
+    return !(x.fed && now - x.fed > FED_FORGET);
+  });
+  let feed = null;
+  const i = qFirstFree(out);
+  if (m && m.playing && m.track && m.track.dur && i === 0 && out.length){
+    const left = m.track.dur - progressAt(m, now);
+    if (left < FEED_AHEAD){ out[0] = Object.assign({}, out[0], { fed: now }); feed = out[0]; }
+  }
+  return { q: out, feed: feed, played: played };
+}
+/** Marks a song as handed over now (for a skip), or not (when Spotify refused it). */
+function queueFed(q, id, now){ return q.map(x => x.id === id ? Object.assign({}, x, { fed: now || 0 }) : x); }
+
+/* ---------- through the relay: short keys, and only what's needed ---------- */
+function queueWire(q, max){
+  return q.slice(0, max || WIRE_MAX).map(x => ({ i: x.id, u: x.uri, n: x.name, a: x.artist, m: x.img, d: x.dur, b: x.by.name, g: x.by.id, v: x.votes.slice(-20), f: x.fed ? 1 : 0 }));
+}
+const qStr = (v, n) => String(v == null ? '' : v).slice(0, n);
+function readWire(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.slice(0, WIRE_MAX).filter(x => x && /^[a-z0-9]{4,12}$/.test(x.i) && /^spotify:track:[A-Za-z0-9]{1,40}$/.test(x.u)).map(x => ({
+    id: x.i, uri: x.u, name: qStr(x.n, 80), artist: qStr(x.a, 60), img: coverUrl(x.m) ? x.m : '', dur: +x.d || 0,
+    by: { id: qStr(x.g, 16), name: qStr(x.b, 24) }, votes: Array.isArray(x.v) ? x.v.filter(v => typeof v === 'string').map(v => v.slice(0, 16)).slice(0, 20) : [], fed: x.f ? 1 : 0 }));
+}
+
+/* ---------- parties: guests scan a code on the TV and add songs, on a topic of their own ---------- */
+const partyTopic = code => 'hse-party-' + String(code).toLowerCase();
+const PARTY_CMDS = ['hello', 'add', 'vote', 'search'];
+const qGuest = w => w && /^[a-z0-9]{6,16}$/.test(w.id) ? { id: w.id, name: qStr(w.name, 24).replace(/[\u0000-\u001f]/g, '').trim() || 'A guest' } : null;
+/** A message on a party's topic (the relay's `data`): a guest's request, or the TV's answer. Null for anything else. */
+function readParty(data){
+  let m, c;
+  try { m = JSON.parse(data); if (m.event !== 'message') return null; c = JSON.parse(m.message); } catch(e){ return null; }
+  if (!c || typeof c !== 'object') return null;
+  if (c.from === 'guest' && PARTY_CMDS.indexOf(c.cmd) >= 0){
+    const who = qGuest(c.who);
+    if (!who) return null;
+    const out = { from: 'guest', cmd: c.cmd, who: who };
+    if (c.cmd === 'add'){ if (!/^spotify:track:[A-Za-z0-9]{1,40}$/.test(c.uri)) return null; out.uri = c.uri; }
+    if (c.cmd === 'vote'){ if (!/^[a-z0-9]{4,12}$/.test(c.id)) return null; out.id = c.id; }
+    if (c.cmd === 'search'){ const s = qStr(c.q, 80).trim(); if (!s || !/^[a-z0-9]{1,12}$/.test(c.rid)) return null; out.q = s; out.rid = c.rid; }
+    return out;
+  }
+  if (c.from === 'screen'){
+    if (c.results && /^[a-z0-9]{1,12}$/.test(c.rid)){
+      return { from: 'screen', rid: c.rid, to: qStr(c.to, 16), results: (Array.isArray(c.results) ? c.results : []).slice(0, 10).filter(x => x && /^spotify:track:[A-Za-z0-9]{1,40}$/.test(x.u))
+        .map(x => ({ uri: x.u, name: qStr(x.n, 80), artist: qStr(x.a, 60), img: coverUrl(x.m) ? x.m : '', dur: +x.d || 0 })) };
+    }
+    if (c.reply){ return { from: 'screen', to: qStr(c.to, 16), reply: qStr(c.reply, 120), ok: !!c.ok }; }
+    if (c.party){
+      const p = c.party, now = p.now && typeof p.now === 'object' ? { name: qStr(p.now.n, 80), artist: qStr(p.now.a, 60), img: coverUrl(p.now.m) ? p.now.m : '', playing: !!p.now.p } : null;
+      return { from: 'screen', party: { open: !!p.open, at: +p.at || 0, now: now, queue: readWire(p.q), more: Math.max(0, +p.more || 0), max: GUEST_MAX } };
+    }
+  }
+  return null;
+}
+/** What a guest's phone shows of a song: its cover (small), and whether it's theirs or they've voted for it. */
+function guestView(q, me){
+  return q.map((x, i) => ({ id: x.id, name: x.name, artist: x.artist, img: coverUrl(x.img), by: x.by.name, mine: !!me && x.by.id === me, voted: !!me && x.votes.indexOf(me) >= 0, votes: x.votes.length, fed: !!x.fed, pos: i + 1 }));
 }
 /* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
@@ -4574,7 +4769,7 @@ function tmToggle(){
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
   return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
 }
-const tmNext = () => tmAct(sp => sp.next(tmDevice()), 600);
+const tmNext = () => tmAct(sp => hqSkip(sp, tmDevice()), 600);
 const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
 /** A favourite from the number keys: a playlist or album, from the top. */
 function tmFavourite(i){
@@ -4643,8 +4838,9 @@ function tmTick(now){
   }
   const night = D.set.night && inWindow(now, D.set.nightFrom, D.set.nightTo);
   // only as the window starts: a screen that wakes up or reloads in the night (the fresh start is at 03:30) leaves it be
-  if (night && TM.wasNight === false && D.set.musicNight !== false && m && m.playing) tmFade(60);
+  if (night && TM.wasNight === false && D.set.musicNight !== false && !HQ.party && m && m.playing) tmFade(60);
   TM.wasNight = night;
+  hqTick(now);
   if (shown() === 'music') tmTickView(now);
 }
 
@@ -4667,7 +4863,9 @@ function tmLyricsHtml(lines, i){
 function renderMusic(){
   const sec = $('section[data-mode="music"]');
   const m = tmModel(), t = tmTrack();
-  sec.className = 'mode music-mode view-' + TM.view;
+  sec.className = 'mode music-mode view-' + TM.view + (HQ.party ? ' party-on' : '');
+  $('#mParty').hidden = !HQ.party || !(TM.acc && t);
+  if (HQ.party) setHtml($('#mParty'), hqPartyHtml());
   $('#mEmpty').hidden = !!(TM.acc && t);
   $('#mMain').hidden = !(TM.acc && t);
   if (!TM.acc){
@@ -4676,7 +4874,11 @@ function renderMusic(){
   }
   if (!t){
     const e = SRC.music.err;
-    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.')) + '</p>' + tmFavsHtml() + tmWallHtml();
+    const waiting = HQ.q.filter(x => !x.fed).length;
+    setHtml($('#mEmpty'), '<div class="m-idle"><p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) + ' ' : '') + (waiting ? 'Press OK to play the house queue' + (tmFavs().length ? ', or a number for a favourite.' : '.')
+      : tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.') + '</p>'
+      + (waiting ? '<div class="m-next">' + hqNextHtml() + '</div>' : tmFavsHtml() + tmWallHtml()) + '</div>' + (HQ.party ? '<aside class="m-party">' + hqPartyHtml() + '</aside>' : ''));
+    $('#mEmpty').className = 'm-empty' + (HQ.party ? ' with-party' : '');
     $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
   }
   const art = artUrl(t.images, 640);
@@ -4687,7 +4889,7 @@ function renderMusic(){
   $('#mState').className = 'mstate ' + (m.playing ? 'on' : 'off');
   if (!$('#mState').firstChild) $('#mState').innerHTML = '<i></i><i></i><i></i>';
   const q = TM.queue && TM.queue.length ? TM.queue[0] : null;
-  $('#mNext').innerHTML = q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
+  $('#mNext').innerHTML = HQ.q.length ? hqNextHtml() : q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
   const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
   if (TM.view === 'notes') tmNotesHtml();
   else if (lines){ TM.shownLine = -2; tmTickView(Date.now()); }
@@ -4721,6 +4923,7 @@ function tmNotesHtml(){
 function tmKey(e){
   if (!TM.acc) return false;
   if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
+  if (!tmTrack() && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
   if (!tmTrack()) return false;
   if (e.key === 'Enter'){ tmToggle(); return true; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
@@ -4749,9 +4952,162 @@ function tmTodayHtml(){
 }
 /** From the phone, sealed: this screen's own Spotify sign-in. */
 function tmTake(acc){
-  saveSpotifyStore({ accounts: [acc], active: acc.id });
+  rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+}
+/* ===================== display: the house queue, parties and who's listening (src/lib/queue.js) ===================== */
+// Plain script for TV browsers (Chromium 63): no ?. or ??. The TV keeps the house's queue, because it's always on:
+// phones add, move, remove and vote through the relay, guests at a party add and vote from a page of their own, and
+// the TV hands Spotify the next song just before the one playing ends, so everything stays movable until then.
+const HQ = { q: hqLoad(), party: cleanCode(store.get('party')) || '', partyAt: +store.get('partyAt') || 0, stopParty: null, guests: {},
+  sendTimer: 0, partySent: '', nowSent: '' };
+const HQ_WHY = { DUP: 'That song is already in the queue.', FULL: 'The queue is full for now.', LIMIT: 'You have ' + GUEST_MAX + ' songs waiting. Once one plays, add another.',
+  LOOKUP: 'Spotify couldn\'t find that song.', NOSPOTIFY: 'Spotify isn\'t on the TV yet.', CLOSED: 'The party is over.' };
+
+function hqLoad(){
+  const q = store.getJ('houseQueue', []);
+  return Array.isArray(q) ? q.filter(x => x && x.id && x.uri && x.by && Array.isArray(x.votes)) : [];
+}
+/** Keeps the queue, redraws, and tells the phones and the party. */
+function hqSet(q, note){
+  HQ.q = q; store.setJ('houseQueue', q);
+  render(); D.sentState = ''; tellRemote(note); hqPartyTell();
+}
+/** Adds a song by its uri, looked up with the TV's own Spotify so its name and cover are Spotify's. */
+async function hqAdd(uri, by, guest){
+  const sp = tmSp();
+  if (!sp) return { err: 'NOSPOTIFY' };
+  if (HQ.q.some(x => x.uri === uri)) return { err: 'DUP' };
+  let t = null;
+  try { t = trackOf(await sp.track(uri.split(':')[2])); } catch(e){}
+  if (!t) return { err: 'LOOKUP' };
+  const r = queueAdd(HQ.q, queueItem(t, by, Date.now()), { guest: guest });
+  if (r.err) return r;
+  hqSet(r.q, (by.name || 'Someone') + ' added ' + t.name);
+  toast('♪ ' + (by.name || 'Someone') + ' added ' + t.name + ' · ' + t.artist, 4000);
+  return { item: r.q[r.q.length - 1] };
+}
+/** From a paired phone: add, move, remove or vote. */
+function hqCommand(r){
+  if (r.op === 'add') hqAdd(r.uri, r.who, false).then(x => { if (x.err) tellRemote(HQ_WHY[x.err]); });
+  else if (r.op === 'move') hqSet(queueMove(HQ.q, r.id, r.to));
+  else if (r.op === 'remove') hqSet(queueRemove(HQ.q, r.id));
+  else if (r.op === 'vote') hqSet(queueVote(HQ.q, r.id, r.who.id));
+}
+/** Every second: hand Spotify the next song as this one ends, and drop songs that have started. */
+function hqTick(now){
+  if (HQ.party && now - HQ.partyAt > 12 * 3600e3) hqParty(false);
+  const m = tmModel();
+  const id = m && m.track ? m.track.id + (m.playing ? '>' : '|') : '';
+  if (id !== HQ.nowSent){ HQ.nowSent = id; hqPartyTell(); }
+  // at a party, a song added while nothing at all is playing starts the music (never a paused song, though)
+  if (HQ.party && SRC.music.at && !(m && m.track) && HQ.q.some(x => !x.fed) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStart(); return; }
+  if (!HQ.q.length || !m) return;
+  const r = queueStep(HQ.q, m, now);
+  if (!r.feed && !r.played && r.q.length === HQ.q.length) return;
+  hqSet(r.q);
+  const sp = tmSp();
+  if (r.feed && sp) sp.addToQueue(r.feed.uri, tmDevice()).catch(() => hqSet(queueFed(HQ.q, r.feed.id, 0)));
+}
+/** Plays the house queue from the top, when nothing is playing: on the device last used, or the first awake. */
+function hqStart(){
+  const top = HQ.q.filter(x => !x.fed)[0];
+  if (!top) return;
+  hqSet(queueFed(HQ.q, top.id, Date.now()));
+  tmAct(sp => sp.play({ device: tmDevice(), uris: [top.uri] }).catch(e => {
+    if (e.code !== 'NO_DEVICE') throw e;
+    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
+  }).catch(e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; }), 900);
+}
+/** Skipping with songs waiting in the house queue plays the next of them, not what Spotify would have played. */
+function hqSkip(sp, dev){
+  const top = HQ.q.length && !HQ.q[0].fed ? HQ.q[0] : null;
+  if (!top) return sp.next(dev);
+  hqSet(queueFed(HQ.q, top.id, Date.now()));
+  return sp.addToQueue(top.uri, dev).then(() => sp.next(dev), e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; });
+}
+
+/* ---------- parties: guests scan a code and add songs, on a topic of their own ---------- */
+function hqParty(on){
+  if (HQ.stopParty){ HQ.stopParty(); HQ.stopParty = null; }
+  if (on){
+    if (!tmSp()){ toast('Spotify isn\'t on this screen yet: on your phone, Screen, then Connect Spotify on the TV.', 6000); return; }
+    if (!HQ.party){ HQ.party = newRemoteCode(); HQ.partyAt = Date.now(); store.set('party', HQ.party); store.set('partyAt', String(HQ.partyAt)); toast('The party\'s on. Guests scan the code to add songs.', 5000); }
+    HQ.stopParty = listenTopic(partyTopic(HQ.party), readParty, hqGuest);
+    if (D.mode !== 'music') setMode('music');
+  } else if (HQ.party){
+    sendTopic(partyTopic(HQ.party), { from: 'screen', party: { open: false, at: Date.now() } });
+    HQ.party = ''; HQ.guests = {}; HQ.partySent = ''; store.del('party'); store.del('partyAt');
+    toast('The party\'s over. The house queue stays.', 4000);
+  }
+  D.sentState = ''; tellRemote(on ? 'Party on' : 'Party over'); render();
+  if (on) hqPartyTell(true);
+}
+/** A guest's request. Each guest gets a search a second, a few hundred requests a party, and songs only up to the limit (queueAdd). */
+function hqGuest(r){
+  if (r.from !== 'guest' || !HQ.party) return;
+  const now = Date.now(), g = HQ.guests[r.who.id] || (HQ.guests[r.who.id] = { t: 0, n: 0 });
+  if (g.n > 400 || (r.cmd === 'search' && now - g.t < 1000)) return;
+  g.n++; if (r.cmd === 'search') g.t = now;
+  if (r.cmd === 'hello') hqPartyTell(true);
+  else if (r.cmd === 'search') hqSearch(r);
+  else if (r.cmd === 'add') hqAdd(r.uri, r.who, true).then(x => hqReply(r.who.id, x.err ? HQ_WHY[x.err] : 'Added ' + x.item.name + '. It\'s number ' + (HQ.q.map(y => y.id).indexOf(x.item.id) + 1) + ' in the queue.', !x.err));
+  else if (r.cmd === 'vote') hqSet(queueVote(HQ.q, r.id, r.who.id));
+}
+function hqReply(to, text, ok){ sendTopic(partyTopic(HQ.party), { from: 'screen', to: to, reply: text, ok: !!ok }); }
+function hqSearch(r){
+  const sp = tmSp(); if (!sp) return;
+  sp.search(r.q, ['track'], 8).then(j => {
+    const list = ((j && j.tracks && j.tracks.items) || []).filter(Boolean).map(trackOf).filter(t => t && t.playable !== false);
+    sendTopic(partyTopic(HQ.party), { from: 'screen', rid: r.rid, to: r.who.id, results: list.map(t => ({ u: t.uri, n: t.name.slice(0, 80), a: t.artist.slice(0, 60), m: coverId(artUrl(t.images, 300)), d: t.dur })) });
+  }, () => hqReply(r.who.id, 'Spotify didn\'t answer. Try again in a moment.', false));
+}
+/** Tells the party what's playing and what's next, a moment after anything changes. */
+function hqPartyTell(force){
+  if (!HQ.party) return;
+  clearTimeout(HQ.sendTimer);
+  HQ.sendTimer = setTimeout(() => {
+    const t = tmTrack(), m = tmModel();
+    const msg = { from: 'screen', party: { open: true, at: Date.now(), now: t ? { n: t.name.slice(0, 80), a: t.artist.slice(0, 60), m: coverId(artUrl(t.images, 300)), p: !!(m && m.playing) } : null,
+      q: queueWire(HQ.q), more: Math.max(0, HQ.q.length - WIRE_MAX) } };
+    const key = JSON.stringify([msg.party.now, msg.party.q, msg.party.more]);
+    if (key === HQ.partySent && !force) return;
+    HQ.partySent = key;
+    sendTopic(partyTopic(HQ.party), msg);
+  }, force ? 50 : 700);
+}
+function hqPartyUrl(){
+  if (!HQ.party || !/^https?:$/.test(location.protocol)) return '';
+  return location.href.split('#')[0].replace(/[^\/]*$/, '') + 'party.html#' + HQ.party;
+}
+/** After a reload, a party that was on carries on. */
+function hqResume(){ if (HQ.party && !D.embed) hqParty(true); }
+
+/* ---------- on the Music view: what's next in the house queue, and the party's code ---------- */
+function hqNextHtml(){
+  const list = HQ.q.slice(0, 3);
+  if (!list.length) return '';
+  const rest = HQ.q.length - list.length;
+  return '<p class="label">Up next in the house queue' + (rest > 0 ? ' · ' + rest + ' more' : '') + '</p><ol class="hq">' + list.map(x =>
+    `<li><span class="t"><b>${esc(x.name)}</b> <span class="muted">· ${esc(x.artist)}</span></span>${x.votes.length ? `<span class="votes">♥ ${x.votes.length}</span>` : ''}${x.by.name ? `<span class="by">${esc(x.by.name)}</span>` : ''}</li>`).join('') + '</ol>';
+}
+function hqPartyHtml(){
+  const url = hqPartyUrl();
+  if (!url) return '<p class="label">Party</p><p class="note">Open the display from the website to show guests a code.</p>';
+  return `<p class="label">Party · add a song</p><div class="pqr">${qrSvg(url, { label: 'Code to add songs to the party' })}</div><p class="pcode mono">${showCode(HQ.party)}</p><p class="note">Scan with your phone's camera. Up to ${GUEST_MAX} songs each; vote for the ones you want sooner.</p>`;
+}
+
+/* ---------- who's listening: the TV can hold several people's Spotify, and plays as one of them ---------- */
+function tmPeople(){ return spotifyStore().accounts.map(a => ({ id: a.id, name: a.name || a.id })); }
+function tmListen(id){
+  const s = spotifyStore(), a = s.accounts.filter(x => x.id === id)[0];
+  if (!a){ toast('That Spotify isn\'t on this screen.', 4000); return; }
+  s.active = a.id; saveSpotifyStore(s);
+  TM.acc = a; TM.lastTrack = '';
+  ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+  toast('Listening as ' + (a.name || a.id), 3000);
+  D.sentState = ''; tellRemote('Listening as ' + (a.name || a.id)); render();
 }
 /* ===================== display: modes, remote control, scheduling, rendering ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
@@ -4850,9 +5206,9 @@ function tick(){
   tmTick(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
-  if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
+  if (night && idle > 2*MIN && D.mode !== 'night' && !open() && !(HQ.party && D.mode === 'music')) setOverride('night');
   else if (!night && D.override === 'night') setOverride(null);
-  else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open()) setOverride('screensaver');
+  else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open() && !(HQ.party && D.mode === 'music')) setOverride('screensaver');
   if (set.rotate > 0 && !D.override && ROTATING.indexOf(D.mode) >= 0 && now >= D.rotateAt && now - D.lastPick > 2*MIN && !open()){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
@@ -5098,6 +5454,10 @@ function startRemote(){
     else if (r.cmd === 'account'){ takeDetails(r.box); return; }
     else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
     else if (r.cmd === 'sleep'){ tmSleep(r.mins, r.song); return; }
+    else if (r.cmd === 'queue'){ hqCommand(r); return; }
+    else if (r.cmd === 'party'){ hqParty(r.on); return; }
+    else if (r.cmd === 'listen'){ tmListen(r.id); return; }
+    else if (r.cmd === 'skip'){ tmNext(); return; }
     else if (r.cmd === 'favs'){ store.setJ('musicFavs', r.favs); toast(r.favs.length ? 'Favourites for the number keys, from your phone: ' + r.favs.map((f, i) => (i + 1) + ' ' + f.name).join(', ') : 'Favourites cleared: the number keys play your first playlists.', 6000); render(); D.sentState = ''; tellRemote('Favourites saved'); return; }
     D.sentState = ''; tellRemote();
   });
@@ -5107,10 +5467,12 @@ function startRemote(){
 function tellRemote(note){
   if (!D.remote || D.embed) return;
   const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong;
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
   if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '' } });
+  // with the house queue (the first few), the party's code, and whose Spotify the TV has (src/display/tvqueue.js)
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '',
+    queue: queueWire(HQ.q, 8), more: Math.max(0, HQ.q.length - 8), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -5261,6 +5623,14 @@ function fillSheet(){
   $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on this screen.` : 'For live draw and today\'s cost, open the phone pages on this screen once (Settings, then Account) and connect your Octopus account.';
   $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
     : `Home server helper found. Trains: ${NET.keys.rtt ? 'token set' : 'no Realtime Trains token yet'}. Trams: ${NET.keys.tfgm ? 'key set' : 'no TfGM key yet'}.`;
+  const people = tmPeople();
+  $('#fListen').innerHTML = people.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  if (TM.acc) setv('fListen', TM.acc.id);
+  $('#listenRow').hidden = people.length < 2;
+  $('#partyBtn').textContent = HQ.party ? 'End the party' : 'Start a party';
+  $('#partyBtn').disabled = !TM.acc;
+  $('#musicHelp').textContent = !TM.acc ? 'Spotify isn\'t on this screen yet. On your phone: Screen, then Connect Spotify on the TV.'
+    : (HQ.party ? 'The party is on: guests scan the code on the Music view to add songs. ' : 'A party shows a code on the Music view that guests scan to add songs and vote, with no sign-in. ') + 'Add another person\'s Spotify from their phone (Screen, then Spotify on the TV).';
   $('#setupOut').textContent = '';
   $('#pairCode').textContent = D.remote ? showCode(D.remote) : 'Starting…';
 }
@@ -5304,7 +5674,8 @@ function wire(){
   $('#wifiCard').addEventListener('click', hideWifi);
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
-  $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });
+  $('#setForm').addEventListener('submit', e => { e.preventDefault(); const lv = $('#fListen').value; applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); if (lv && TM.acc && lv !== TM.acc.id) tmListen(lv); });
+  $('#partyBtn').addEventListener('click', () => { closeSheet(); hqParty(!HQ.party); });
   $('#copySetup').addEventListener('click', () => {
     const link = setupLink(readSheet(), $('#fRegion').value), out = $('#setupOut');
     const done = ok => { out.textContent = (ok ? 'Copied. ' : '') + 'Open this link on the other screen to copy these settings there' + (readSheet().ical ? ' (it includes your secret calendar address, so only send it to yourself)' : '') + ': ' + link; };
@@ -5355,6 +5726,7 @@ function wire(){
   if (!D.embed) keepAwake();
   await detectProxy();
   startRemote();
+  hqResume();
   tick(); setInterval(tick, 1000);
 })();
 

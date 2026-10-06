@@ -95,9 +95,9 @@ function tick(){
   tmTick(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
-  if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
+  if (night && idle > 2*MIN && D.mode !== 'night' && !open() && !(HQ.party && D.mode === 'music')) setOverride('night');
   else if (!night && D.override === 'night') setOverride(null);
-  else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open()) setOverride('screensaver');
+  else if (!D.override && set.saver > 0 && idle > set.saver*MIN && D.mode !== 'screensaver' && D.mode !== 'night' && !open() && !(HQ.party && D.mode === 'music')) setOverride('screensaver');
   if (set.rotate > 0 && !D.override && ROTATING.indexOf(D.mode) >= 0 && now >= D.rotateAt && now - D.lastPick > 2*MIN && !open()){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
@@ -343,6 +343,10 @@ function startRemote(){
     else if (r.cmd === 'account'){ takeDetails(r.box); return; }
     else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
     else if (r.cmd === 'sleep'){ tmSleep(r.mins, r.song); return; }
+    else if (r.cmd === 'queue'){ hqCommand(r); return; }
+    else if (r.cmd === 'party'){ hqParty(r.on); return; }
+    else if (r.cmd === 'listen'){ tmListen(r.id); return; }
+    else if (r.cmd === 'skip'){ tmNext(); return; }
     else if (r.cmd === 'favs'){ store.setJ('musicFavs', r.favs); toast(r.favs.length ? 'Favourites for the number keys, from your phone: ' + r.favs.map((f, i) => (i + 1) + ' ' + f.name).join(', ') : 'Favourites cleared: the number keys play your first playlists.', 6000); render(); D.sentState = ''; tellRemote('Favourites saved'); return; }
     D.sentState = ''; tellRemote();
   });
@@ -352,10 +356,12 @@ function startRemote(){
 function tellRemote(note){
   if (!D.remote || D.embed) return;
   const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong;
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
   if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '' } });
+  // with the house queue (the first few), the party's code, and whose Spotify the TV has (src/display/tvqueue.js)
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '',
+    queue: queueWire(HQ.q, 8), more: Math.max(0, HQ.q.length - 8), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -506,6 +512,14 @@ function fillSheet(){
   $('#acctHelp').textContent = NET.creds ? `Live draw and today's cost use the Octopus account ${NET.creds.account}, connected on this screen.` : 'For live draw and today\'s cost, open the phone pages on this screen once (Settings, then Account) and connect your Octopus account.';
   $('#travelHelp').textContent = !NET.proxy ? 'Live trains and trams come through the home server helper, which holds the API keys. Open the display from it to see them.'
     : `Home server helper found. Trains: ${NET.keys.rtt ? 'token set' : 'no Realtime Trains token yet'}. Trams: ${NET.keys.tfgm ? 'key set' : 'no TfGM key yet'}.`;
+  const people = tmPeople();
+  $('#fListen').innerHTML = people.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+  if (TM.acc) setv('fListen', TM.acc.id);
+  $('#listenRow').hidden = people.length < 2;
+  $('#partyBtn').textContent = HQ.party ? 'End the party' : 'Start a party';
+  $('#partyBtn').disabled = !TM.acc;
+  $('#musicHelp').textContent = !TM.acc ? 'Spotify isn\'t on this screen yet. On your phone: Screen, then Connect Spotify on the TV.'
+    : (HQ.party ? 'The party is on: guests scan the code on the Music view to add songs. ' : 'A party shows a code on the Music view that guests scan to add songs and vote, with no sign-in. ') + 'Add another person\'s Spotify from their phone (Screen, then Spotify on the TV).';
   $('#setupOut').textContent = '';
   $('#pairCode').textContent = D.remote ? showCode(D.remote) : 'Starting…';
 }
@@ -549,7 +563,8 @@ function wire(){
   $('#wifiCard').addEventListener('click', hideWifi);
   $('#closeSheet').addEventListener('click', closeSheet);
   $('#newCode').addEventListener('click', () => { newPairing(); toast('New code. Enter it on your phone again.'); });
-  $('#setForm').addEventListener('submit', e => { e.preventDefault(); applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); });
+  $('#setForm').addEventListener('submit', e => { e.preventDefault(); const lv = $('#fListen').value; applySettings(readSheet(), $('#fRegion').value); closeSheet(); toast('Settings saved on this device.'); if (lv && TM.acc && lv !== TM.acc.id) tmListen(lv); });
+  $('#partyBtn').addEventListener('click', () => { closeSheet(); hqParty(!HQ.party); });
   $('#copySetup').addEventListener('click', () => {
     const link = setupLink(readSheet(), $('#fRegion').value), out = $('#setupOut');
     const done = ok => { out.textContent = (ok ? 'Copied. ' : '') + 'Open this link on the other screen to copy these settings there' + (readSheet().ical ? ' (it includes your secret calendar address, so only send it to yourself)' : '') + ': ' + link; };
@@ -600,5 +615,6 @@ function wire(){
   if (!D.embed) keepAwake();
   await detectProxy();
   startRemote();
+  hqResume();
   tick(); setInterval(tick, 1000);
 })();

@@ -19,6 +19,10 @@ test('the locked site opens with the PIN on the keypad and remembers the screen'
   assert.doesNotMatch(page0, /Agile price now/, 'the display is encrypted');
   assert.ok(existsSync(join(dir, '.nojekyll')));
   assert.ok(!existsSync(join(dir, 'server.py')), 'only the pages are published');
+  for (const f of ['index.html', 'money.html', 'music.html', 'screen.html', 'settings.html']) assert.match(readFileSync(join(dir, f), 'utf8'), /staticrypt/i, f + ' is locked');
+  const party = readFileSync(join(dir, 'party.html'), 'utf8');
+  assert.doesNotMatch(party, /staticrypt/i, 'the party page opens for guests without the PIN');
+  assert.doesNotMatch(party, /Octopus|household\.json|remoteTV/, 'and has nothing of the household in it');
 
   const server = http.createServer((req, res) => {
     let file = normalize(join(dir, new URL(req.url, 'http://x').pathname));

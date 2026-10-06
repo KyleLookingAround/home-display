@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation** (music branch, stage 4): the house queue, parties and who's listening ([decision 0013](docs/decisions/0013-house-queue.md)).
+  - **The house queue:** with the TV paired and on Spotify, + on a phone adds to a queue the TV keeps. Up next in the player shows it: drag a song by its handle (or the arrow keys) to move it, the heart to vote it up, the cross to take it out. The TV hands Spotify the top song about 25 seconds before the one playing ends, and skipping plays the house's next.
+  - **The TV:** the Music view lists the next three, with who chose them and their votes.
+  - **Parties:** "Start a party" (on the phone, or in the TV's settings) shows a code on the TV. Guests scan it to open `party.html`, give a name, search (the TV searches for them) or paste a Spotify link, add up to three songs each and vote. The page isn't behind the PIN and holds nothing private; the party's topic can only add songs and vote. While a party's on, the screensaver, the night clock and the bedtime fade wait.
+  - **Who's listening:** "Add someone" in Settings, Music signs in another person's Spotify; the Music tab shows faces to switch between. The TV can hold several people too, and Screen picks who it plays as.
 - **Creation** (music branch, stage 3): music on the TV.
   - **Signed in from the phone:** Screen, then "Connect Spotify on the TV". Spotify asks which account; the sign-in is sealed with the site PIN and sent, and the TV keeps its own.
   - **The Music view** (key 6): the cover, the song, where it's playing, the time, three lines of the words and what's next, over the cover's colours. Down shows the words large, then the liner notes (left and right turn the pages). OK plays and pauses, left and right skip, 1 to 9 play favourites. With nothing on, the favourites and a wall of your albums.

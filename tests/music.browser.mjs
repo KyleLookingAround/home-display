@@ -28,7 +28,10 @@ function png(r, g, b, size = 64){
 const COVERS = { amber: png(250, 160, 40), violet: png(150, 90, 240), cyan: png(40, 200, 240) };
 
 /* ---------- the pretend Spotify ---------- */
-const img = c => [{ url: `https://i.scdn.co/image/${c}-640`, width: 640, height: 640 }, { url: `https://i.scdn.co/image/${c}-300`, width: 300, height: 300 }, { url: `https://i.scdn.co/image/${c}-64`, width: 64, height: 64 }];
+// Spotify's covers have 40-character ids; these say which colour and size they are.
+const ID2C = {};
+const cid = (c, w) => { const id = { amber: 'a', violet: 'b', cyan: 'c' }[c] + w.toString(16).padStart(4, '0') + '0'.repeat(35); ID2C[id] = c; return 'https://i.scdn.co/image/' + id; };
+const img = c => [640, 300, 64].map(w => ({ url: cid(c, w), width: w, height: w }));
 const ALBUMS = {
   al1: { id: 'al1', uri: 'spotify:album:al1', name: 'Region G', release_date: '2026-09-04', images: img('amber'), artists: [{ id: 'a1', name: 'The Stockport Satellites' }] },
   al2: { id: 'al2', uri: 'spotify:album:al2', name: 'Half-Hourly', release_date: '2025-03-01', images: img('violet'), artists: [{ id: 'a2', name: 'Agile Hearts' }] },
@@ -66,7 +69,7 @@ async function openLibraries(page){
   await page.route(/^https:\/\/musicbrainz\.org\/ws\/2\//, r => { const u = new URL(r.request().url()), k = u.pathname.replace('/ws/2', ''); return MBX[k] ? r.fulfill({ json: MBX[k], headers: CORS }) : r.fulfill({ status: 404, json: { error: 'Not Found' }, headers: CORS }); });
   await page.route(/^https:\/\/www\.wikidata\.org\/w\/api\.php/, r => { const id = new URL(r.request().url()).searchParams.get('ids'); return r.fulfill({ json: { entities: { [id]: { sitelinks: WIKI[id] ? { enwiki: { title: WIKI[id] } } : {} } } }, headers: CORS }); });
   await page.route(/^https:\/\/en\.wikipedia\.org\/api\/rest_v1\/page\/summary\//, r => { const t = decodeURIComponent(r.request().url().split('/summary/')[1]); return SUMMARY[t] ? r.fulfill({ json: { type: 'standard', title: t.replace(/_/g, ' '), extract: SUMMARY[t], content_urls: { mobile: { page: 'https://en.m.wikipedia.org/wiki/' + t } } }, headers: CORS }) : r.fulfill({ status: 404, json: {}, headers: CORS }); });
-  await page.route(/^https:\/\/coverartarchive\.org\/release\/rel1$/, r => r.fulfill({ json: { images: [['Back', 'violet'], ['Front', 'amber'], ['Booklet', 'cyan']].map(([t, c]) => ({ types: [t], front: t === 'Front', image: `https://i.scdn.co/image/${c}-640`, thumbnails: { 500: `https://i.scdn.co/image/${c}-300` } })) }, headers: CORS }));
+  await page.route(/^https:\/\/coverartarchive\.org\/release\/rel1$/, r => r.fulfill({ json: { images: [['Back', 'violet'], ['Front', 'amber'], ['Booklet', 'cyan']].map(([t, c]) => ({ types: [t], front: t === 'Front', image: cid(c, 640), thumbnails: { 500: cid(c, 300) } })) }, headers: CORS }));
 }
 const LRC = '[00:00.50]Streetlights hum along the viaduct\n[00:08.00]Kettle on at half past nine\n[00:16.00]The meter ticks, the prices drop\n[00:24.00]We wait for cheaper time\n[00:32.00]Harold Street, Harold Street\n[00:40.00]Stars above the chimney pots';
 
@@ -106,7 +109,8 @@ function spotify(opts = {}){
     if (p === '/me/player/repeat'){ st.repeat_state = q.get('state'); return { status: 204 }; }
     if (p === '/me/player/volume'){ st.device = Object.assign({}, st.device, { volume_percent: +q.get('volume_percent') }); return { status: 204 }; }
     if (p === '/me/player/queue' && method === 'GET') return { json: { currently_playing: st && st.item, queue: S.queue } };
-    if (p === '/me/player/queue' && method === 'POST'){ S.queue.push(find(q.get('uri'))); return { status: 204 }; }
+    if (p === '/me/player/queue' && method === 'POST'){ S.queue.unshift(find(q.get('uri'))); return { status: 204 }; }
+    if (/^\/tracks\/\w+$/.test(p)){ const t = TRACKS.find(x => x.id === p.split('/')[2]); return t ? { json: t } : err(404, 'Non existing id'); }
     if (p === '/me/tracks/contains') return { json: q.get('ids').split(',').map(id => S.liked.has(id)) };
     if (p === '/me/tracks' && method === 'PUT'){ q.get('ids').split(',').forEach(id => S.liked.add(id)); return { status: 200, json: {} }; }
     if (p === '/me/tracks' && method === 'DELETE'){ q.get('ids').split(',').forEach(id => S.liked.delete(id)); return { status: 200, json: {} }; }
@@ -151,7 +155,7 @@ async function open(path, { width = 390, height = 844, sp = spotify(), signedIn 
   // nothing leaves the test but what's pretended here
   await page.route(u => !u.href.startsWith(base), r => r.abort());
   await page.route(/^https:\/\/fonts\.(googleapis|gstatic)\.com\//, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
-  await page.route(/^https:\/\/i\.scdn\.co\/image\/(\w+)-\d+/, r => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: COVERS[/image\/(\w+)-/.exec(r.request().url())[1]] }));
+  await page.route(/^https:\/\/i\.scdn\.co\/image\/[0-9a-f]{40}$/, r => r.fulfill({ status: 200, contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' }, body: COVERS[ID2C[r.request().url().split('/').pop()]] }));
   await page.route(/^https:\/\/lrclib\.net\/api\/get/, r => /track_name=Harold/.test(r.request().url()) ? r.fulfill({ json: { syncedLyrics: LRC, plainLyrics: 'x', instrumental: false }, headers: { 'Access-Control-Allow-Origin': '*' } }) : r.fulfill({ status: 404, json: {}, headers: { 'Access-Control-Allow-Origin': '*' } }));
   await page.route(/^https:\/\/api\.spotify\.com\/v1\//, async r => {
     const req = r.request(), raw = req.postData(); let body; try { body = raw ? JSON.parse(raw) : undefined; } catch (e) { body = raw; }
@@ -483,7 +487,7 @@ async function relay(page, deliver, retry = 60000){
   await page.route(/^https:\/\/ntfy\.sh\//, async r => {
     const req = r.request();
     if (req.method() === 'POST'){ sent.push({ topic: new URL(req.url()).pathname.slice(1), msg: JSON.parse(req.postData() || '{}') }); return r.fulfill({ json: { event: 'message' }, headers: CORS }); }
-    const body = deliver().map(m => 'data: ' + JSON.stringify({ event: 'message', message: JSON.stringify(m) }) + '\n\n').join('');
+    const body = deliver(new URL(req.url()).pathname.split('/')[1]).map(m => 'data: ' + JSON.stringify({ event: 'message', message: JSON.stringify(m) }) + '\n\n').join('');
     return r.fulfill({ status: 200, contentType: 'text/event-stream', headers: CORS, body: `retry: ${retry}\n\n` + body });
   });
   return sent;
@@ -501,7 +505,7 @@ test('music on the TV: signed in from the phone, sealed, then the Music view wit
   await phone.page.reload();
   const card = phone.page.locator('#spotify');
   await until(() => card.textContent().then(t => /The TV plays as\s*Kyle/.test(t)).catch(() => false), 'the TV says who it plays as', 8000);
-  await card.locator('.actions button', { hasText: 'Change account' }).click();
+  await card.locator('.actions button', { hasText: 'Add someone to the TV' }).click();
   await phone.page.waitForURL(/screen\.html#spotify/, { timeout: 8000 });
   assert.equal(phone.sp.authorize.show_dialog, 'true', 'Spotify asks which account, for the TV');
   await until(() => phoneSent.some(s => s.msg.cmd === 'account' && s.msg.box), 'the sign-in sealed and sent', 8000);
@@ -630,4 +634,182 @@ test('music on the TV: on Today, in the screensaver, and fading out at bedtime',
   await until(() => calls(sp, 'PUT', '/me/player/volume').length > vols.length, 'starts fading at night', 8000);
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+/* ---------- stage 4: the house queue, parties, and who's listening ---------- */
+const KYLE = { id: 'phone00001', name: 'Kyle' };
+const say = (topic, m) => ({ topic, m });
+/** A relay whose streams reconnect every 300ms, delivering whatever's waiting for each topic once. */
+function postbox(){
+  const waiting = [];
+  return { put: (topic, m) => waiting.push(say(topic, m)), take: topic => { const out = []; for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].topic === topic) out.unshift(waiting.splice(i, 1)[0].m); return out; } };
+}
+
+test('music on the TV: the house queue, handed to Spotify a song at a time, and a party', async () => {
+  const CODE = 'ABCDEFGH', HOUSE = 'hse-screen-abcdefgh';
+  const sp = spotify();
+  const tv = await open('/display.html#music', { width: 1920, height: 1080, sp, settings: {}, keep: { 'hse.remote': CODE } });
+  const box = postbox(), sent = await relay(tv.page, topic => box.take(topic), 300);
+  await tv.page.reload();
+  await until(() => tv.page.textContent('#mTitle').then(t => t === 'Harold Street'), 'playing', 8000);
+  const stateOf = () => { const s = sent.filter(x => x.topic === HOUSE && x.msg.state).pop(); return s && s.msg.state; };
+  // a phone adds two songs; the TV looks them up and shows who chose them
+  box.put(HOUSE, { from: 'phone', cmd: 'queue', op: 'add', uri: 'spotify:track:t3', who: KYLE });
+  box.put(HOUSE, { from: 'phone', cmd: 'queue', op: 'add', uri: 'spotify:track:t4', who: KYLE });
+  await until(() => tv.page.locator('.hq li').count().then(n => n === 2), 'two songs in the house queue', 8000);
+  assert.match(await tv.page.textContent('#mNext'), /Up next in the house queue\s*Last Train to Piccadilly · Viaduct\s*Kyle\s*Bins Out Tonight/);
+  await until(() => (stateOf() || { queue: [] }).queue.length === 2, 'the phones are told');
+  const [first, second] = stateOf().queue;
+  assert.equal(first.n, 'Last Train to Piccadilly'); assert.equal(first.b, 'Kyle');
+  // a vote lifts the second above the first
+  box.put(HOUSE, { from: 'phone', cmd: 'queue', op: 'vote', id: second.i, who: { id: 'phone00002', name: 'Sam' } });
+  await until(() => tv.page.locator('.hq li').first().textContent().then(t => /Bins Out Tonight.*♥ 1/.test(t)), 'voted up');
+  assert.equal(calls(sp, 'POST', '/me/player/queue').length, 0, 'nothing handed to Spotify yet: it can still move');
+  // near the end of the song, the top one goes to Spotify; when it starts, it leaves the house queue
+  sp.state.progress_ms = 190000; sp.state.timestamp = Date.now();
+  await until(() => calls(sp, 'POST', '/me/player/queue').some(c => c.query.uri === 'spotify:track:t4'), 'handed to Spotify ahead of time', 8000);
+  sp.state.item = TRACKS[3]; sp.state.progress_ms = 1000;
+  await until(() => tv.page.locator('.hq li').count().then(n => n === 1), 'gone once it plays', 8000);
+  // skipping plays the house queue's next, not whatever Spotify had
+  await tv.page.keyboard.press('ArrowRight');
+  await until(() => calls(sp, 'POST', '/me/player/next').length === 1, 'skipped');
+  assert.ok(calls(sp, 'POST', '/me/player/queue').some(c => c.query.uri === 'spotify:track:t3'), 'the house\'s next was handed over first');
+  await until(() => tv.page.textContent('#mTitle').then(t => t === 'Last Train to Piccadilly'), 'and it plays', 8000);
+
+  // a party: guests on their own topic can search, add and vote, and nothing else
+  box.put(HOUSE, { from: 'phone', cmd: 'party', on: true, who: KYLE });
+  await until(() => tv.page.isVisible('#mParty svg'), 'the party code on the TV', 8000);
+  const party = await tv.page.evaluate(() => localStorage.getItem('hse.party'));
+  assert.match(party, /^[A-Z2-9]{8}$/);
+  assert.match(await tv.page.textContent('#mParty'), new RegExp(party.slice(0, 4) + '-' + party.slice(4)));
+  await until(() => (stateOf() || {}).party === party, 'the phones know the party\'s code');
+  const PARTY = 'hse-party-' + party.toLowerCase(), guest = id => ({ id, name: 'Guest ' + id.slice(-1) });
+  const said = (to, re) => sent.some(x => x.topic === PARTY && x.msg.to === to && re.test(x.msg.reply || ''));
+  box.put(PARTY, { from: 'guest', cmd: 'search', who: guest('guest0001'), q: 'harold', rid: 'r1' });
+  await until(() => sent.some(x => x.topic === PARTY && x.msg.rid === 'r1' && x.msg.results.length === 2), 'search results for the guest', 8000);
+  for (const [i, t] of [[1, 't1'], [2, 't2'], [3, 't4'], [4, 't3']].entries()) { box.put(PARTY, { from: 'guest', cmd: 'add', who: guest('guest0001'), uri: 'spotify:track:' + t[1] }); await tv.page.waitForTimeout(1300); }
+  await until(() => said('guest0001', /^Added Harold Street/), 'told it was added', 8000);
+  await until(() => said('guest0001', /3 songs waiting/), 'three each', 8000);
+  box.put(PARTY, { from: 'guest', cmd: 'mode', who: guest('guest0002'), mode: 'night' });
+  box.put(PARTY, { from: 'guest', cmd: 'vote', who: guest('guest0002'), id: stateOf().queue[2].i });
+  await until(() => sent.some(x => x.topic === PARTY && x.msg.party && x.msg.party.open && x.msg.party.q.length === 3), 'the party sees the queue', 8000);
+  assert.equal(await tv.page.evaluate(() => location.hash), '#music', 'a guest can\'t change the view');
+  await tv.page.waitForTimeout(800);
+  await shot(tv.page, 'tv-music-party');
+  assert.deepEqual(await smallText(tv.page), []);
+  box.put(HOUSE, { from: 'phone', cmd: 'party', on: false, who: KYLE });
+  await until(() => sent.some(x => x.topic === PARTY && x.msg.party && !x.msg.party.open), 'the guests are told it\'s over', 8000);
+  assert.equal(await tv.page.isVisible('#mParty'), false);
+  assert.deepEqual(tv.errors, []);
+  await tv.ctx.close();
+});
+
+test('music: the house queue on the phone, a party, and the guests\' page', async () => {
+  const CODE = 'ABCDEFGH', HOUSE = 'hse-screen-abcdefgh', PARTY = 'hse-party-wxyz2345';
+  const wire = [['qid1', 't3', 'Sam', ['g1']], ['qid2', 't2', 'Kyle', []], ['qid3', 't4', 'Jo', []]].map(([i, t, b, v]) => { const x = TRACKS.find(y => y.id === t); return { i, u: x.uri, n: x.name, a: x.artists[0].name, m: x.album.images[1].url.split('/').pop(), d: x.duration_ms, b, g: 'x' + i + '00000', v, f: 0 }; });
+  const state = extra => ({ from: 'screen', state: Object.assign({ mode: 'music', shown: 'music', at: Date.now(), spotify: 'Kyle', queue: wire, more: 0, party: '', people: [{ id: 'kyle', name: 'Kyle' }], listening: 'kyle' }, extra) });
+  const phone = await open('/music.html', { keep: { 'hse.remoteTV': CODE } });
+  const box = postbox(), sent = await relay(phone.page, topic => box.take(topic), 300);
+  box.put(HOUSE, state());
+  await phone.page.reload();
+  await phone.page.locator('.mini').waitFor();
+  const asked = (op, f) => sent.some(x => x.topic === HOUSE && x.msg.cmd === 'queue' && x.msg.op === op && (!f || f(x.msg)));
+  // + on a song adds it to the house queue, not Spotify's
+  await until(() => phone.page.evaluate(() => !!sessionStorage.getItem('hse-tv')), 'the TV answered', 8000);
+  box.put(HOUSE, state());
+  await phone.page.locator('.sbox input').fill('harold');
+  await phone.page.locator('.tr .add').first().click();
+  await until(() => asked('add', m => m.uri === 'spotify:track:t1'), 'added to the house queue');
+  assert.equal(calls(phone.sp, 'POST', '/me/player/queue').length, 0, 'not to Spotify\'s own queue');
+  // the player's Up next: the house queue to drag, vote and trim
+  await phone.page.locator('.mini').click({ position: { x: 120, y: 20 } });
+  const sheet = phone.page.locator('.sheet.open');
+  await until(() => sheet.locator('.glance.nx').textContent().then(t => /Up next · the house.*Last Train to Piccadilly.*Sam/s.test(t)), 'the house\'s next song', 8000);
+  await sheet.locator('.glance.nx').click();
+  const rows = sheet.locator('.house .hq li');
+  await until(() => rows.count().then(n => n === 3), 'three songs');
+  const handle = await rows.nth(2).locator('.handle').boundingBox(), top = await rows.nth(0).boundingBox();
+  await phone.page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+  await phone.page.mouse.down();
+  for (let k = 1; k <= 8; k++) await phone.page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2 - (handle.y - top.y) * k / 8);
+  await phone.page.mouse.up();
+  await until(() => asked('move', m => m.id === 'qid3' && m.to === 0), 'dragged to the top');
+  assert.match(await rows.nth(0).textContent(), /Bins Out Tonight/, 'shown at once');
+  await rows.nth(1).locator('.vote').click();
+  await until(() => asked('vote', m => m.id === 'qid1'), 'voted');
+  await rows.nth(2).locator('.handle').focus(); await phone.page.keyboard.press('ArrowUp');
+  await until(() => asked('move', m => m.id === 'qid2' && m.to === 1), 'moved with the keyboard');
+  await sheet.locator('.house .rm').last().click();
+  await until(() => asked('remove'), 'taken out');
+  await phone.page.waitForTimeout(400);
+  await shot(phone.page, 'music-house-queue');
+  // a party
+  await sheet.locator('.party button', { hasText: 'Start a party' }).click();
+  await until(() => sent.some(x => x.topic === HOUSE && x.msg.cmd === 'party' && x.msg.on), 'asked the TV for a party');
+  box.put(HOUSE, state({ party: 'WXYZ2345' }));
+  await until(() => sheet.locator('.party.on svg').count().then(n => n === 1), 'the party\'s code on the phone', 8000);
+  assert.match(await sheet.locator('.party.on').textContent(), /WXYZ-2345/);
+  await phone.page.waitForTimeout(300);
+  await shot(phone.page, 'music-house-party');
+  assert.deepEqual(phone.errors, []);
+  await phone.ctx.close();
+
+  // a guest scans the code: no PIN, no Spotify, just a name
+  const g = await open('/party.html#WXYZ2345', { signedIn: false, settings: {} });
+  const gbox = postbox(), gsent = await relay(g.page, topic => gbox.take(topic), 300);
+  const now = { n: 'Harold Street', a: 'The Stockport Satellites', m: TRACKS[0].album.images[1].url.split('/').pop(), p: 1 };
+  gbox.put(PARTY, { from: 'screen', party: { open: true, at: Date.now(), now, q: wire, more: 0 } });
+  await g.page.reload();
+  await until(() => g.page.textContent('.answer').then(t => /Playing now\s*Harold Street\s*The Stockport Satellites/.test(t)), 'what\'s playing', 8000);
+  assert.equal(await g.page.locator('.nav').count(), 0, 'none of the household\'s pages');
+  await g.page.fill('input[aria-label="Your name"]', 'Alex'); await g.page.click('button:has-text("Join")');
+  const me = await g.page.evaluate(() => JSON.parse(localStorage.getItem('hse.guest')));
+  assert.equal(me.name, 'Alex');
+  await g.page.fill('.sbox input', 'oasis');
+  await until(() => gsent.some(x => x.topic === PARTY && x.msg.cmd === 'search' && x.msg.q === 'oasis'), 'asked the TV to search', 8000);
+  const rid = gsent.find(x => x.msg.cmd === 'search').msg.rid;
+  gbox.put(PARTY, { from: 'screen', rid, to: me.id, results: [TRACKS[1], TRACKS[2]].map(t => ({ u: t.uri, n: t.name, a: t.artists[0].name, m: t.album.images[1].url.split('/').pop(), d: t.duration_ms })) });
+  await until(() => g.page.locator('.res li').count().then(n => n === 2), 'results', 8000);
+  await g.page.locator('.res li').first().locator('.add').click();
+  await until(() => gsent.some(x => x.msg.cmd === 'add' && x.msg.uri === 'spotify:track:t2' && x.msg.who.name === 'Alex'), 'added');
+  gbox.put(PARTY, { from: 'screen', to: me.id, reply: 'Added Negative Pricing. It\'s number 4 in the queue.', ok: true });
+  await until(() => g.page.textContent('.toast').then(t => /number 4/.test(t)).catch(() => false), 'told where it is', 8000);
+  await g.page.locator('.ql li').nth(1).locator('.vote').click();
+  await until(() => gsent.some(x => x.msg.cmd === 'vote' && x.msg.id === 'qid2'), 'voted');
+  await g.page.fill('.sbox input', 'https://open.spotify.com/track/abcdefghij1234567890?si=x');
+  await g.page.click('button:has-text("Add the song from that link")');
+  await until(() => gsent.some(x => x.msg.cmd === 'add' && x.msg.uri === 'spotify:track:abcdefghij1234567890'), 'a pasted link');
+  await g.page.waitForTimeout(500);
+  await shot(g.page, 'party-guest');
+  gbox.put(PARTY, { from: 'screen', party: { open: false, at: Date.now() } });
+  await until(() => g.page.textContent('.answer').then(t => /The party's over/.test(t)), 'the end', 8000);
+  assert.deepEqual(g.errors, []);
+  await g.ctx.close();
+});
+
+test('music: who\'s listening, on the phone and on the TV', async () => {
+  const two = { accounts: [{ id: 'kyle', name: 'Kyle', product: 'premium', client: 'feedc0ffee0123456789abcdef012345', refresh: 'ref1', access: 'acc1', exp: Date.now() + 3600e3, scope: '' },
+    { id: 'sam', name: 'Sam Rivers', product: 'premium', client: 'feedc0ffee0123456789abcdef012345', refresh: 'ref1', access: 'acc2', exp: Date.now() + 3600e3, scope: '' }], active: 'kyle' };
+  const { page, ctx, errors } = await open('/music.html', { signedIn: false, keep: { 'hse.spotify': JSON.stringify(two) } });
+  await page.locator('.people').waitFor();
+  assert.match(await page.textContent('.people'), /Who's listening\s*K\s*Kyle\s*SR\s*Sam/);
+  assert.match(await page.textContent('.now-answer .label'), /, Kyle/);
+  await page.locator('.face', { hasText: 'Sam' }).click();
+  await until(() => page.textContent('.now-answer .label').then(t => /, Sam/.test(t)), 'Sam is listening');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.spotify')).active), 'sam', 'remembered');
+  assert.equal(await page.getAttribute('.face.on', 'aria-pressed'), 'true');
+  await page.waitForTimeout(300);
+  await shot(page, 'music-people');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // the TV holds both, and a phone picks who it plays as
+  const tv = await open('/display.html#music', { width: 1920, height: 1080, signedIn: false, settings: {}, keep: { 'hse.spotify': JSON.stringify(two), 'hse.remote': 'ABCDEFGH' } });
+  const box = postbox(), sent = await relay(tv.page, topic => box.take(topic), 300);
+  await tv.page.reload();
+  await until(() => tv.page.textContent('#mFoot').then(t => /Spotify · Kyle/.test(t)), 'the TV as Kyle', 8000);
+  box.put('hse-screen-abcdefgh', { from: 'phone', cmd: 'listen', id: 'sam' });
+  await until(() => tv.page.textContent('#mFoot').then(t => /Spotify · Sam Rivers/.test(t)), 'the TV as Sam', 8000);
+  await until(() => sent.some(x => x.msg.state && x.msg.state.listening === 'sam' && x.msg.state.people.length === 2), 'the phones are told');
+  assert.deepEqual(tv.errors, []);
+  await tv.ctx.close();
 });

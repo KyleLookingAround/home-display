@@ -5,10 +5,12 @@
  * Spotify is signed in to on this device (src/lib/spotify.js); nothing goes anywhere else.
  */
 import { store } from '../lib/browser.js';
-import { spotify, spotifyStore, activeAccount, forgetAccount, spotifyErrorText } from '../lib/spotify.js';
+import { spotify, spotifyStore, saveSpotifyStore, activeAccount, forgetAccount, spotifyErrorText } from '../lib/spotify.js';
 import { playerModel, progressAt, playOn, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
 import { songStory, linerNotes } from '../lib/musicdata.js';
 import { cacheGet, cacheSet } from './cache.js';
+import { tv, tvQueue, tvSend } from './tv.svelte.js';
+import { coverUrl } from '../lib/queue.js';
 
 const SEC = 1000;
 
@@ -40,6 +42,11 @@ class Music {
   get track(){ return this.player ? this.player.track : null; }
   get progress(){ return progressAt(this.player, this.now); }
   get canControl(){ return !this.acc || this.acc.product !== 'free'; }
+  /** What plays next: the top of the TV's house queue when that's in use, or Spotify's own queue. */
+  get nextUp(){
+    if (tv.house && tv.queue.length){ const x = tv.queue[0]; return { name: x.name, artist: x.artist, uri: x.uri, images: x.img ? [{ url: coverUrl(x.img), width: 300 }] : [], by: x.by.name, house: true }; }
+    return this.queue && this.queue.length ? this.queue[0] : null;
+  }
 }
 export const music = new Music();
 
@@ -64,6 +71,16 @@ export function reloadAccount(){
   if (!music.acc){ music.player = null; applyColours(null); return; }
   if (!started) watchMusic(); else poll();
 }
+/** Who's listening: plays, reads and likes as another of the people signed in on this phone. */
+export function switchAccount(id){
+  const s = spotifyStore();
+  if (!s.accounts.some(a => a.id === id) || (music.acc && music.acc.id === id)) return;
+  s.active = id; saveSpotifyStore(s);
+  lastTrack = ''; lastCtx = ''; music.queue = null; music.devices = []; music.err = null;
+  reloadAccount(); haptic();
+  say('Listening as ' + music.acc.name);
+}
+export const people = () => spotifyStore().accounts;
 export function signOut(){
   if (music.acc) forgetAccount(music.acc.id);
   music.acc = activeAccount(); music.player = null; music.open = false; applyColours(null);
@@ -169,7 +186,11 @@ export function toggle(){
   music.player = Object.assign({}, m, { playing, progress: progressAt(m, Date.now()), at: Date.now() });
   return act(() => playing ? sp().play({ device: device() }) : sp().pause(device()));
 }
-export const next = () => act(() => sp().next(device()), 500);
+/** Skips; with songs waiting in the house queue, the TV skips to the next of them (src/display/tvqueue.js). */
+export function next(){
+  if (tv.house && tv.queue.length && !tv.queue[0].fed) return act(() => tvSend('skip'), 1500);
+  return act(() => sp().next(device()), 500);
+}
 export function previous(){
   const m = music.player;
   if (m && progressAt(m, Date.now()) > 4000) return seek(0);
@@ -234,6 +255,13 @@ export function play(o){
   }, 700);
 }
 export async function addToQueue(t){
+  // With the TV's house queue in use, songs go there, so anyone can move them, take them out or vote them up.
+  if (tv.house){
+    haptic();
+    const ok = await tvQueue('add', { uri: t.uri });
+    say(ok ? 'Added to the house queue: ' + t.name : 'The relay didn\'t take that. Try again.');
+    return;
+  }
   try { await sp().addToQueue(t.uri, device()); haptic(); say('Added to Up next: ' + t.name); if (music.open) loadQueue(); }
   catch (e){ fail(e); }
 }
