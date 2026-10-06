@@ -10,7 +10,8 @@
   const tiles = $derived(view ? viewTiles(view) : []);
   const line = $derived(view ? route.map(p => onView(view, p)).map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ') : '');
   const paths = $derived(view ? walks.map(w => w.map(p => onView(view, p)).map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ')) : []);
-  const marks = $derived(view ? places.map(p => ({ ...p, ...onView(view, p) })) : []);
+  // labels go on the right unless that's the edge (or the place says left)
+  const marks = $derived(view ? places.map(p => { const q = onView(view, p); return { ...p, ...q, right: p.right === false ? false : p.right === true || q.x < width * 0.6 }; }) : []);
 </script>
 
 <div class="map" style="height:{height}px" bind:clientWidth={width} role="img" aria-label={label}>
@@ -34,7 +35,7 @@
         {/if}
       {/each}
       {#each marks.filter(m => m.label) as m}
-        <text class="lbl" class:strong={m.kind !== 'station' || m.major} x={m.x + (m.right === false ? -10 : 10)} y={m.y + 4} text-anchor={m.right === false ? 'end' : 'start'}>{m.label}</text>
+        <text class="lbl" class:strong={m.kind !== 'station' || m.major} x={m.x + (m.right ? 10 : -10)} y={m.y + 4} text-anchor={m.right ? 'start' : 'end'}>{m.label}</text>
       {/each}
     </svg>
   {/if}

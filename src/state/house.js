@@ -14,7 +14,8 @@ import { CI_REGION } from '../lib/format.js';
 import { tv, tvSend } from './tv.svelte.js';
 import { liveTrains, watchWhere } from './where.svelte.js';
 import { lockSecret, canSeal, sealDetails } from '../lib/remote.js';
-import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg, cleanPlan } from '../lib/household.js';
+import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg, cleanPlan, officeDay } from '../lib/household.js';
+import { logDay } from '../lib/geo.js';
 
 const MIN = 60e3;
 let started = null, shared = null;
@@ -25,13 +26,20 @@ async function loadSettings(){
   shared = null;
   try { const r = await fetch('household.json', { cache: 'no-cache' }); if (r.ok) shared = await r.json(); } catch {}
   app.house = Object.assign(mergeSettings(shared, store.getJ('display', null)), { plan: cleanPlan(store.getJ('plan', {}), Date.now()) });
+  logOffice();
   return app.house;
+}
+/** The office days you've been in, for your commute in numbers: today joins the log once it's an office day and your day has started. */
+export function logOffice(){
+  if (!app.house || !app.house.trainTo) return;
+  const now = Date.now(), old = store.getJ('officeLog', []), log = logDay(old, officeDay(app.house, now, app.holidays), now);
+  if (log.length !== old.length) store.setJ('officeLog', log);
 }
 /** Your office days as planned on this phone: { 'YYYY-MM-DD': { in, start?, end? } }, only the days that differ from your usual week. */
 export function savePlan(plan){
   const p = cleanPlan(plan, Date.now());
   store.setJ('plan', p);
-  if (app.house) app.house = Object.assign({}, app.house, { plan: p });
+  if (app.house){ app.house = Object.assign({}, app.house, { plan: p }); logOffice(); }
   loadTrains(true);
   return p;
 }

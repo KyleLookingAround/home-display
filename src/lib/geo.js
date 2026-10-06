@@ -5,7 +5,7 @@
  */
 import { HOME, hhmm } from './format.js';
 import { ApiError, request } from './net.js';
-import { HUXLEY, boardTime, catchable, commuteTrain } from './household.js';
+import { HUXLEY, atClock, boardTime, catchable, commuteTrain } from './household.js';
 
 /* ---------- distance ---------- */
 /** Great-circle distance in kilometres between two { lat, lon }. */
@@ -210,7 +210,7 @@ export function journeyView(pos, leg, index, home){
   stops.forEach(s => {
     const p = at(s.crs); if (!p) return;
     const ends = s.crs === onCrs || s.crs === offCrs, next = pos && pos.to && pos.to.crs === s.crs && stops.length > 2;
-    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, label: ends || next ? (index[s.crs] || s).name : '' });
+    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, label: ends || next ? (index[s.crs] || s).name : '', right: s.crs === homeEnd ? true : undefined });   // home's label is on the left
   });
   if (home) places.push({ lat: home.lat, lon: home.lon, kind: 'home', label: 'Home', right: false });   // labelled to the left: home is a walk from the station
   if (pos && !pos.end) places.push({ lat: pos.lat, lon: pos.lon, kind: 'train' });
@@ -270,4 +270,40 @@ export function tripHead(trip, pos){
   const home = tripHome(trip, pos), where = pos ? trainText(pos).replace(/^./, c => c.toLowerCase()) : '';
   return { kind: 'train', tone: 'good', title: trip.name ? trip.name + '\u2019s on the way home' : 'On the way home',
     sub: 'On the ' + hhmm(trip.sched) + (where ? ' · ' + where : '') + (home ? ' · home about ' + hhmm(home) : '') };
+}
+
+/* ---------- getting home from anywhere ---------- */
+/**
+ * The ways home from where you are: the nearest stations within 15 km (up to four), each with the walk there, the
+ * first train you can make from it that calls at your station, and when you'd be home with your walk at that end.
+ * `load(from, to)` gives a departure board (loadTrainsLive). Best first. Near your own station, just the walk.
+ */
+export async function waysHome(here, index, homeCrs, homeWalk, now, load){
+  const near = nearestStations(index, here, 4, 15), home = index[homeCrs];
+  if (home && distKm(here, home) <= 2) return { near: true, walk: walkMins(distKm(here, home)), station: home, ways: [] };
+  const ways = await Promise.all(near.filter(s => s.crs !== homeCrs).map(s => load(s.crs, homeCrs).then(b => {
+    const walk = walkMins(s.km), d = catchable(((b && b.list) || []).filter(x => !x.cancelled && x.arr), walk, now).list[0];
+    return d ? { station: s, walk: walk, train: d, home: d.arr + (homeWalk || 0) * 60e3 } : { station: s, walk: walk, train: null, home: 0 };
+  }, () => ({ station: s, walk: walkMins(s.km), train: null, home: 0, err: true }))));
+  return { near: false, ways: ways.filter(w => w.train).sort((a, b) => a.home - b.home).concat(ways.filter(w => !w.train)) };
+}
+
+/* ---------- the commute in numbers ---------- */
+/** The log of office days ('YYYY-MM-DD', kept on the phone), with today added once it's an office day (officeDay) and your day has started. */
+export function logDay(log, day, now){
+  const l = (log || []).filter(k => /^\d{4}-\d\d-\d\d$/.test(k));
+  return day && day.in && now >= atClock(now, day.start) && l.indexOf(day.key) < 0 ? l.concat([day.key]).sort() : l;
+}
+/**
+ * Your commute in numbers, for the days in the log since `since` (estimates): by train there and back (the line's
+ * length, about a tenth longer than as the crow flies), walking (both walks, both ways), steps (about 110 a minute),
+ * and the CO₂ next to driving it (a road about a third longer; an average car 170 g/km, rail 35 g/km per passenger).
+ */
+export function commuteStats(log, s, index, since){
+  const days = (log || []).filter(k => k >= since), a = index && index[s.trainFrom], b = index && index[s.trainTo];
+  if (!a || !b) return null;
+  const crow = distKm(a, b), rail = crow * 1.1 * 2 * days.length, road = crow * 1.3 * 2 * days.length;
+  const walk = ((+s.trainWalk || 0) + (+s.workWalk || 0)) * 2 * days.length;
+  return { days: days.length, first: days[0] || '', railKm: rail, railMiles: rail * MILES, walkMins: walk, steps: Math.round(walk * 110 / 100) * 100,
+    co2Kg: Math.max(0, road * 0.17 - rail * 0.035) };
 }

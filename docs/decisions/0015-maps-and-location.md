@@ -1,6 +1,6 @@
 # 0015: Maps, location and distance
 
-**Status:** accepted, October 2026. Stages 1 (the journey map), 2 (walk times from where you are, work noticed) and 3 (the way home on the TV) built; "get me home" follows.
+**Status:** accepted, October 2026. All four stages built: the journey map, walk times from where you are (work noticed), the way home on the TV, and getting home from anywhere with the commute in numbers.
 
 **Context.** Kyle asked for something cool with maps, location and distance, and picked four: a live journey map, walk times from where the phone is, his way home shown on the TV, and getting home from anywhere with commute stats. There is no home server ([0004](0004-no-home-server.md)), the repository is public and names the street, and the commute already says when the house is empty, so it never goes in `household.json`.
 
@@ -12,6 +12,8 @@
 - **Location stays on the phone, and goes to the TV sealed.** The phone's position is only asked for when Kyle turns it on (Settings, Location), at most once a minute while a page is open, and kept in memory. Work's place is kept on the phone; what the TV gets is the walk from the station, with the office days, sealed with the site PIN like the guest Wi-Fi. The walk to the train comes from the position only within 3 km of the station (further, you're not walking), and work is noticed within 250 m (or the fix's accuracy, up to 500 m), between 06:00 and 20:00, and only ever adds an office day.
 
 - **The TV follows the train, not the phone.** Phones stop running pages in a pocket, so the phone tells the TV which train you're on (and where you are, if it knows) and the TV follows that train from its live times by itself, until a quarter of an hour after you'd be home.
+
+- **The commute in numbers are estimates, from a log on the phone.** Each office day the phone sees joins a log once the day has started. Distances are as the crow flies between the stations, a tenth more by rail and a third more by road; an average car is 170 g of CO₂ a km and the train 35 g a passenger km (round figures, in the range of the government's conversion factors); about 110 steps a minute walking.
 
 **Consequences.**
 - The train's place is interpolated: a train stuck between stations shows as nearly at the next one until that stop reports.

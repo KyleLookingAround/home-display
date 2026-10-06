@@ -4,6 +4,10 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation**: maps, stage 4: getting home from anywhere, and your commute in numbers.
+  - Get me home (on Home): from wherever you are, the nearest stations within 15 km with trains that call at yours, the walk to each, the first you can make, and when you'd be home; best first, with a map. Near your own station, just the walk (`waysHome`). It asks where you are just that once if location isn't on.
+  - Your commute this year: office days, miles by train, walking, steps and the CO₂ next to driving it, all estimates (`commuteStats`). The phone logs each office day once your day has started (`logDay`; `hse.officeLog`, on the phone only), so it counts from today.
+  - Map labels move to the left near the map's edge.
 - **Creation**: maps, stage 3: your way home on the TV.
   - On the way home, "Show the TV I'm on my way" under your journey tells the paired TV which train you're on, sealed with the site PIN; or it happens by itself once your train home leaves (Settings, Location: "Tell the TV when I'm on my train home").
   - The TV follows that train from its live times, on its own: a heads-up on Today ("On the way home · On the 17:50 · home about 18:03", with your name if your Spotify is on the phone) and the map on Travel, with where you are when location is on.

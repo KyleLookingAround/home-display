@@ -114,6 +114,6 @@ function mapHtml(j, w, h){
     else if (p.kind === 'you') svg += `<circle class="you-ring" cx="${q.x}" cy="${q.y}" r="22"/><circle class="you" cx="${q.x}" cy="${q.y}" r="11"/>`;
     else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
   });
-  j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false; svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
+  j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false || (p.right !== true && q.x > w * 0.6); svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
   return `<div class="jmap" style="height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg><span class="credit">${esc(MAP_CREDIT)}</span></div>`;
 }

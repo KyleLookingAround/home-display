@@ -90,14 +90,14 @@ function huxley(url = ''){
     if (!x) return {};
     return Object.assign({}, x, { crs: board.crs, locationName: board.locationName, previousCallingPoints: sv[2] ? null : [{ callingPoint: [{ locationName: 'Hazel Grove', crs: 'HAZ', st: hm(+sv[3] - 12), at: 'On time' }] }] });
   }
-  const home = /\/departures\/MAN\//i.test(url), to = (/\/to\/([A-Z]{3})\//i.exec(url) || [])[1];
+  const at = (/\/departures\/([A-Z]{3})\//i.exec(url) || [])[1], home = !!at && at.toUpperCase() !== 'SPT', to = (/\/to\/([A-Z]{3})\//i.exec(url) || [])[1];
   const calls = home ? { Buxton: [['Stockport', 9], ['Davenport', 13], ['Hazel Grove', 17], ['Buxton', 45]], Crewe: [['Stockport', 8], ['Macclesfield', 20], ['Crewe', 40]], 'Hazel Grove': [['Levenshulme', 6], ['Heaton Chapel', 9], ['Stockport', 12], ['Hazel Grove', 20]] }
     : { 'Manchester Piccadilly': [['Heaton Chapel', 4], ['Levenshulme', 7], ['Manchester Piccadilly', 11]], 'London Euston': [['Macclesfield', 12], ['Stoke-on-Trent', 30], ['Milton Keynes Central', 90], ['London Euston', 120]],
         Buxton: [['Davenport', 4], ['Hazel Grove', 9], ['Disley', 15], ['Buxton', 35]], 'Manchester Airport': [['Manchester Piccadilly', 10], ['Manchester Airport', 30]] };
   const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, length: 4, destination: [{ locationName: dest, via: null }], serviceIdUrlSafe: 'S' + (home ? 'H' : '') + m,
     subsequentCallingPoints: [{ callingPoint: (calls[dest] || [[dest, 30]]).map(([n, k]) => ({ locationName: n, crs: CRS[n] || null, st: hm(m + k), et: 'On time' })) }] }, extra || {});
   const named = { MAN: 'Manchester Piccadilly', SPT: 'Stockport' };
-  if (home) return { locationName: 'Manchester Piccadilly', crs: 'MAN', filterLocationName: to ? named[to] : null, nrccMessages: null, trainServices: [
+  if (home) return { locationName: { MAN: 'Manchester Piccadilly', MCO: 'Manchester Oxford Road' }[at.toUpperCase()] || at.toUpperCase(), crs: at.toUpperCase(), filterLocationName: to ? named[to] : null, nrccMessages: null, trainServices: [
     svc(8, 'Buxton', '13'), svc(20, 'Crewe', '5'), svc(34, 'Hazel Grove', '14'), svc(47, 'Buxton', '13') ] };
   const all = [svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', hm(23)), svc(24, 'Buxton', '4'),
     svc(31, 'Hazel Grove', '2', 'Cancelled', { isCancelled: true }), svc(38, 'Sheffield', '3', 'Delayed'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4')];
@@ -929,6 +929,33 @@ test('the way home: the phone tells the TV, sealed, and the TV follows the train
   assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.trip')), null);
   assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
   await tv.ctx.close(); await phone.ctx.close();
+});
+
+test('get me home from anywhere, and the commute in numbers', async () => {
+  const evening = new Date('2026-10-05T17:30:00+01:00');
+  let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: evening, settings: COMMUTE, withHelper: false, geo: { latitude: 53.4774, longitude: -2.2309 } });
+  const card = page.locator('#gethome');
+  await card.getByRole('button', { name: 'Get me home' }).click();
+  await page.waitForFunction(() => /Home about/.test(document.getElementById('gethome').textContent), null, { timeout: 20000 });
+  // from Piccadilly's doorstep: the 17:38 is at Stockport 17:47, then the 5 minute walk
+  assert.match(await card.textContent(), /Home about\s*17:52/);
+  assert.match(await card.textContent(), /Walk 1 min to Manchester Piccadilly, then the\s*17:38\s*from platform 13 \(Buxton\), at Stockport 17:47/);
+  assert.ok(await card.locator('.rows li').count() >= 1, 'other stations near by');
+  await card.scrollIntoViewIfNeeded(); await shot(page, 'home-get-home');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // the office days this phone has seen, today's joining once the day has started
+  ({ page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: new Date('2026-10-06T09:30:00+01:00'), settings: COMMUTE, withHelper: false }));
+  await page.evaluate(() => localStorage.setItem('hse.officeLog', JSON.stringify(['2026-10-01', '2026-10-02'])));
+  await page.reload(); await ready(page);
+  const stats = page.locator('.card', { hasText: 'Your commute this year' });
+  await stats.waitFor();
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.officeLog'))), ['2026-10-01', '2026-10-02', '2026-10-06']);
+  await page.waitForFunction(() => /3\s*Office days/.test([...document.querySelectorAll('.card')].filter(c => /Your commute this year/.test(c.textContent))[0].textContent));
+  assert.match(await stats.textContent(), /3\s*Office days\s*3[78]\s*Miles by train/);
+  await stats.scrollIntoViewIfNeeded(); await shot(page, 'home-commute-stats');
+  assert.deepEqual(errors, []);
+  await ctx.close();
 });
 
 test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {

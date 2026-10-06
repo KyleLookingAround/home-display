@@ -9,6 +9,8 @@
   import DepartureBoard from './DepartureBoard.svelte';
   import OfficeWeek from './OfficeWeek.svelte';
   import Journey from './Journey.svelte';
+  import GetHome from './GetHome.svelte';
+  import CommuteStats from './CommuteStats.svelte';
   import { qrSvg, wifiCode } from '../../lib/qr.js';
   import { cleanCode, sendRemote } from '../../lib/remote.js';
   import { store } from '../../lib/browser.js';
@@ -113,6 +115,8 @@
     {#if app.house && app.house.trainTo}<OfficeWeek />{/if}
   </section>
   <Journey />
+  <GetHome />
+  <CommuteStats />
   <section class="card">
     <h2 class="label">Coming up</h2>
     {#if cds && cds.length}

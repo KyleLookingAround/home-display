@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'geo', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere readTrip tripHome tripHead workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere waysHome logDay commuteStats readTrip tripHome tripHead workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -498,6 +498,30 @@ test('the way home, as the phone tells the TV', () => {
   assert.equal(A.tripHome(r, null), t('18:03'));
   assert.deepEqual(plain(A.tripHead(r, null)), { kind: 'train', tone: 'good', title: 'Kyle’s on the way home', sub: 'On the 17:50 · home about 18:03' });
   assert.equal(A.tripHead(Object.assign({}, r, { name: '' }), null).title, 'On the way home');
+});
+
+test('getting home from anywhere, and the commute in numbers', async () => {
+  const idx = A.stationIndex({ s: [['SPT', 'Stockport', 53.40545, -2.16304], ['MAN', 'Manchester Piccadilly', 53.47722, -2.23014], ['MCO', 'Manchester Oxford Road', 53.47404, -2.24205], ['DGT', 'Deansgate', 53.47404, -2.25097]] });
+  const now = at('2026-10-05T17:30:00'), d = (m, arr, extra) => Object.assign({ sched: now + m * 60e3, exp: now + m * 60e3, arr: arr ? now + arr * 60e3 : null, dest: 'Buxton' }, extra || {});
+  const boards = { MAN: [d(2, 11), d(20, 29)], MCO: [d(12, 24), d(30, 41, { cancelled: true })], DGT: [] };
+  const load = (from, to) => { assert.equal(to, 'SPT'); return from === 'DGT' ? Promise.reject(new Error('down')) : Promise.resolve({ list: boards[from] }); };
+  const r = await A.waysHome({ lat: 53.4745, lon: -2.2380 }, idx, 'SPT', 15, now, load);
+  assert.equal(r.near, false);
+  assert.deepEqual(plain(r.ways.map(w => [w.station.crs, w.walk, w.train && new Date(w.train.sched).toTimeString().slice(0, 5), w.home && new Date(w.home).toTimeString().slice(0, 5)])),
+    [['MCO', 4, '17:42', '18:09'], ['MAN', 10, '17:50', '18:14'], ['DGT', 14, null, 0]], 'soonest home first; the 17:32 is too soon with a 10 minute walk');
+  const nearHome = await A.waysHome({ lat: 53.4089, lon: -2.1625 }, idx, 'SPT', 15, now, load);
+  assert.equal(nearHome.near, true); assert.equal(nearHome.walk, 6);
+  const day = { key: '2026-10-06', in: true, start: '09:00' };
+  assert.deepEqual(plain(A.logDay(['2026-10-01'], day, at('2026-10-06T08:00:00'))), ['2026-10-01'], 'not before the day starts');
+  assert.deepEqual(plain(A.logDay(['2026-10-01'], day, at('2026-10-06T09:05:00'))), ['2026-10-01', '2026-10-06']);
+  assert.deepEqual(plain(A.logDay(['2026-10-06'], day, at('2026-10-06T19:00:00'))), ['2026-10-06'], 'once');
+  assert.deepEqual(plain(A.logDay(['2026-10-01'], Object.assign({}, day, { in: false }), at('2026-10-06T10:00:00'))), ['2026-10-01']);
+  const st = A.commuteStats(['2025-12-30', '2026-10-01', '2026-10-02', '2026-10-06'], { trainFrom: 'SPT', trainTo: 'MAN', trainWalk: 15, workWalk: 25 }, idx, '2026-01-01');
+  assert.equal(st.days, 3); assert.equal(st.first, '2026-10-01');
+  assert.ok(Math.abs(st.railMiles - 37.6) < 0.5, 'about 9.2 km as the crow flies, a tenth more by the line, there and back, three times');
+  assert.equal(st.walkMins, 240); assert.equal(st.steps, 26400);
+  assert.ok(st.co2Kg > 10 && st.co2Kg < 14);
+  assert.equal(A.commuteStats([], { trainFrom: 'SPT', trainTo: '' }, idx, '2026-01-01'), null);
 });
 
 test('the station sign words a train the same on the phone and the TV', () => {
