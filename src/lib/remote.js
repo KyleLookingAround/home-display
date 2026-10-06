@@ -99,7 +99,7 @@ function boxKey(code, secret){
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
  * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp },
- * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [2, 4], start: '09:00', end: '17:30' } }.
+ * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [1, 3, 5], start: '08:00', end: '16:00' } }.
  */
 export async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);

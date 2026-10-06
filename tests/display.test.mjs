@@ -363,29 +363,30 @@ test('trains you can still make with your walk come first; the rest are only cou
 });
 
 test('the commute: your usual days and hours, a plan for the days that differ, every train on days off', () => {
-  const s = A.displaySettings({ trainFrom: 'SPT', trainTo: 'MAN', trainWalk: 15, workDays: [2, 4], workWalk: 25, workStart: '09:00', workEnd: '17:30' });
+  const s = A.displaySettings({ trainFrom: 'SPT', trainTo: 'MAN', trainWalk: 15, workDays: [2, 5], workWalk: 25, workStart: '09:00', workEnd: '17:30' });
   const day = (d, h) => at('2026-10-' + d + 'T' + h + ':00');
   const tue = h => day('06', h), start = day('06', '09:00'), end = day('06', '17:30');
   assert.deepEqual(plain(A.commuteLeg(s, tue('07:40'))), { from: 'SPT', to: 'MAN', walk: 15, after: 25, work: true, home: false, start, end });
   assert.deepEqual(plain(A.commuteLeg(s, tue('13:15'))), { from: 'MAN', to: 'SPT', walk: 25, after: 15, work: false, home: true, start, end }, 'turned round halfway through the day');
   assert.equal(A.commuteLeg(s, tue('13:14')).work, true);
   assert.deepEqual(plain(A.commuteLeg(s, day('05', '07:40'))), { from: 'SPT', to: '', walk: 15, after: 0, work: false, home: false }, 'Monday: not in, so every train from Stockport');
-  assert.equal(A.commuteLeg(s, day('08', '08:00'), [{ date: '2026-10-08', title: 'A bank holiday' }]).work, false, 'a bank holiday is a day off');
+  assert.equal(A.commuteLeg(s, day('09', '08:00')).work, true);
+  assert.equal(A.commuteLeg(s, day('09', '08:00'), [{ date: '2026-10-09', title: 'A bank holiday' }]).work, false, 'a bank holiday is a day off');
   // the plan: in on Monday from 10:00 to 16:00 (home from 13:00), off on Tuesday
   const p = Object.assign({}, s, { plan: { '2026-10-05': { in: true, start: '10:00', end: '16:00' }, '2026-10-06': { in: false } } });
   assert.deepEqual(plain(A.officeDay(p, day('05', '07:00'))), { key: '2026-10-05', in: true, usual: false, start: '10:00', end: '16:00', changed: true });
   assert.equal(A.commuteLeg(p, day('05', '09:50')).start, day('05', '10:00'));
   assert.equal(A.commuteLeg(p, day('05', '13:00')).home, true);
   assert.equal(A.commuteLeg(p, tue('08:00')).to, '', 'off on Tuesday after all');
-  assert.deepEqual(plain(A.officeDay(s, day('08', '07:00'))), { key: '2026-10-08', in: true, usual: true, start: '09:00', end: '17:30', changed: false });
+  assert.deepEqual(plain(A.officeDay(s, day('09', '07:00'))), { key: '2026-10-09', in: true, usual: true, start: '09:00', end: '17:30', changed: false });
   assert.deepEqual(plain(A.cleanPlan({ '2026-10-05': { in: true }, '2026-10-06': { in: false, start: '09:00' }, '2026-10-07': { in: true, start: '9am', end: '16:00' }, '2026-11-30': { in: true }, 'soon': { in: true }, '2026-10-08': { in: 'yes' } }, tue('07:00'))),
     { '2026-10-06': { in: false }, '2026-10-07': { in: true, end: '16:00' } }, 'from today, two weeks at most, well formed');
   assert.equal(A.commuteLeg(A.displaySettings({ trainFrom: 'SPT', trainTo: 'MAN' }), tue('17:00')).to, 'MAN', 'with no work days, the station only picks the trains');
   assert.equal(A.trainWalkOf({ leg: { walk: 25 } }, s), 25);
   assert.equal(A.trainWalkOf(null, s), 15);
   assert.deepEqual(plain(A.displaySettings({ workDays: ['1', 9, 5], workWalk: -3 })).workDays, [1, 5]);
-  assert.deepEqual(plain(A.mergeSettings({ trainTo: 'MAN', workDays: [2, 4], workStart: '08:00' }, null)).workDays, [], 'when you\'re out never comes from the public household file');
-  assert.equal(A.mergeSettings({ workStart: '08:00' }, { workDays: [2, 4] }).workStart, '09:00');
+  assert.deepEqual(plain(A.mergeSettings({ trainTo: 'MAN', workDays: [1, 3], workStart: '08:00' }, null)).workDays, [], 'when you\'re out never comes from the public household file');
+  assert.equal(A.mergeSettings({ workStart: '08:00' }, { workDays: [1, 3] }).workStart, '09:00');
   const odd = A.displaySettings({ workStart: 'soon', homeFrom: '15:00', plan: {} });
   assert.equal(odd.workStart, '09:00'); assert.equal(odd.homeFrom, undefined); assert.equal(odd.plan, undefined, 'the plan is kept apart, per device');
 });
