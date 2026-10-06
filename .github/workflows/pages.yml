@@ -2,8 +2,8 @@ name: Check and publish
 
 # Every push and pull request is checked. Pushes to main are also published to GitHub Pages,
 # locked with the SITE_PASSWORD secret when it's set (see README, "Publishing").
-# The redesign branch, while it exists, is published alongside at /preview/: a push to it, once checked,
-# asks for a fresh run on main, which builds both (only main may deploy to Pages).
+# The work-in-progress branch named below (PREVIEW_BRANCH), while it exists, is published alongside at /preview/:
+# a push to it, once checked, asks for a fresh run on main, which builds both (only main may deploy to Pages).
 on:
   push:
   pull_request:
@@ -14,6 +14,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  PREVIEW_BRANCH: music
 
 concurrency:
   group: pages-${{ github.ref }}
@@ -43,17 +46,17 @@ jobs:
         env:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         run: lock/publish.sh _site
-      - name: Preview the redesign branch at /preview/
+      - name: Preview the work-in-progress branch at /preview/
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           SITE_PASSWORD: ${{ secrets.SITE_PASSWORD }}
         run: |
-          if git ls-remote --exit-code --heads origin redesign >/dev/null; then
-            git fetch --depth 1 origin redesign
-            git worktree add /tmp/redesign FETCH_HEAD
-            (cd /tmp/redesign && npm ci --no-audit --no-fund && lock/publish.sh /tmp/redesign-site)
-            mkdir -p _site/preview && cp -R /tmp/redesign-site/. _site/preview/
-            echo "The redesign branch is previewed at /preview/."
+          if git ls-remote --exit-code --heads origin "$PREVIEW_BRANCH" >/dev/null; then
+            git fetch --depth 1 origin "$PREVIEW_BRANCH"
+            git worktree add /tmp/preview FETCH_HEAD
+            (cd /tmp/preview && npm ci --no-audit --no-fund && lock/publish.sh /tmp/preview-site)
+            mkdir -p _site/preview && cp -R /tmp/preview-site/. _site/preview/
+            echo "The $PREVIEW_BRANCH branch is previewed at /preview/."
           fi
       - name: Next bin collections from Stockport Council
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -68,8 +71,8 @@ jobs:
           path: _site
 
   preview:
-    name: Ask main to republish with the redesign preview
-    if: github.event_name == 'push' && github.ref == 'refs/heads/redesign'
+    name: Ask main to republish with the preview
+    if: github.event_name == 'push' && github.ref == 'refs/heads/music'   # keep in step with PREVIEW_BRANCH (a job's if can't read env)
     needs: check
     runs-on: ubuntu-latest
     permissions:

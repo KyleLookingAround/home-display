@@ -176,7 +176,7 @@ Then run `sudo systemctl enable --now harold-energy`.
 
 Every push to `main` is checked (`npm run ci`) and published to GitHub Pages by `.github/workflows/pages.yml`. Only the dashboard's pages and their scripts, the display, `household.json`, the manifests and the icons are published, not the source or the helper.
 
-**The preview.** While a `redesign` branch exists, it's published alongside at `/preview/` (for example https://kylelookingaround.github.io/home-display/preview/), behind the same PIN, so it can be tried on a phone before it replaces the real thing. Each push to that branch updates it.
+**The preview.** While the work-in-progress branch named in the workflow (`PREVIEW_BRANCH`, now `music`) exists, it's published alongside at `/preview/` (for example https://kylelookingaround.github.io/home-display/preview/), behind the same PIN, so it can be tried on a phone before it replaces the real thing. Each push to that branch updates it.
 
 **The lock.** Add a repository secret called `SITE_PASSWORD` (Settings → Secrets and variables → Actions). It can be a numeric PIN. From the next push, the published pages are encrypted with StatiCrypt. They open with an on-screen keypad you can drive with the TV remote's arrows, and "Remember this screen" means each device asks only once. Without the secret the site is published unlocked, and the workflow says so.
 
