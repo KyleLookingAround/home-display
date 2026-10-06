@@ -4,13 +4,17 @@
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
   import { headsUp, BIN_COLOURS } from '../../lib/household.js';
+  import { musicHeads } from '../../lib/discover.js';
+  import { disc } from '../../state/discover.svelte.js';
   onMount(() => watchHouse());
-  const items = $derived(headsUp({ trains: app.trains, walk: app.house ? app.house.trainWalk : 0, bins: app.collections || [], weather: app.weather, nowcast: app.nowcast, floods: app.floods, countdowns: app.countdowns || [] }, app.now));
+  const items = $derived(headsUp({ trains: app.trains, walk: app.house ? app.house.trainWalk : 0, bins: app.collections || [], weather: app.weather, nowcast: app.nowcast, floods: app.floods, countdowns: app.countdowns || [], music: musicHeads(disc.releases, disc.gigs, app.now) }, app.now));
   const ICON = {
     train: '<rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l-2 2M15 20l2 2M9 16v4M15 16v4"/>',
     bins: '<path d="M4 6h16M9 6V4h6v2M6 6l1 15h10l1-15"/>',
     flood: '<path d="M3 17c2 0 2-1.5 4.5-1.5S9.5 17 12 17s2.5-1.5 4.5-1.5S19 17 21 17M3 21c2 0 2-1.5 4.5-1.5S9.5 21 12 21s2.5-1.5 4.5-1.5S19 21 21 21M12 3v9M8.5 8.5 12 12l3.5-3.5"/>',
     cake: '<path d="M4 21h16M5 21v-8h14v8M8 13v-3M12 13v-3M16 13v-3M8 7.5a1 1 0 0 0 1-1C9 5.7 8 4.5 8 4.5S7 5.7 7 6.5a1 1 0 0 0 1 1zM12 7.5a1 1 0 0 0 1-1C13 5.7 12 4.5 12 4.5s-1 1.2-1 2a1 1 0 0 0 1 1zM16 7.5a1 1 0 0 0 1-1c0-.8-1-2-1-2s-1 1.2-1 2a1 1 0 0 0 1 1zM5 16.5c2.3 1 4.7 1 7 0s4.7-1 7 0"/>',
+    release: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><path d="M12 5.5a6.5 6.5 0 0 0-6.5 6.5"/>',
+    gig: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
     rain: '<path d="M7 15a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3 3 0 0 1 0 6z"/><path d="M9 18l-1 3M13 18l-1 3M17 18l-1 3"/>'
   };
 </script>

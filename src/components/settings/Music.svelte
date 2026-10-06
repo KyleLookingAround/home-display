@@ -34,6 +34,13 @@
       busy = false;
     }
   });
+  let tm = $state(store.get('tmKey') || ''), fm = $state(store.get('lastfmKey') || ''), keysMsg = $state('');
+  function saveKeys(ev){
+    ev.preventDefault();
+    tm.trim() ? store.set('tmKey', tm.trim()) : store.del('tmKey');
+    fm.trim() ? store.set('lastfmKey', fm.trim()) : store.del('lastfmKey');
+    keysMsg = 'Saved on this phone.';
+  }
   function saveClient(ev){ ev.preventDefault(); store.set('spotifyClient', mine.trim()); msg = mine.trim() ? 'Client ID saved on this device.' : 'Using the household\'s Client ID.'; }
   async function connect(another){
     err = ''; busy = true;
@@ -57,6 +64,17 @@
   {/if}
   {#if msg}<p class="note" role="status">{msg}</p>{/if}
   {#if err}<p class="note err" role="alert">{err}</p>{/if}
+  <details class="fold">
+    <summary>Gigs and suggestions</summary>
+    <form class="form" onsubmit={saveKeys}>
+      <div class="field"><label for="tmKey">Ticketmaster key</label><input id="tmKey" class="mono" autocomplete="off" spellcheck="false" bind:value={tm} placeholder="Consumer Key">
+        <span class="help">For gigs near home by the artists you play. Free from developer.ticketmaster.com (My Apps, then the Consumer Key). It stays on this phone.</span></div>
+      <div class="field"><label for="fmKey">Last.fm key <span class="muted">(optional)</span></label><input id="fmKey" class="mono" autocomplete="off" spellcheck="false" bind:value={fm} placeholder="API key">
+        <span class="help">More like this uses ListenBrainz, which needs no key. A free Last.fm API key (last.fm/api) adds its suggestions too.</span></div>
+      <div class="actions"><button class="btn" type="submit">Save</button></div>
+      {#if keysMsg}<p class="note" role="status">{keysMsg}</p>{/if}
+    </form>
+  </details>
   <details class="fold" open={!clientId}>
     <summary>The household's Spotify app</summary>
     <form class="form" onsubmit={saveClient}>

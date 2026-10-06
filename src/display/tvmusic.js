@@ -4,7 +4,7 @@
 // cover in the screensaver, favourites on the number keys, and the sleep timer and bedtime fade, which need a device
 // that's always on.
 const TM = { acc: null, lyrics: null, lyricsFor: '', queue: null, view: 'player', story: null, storyFor: '', notes: null, notesFor: '', notePage: 0,
-  sleepAt: 0, sleepSong: '', fading: false, wasNight: null, lastTrack: '', shownLine: -2 };
+  sleepAt: 0, sleepSong: '', fading: false, wasNight: null, radio: null, radioFor: '', radioAt: 0, lastTrack: '', shownLine: -2 };
 const TM_VIEWS = ['player', 'lyrics', 'notes'];
 
 function tmSp(){
@@ -54,10 +54,29 @@ function tmFavourite(i){
   const f = tmFavs()[i];
   if (!f){ toast('No favourite on ' + (i + 1) + '. Choose them on your phone: Screen, then Spotify on the TV.', 5000); return; }
   toast('Playing ' + f.name, 3000);
-  tmAct(sp => sp.play({ device: tmDevice(), context: f.uri }).catch(e => {
+  tmPlayContext(f.uri);
+}
+/** Plays an album or playlist from the top: where Spotify last played, or the first device that's awake. */
+function tmPlayContext(uri){
+  tmAct(sp => sp.play({ device: tmDevice(), context: uri }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
-    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: f.uri }); });
+    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: uri }); });
   }), 900);
+}
+/** Weather radio (0 on the remote): a playlist for the weather and the time of the week (src/lib/discover.js). */
+async function tmRadio(){
+  const sp = tmSp(); if (!sp) return;
+  const mood = weatherMood(SRC.weather.data && SRC.weather.data.now, Date.now());
+  let list = TM.radioFor === mood.id && Date.now() - TM.radioAt < 6 * 60 * MIN ? TM.radio : null;
+  if (!list){
+    toast('Weather radio: finding something for ' + mood.title.toLowerCase() + '…', 4000);
+    list = await fetchRadio(sp, mood).catch(() => []);
+    TM.radio = list; TM.radioFor = mood.id; TM.radioAt = Date.now();
+  }
+  if (!list.length){ toast('Spotify didn\'t find anything for ' + mood.title.toLowerCase() + '. Try again later.', 5000); return; }
+  const p = list[Math.floor(Math.random() * Math.min(3, list.length))];
+  toast('Weather radio · ' + mood.title + ': ' + p.name, 5000);
+  tmPlayContext(p.uri);
 }
 /** Favourites: chosen on the phone, or else your first playlists. */
 function tmFavs(){
@@ -154,7 +173,7 @@ function renderMusic(){
     const e = SRC.music.err;
     const waiting = HQ.q.filter(x => !x.fed).length;
     setHtml($('#mEmpty'), '<div class="m-idle"><p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) + ' ' : '') + (waiting ? 'Press OK to play the house queue' + (tmFavs().length ? ', or a number for a favourite.' : '.')
-      : tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.') + '</p>'
+      : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, ' : 'Play on any Spotify device, or press ') + '0 for weather radio: ' + esc(weatherMood(SRC.weather.data && SRC.weather.data.now, Date.now()).title.toLowerCase()) + '.') + '</p>'
       + (waiting ? '<div class="m-next">' + hqNextHtml() + '</div>' : tmFavsHtml() + tmWallHtml()) + '</div>' + (HQ.party ? '<aside class="m-party">' + hqPartyHtml() + '</aside>' : ''));
     $('#mEmpty').className = 'm-empty' + (HQ.party ? ' with-party' : '');
     $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
@@ -173,7 +192,7 @@ function renderMusic(){
   else if (lines){ TM.shownLine = -2; tmTickView(Date.now()); }
   else $('#mLyrics').innerHTML = TM.lyricsFor === t.id || TM.lyrics ? '<p class="note">' + (TM.lyrics && TM.lyrics.instrumental ? 'An instrumental.' : 'No timed lyrics for this one.') + '</p>' : '';
   tmTickView(Date.now());
-  $('#mFoot').innerHTML = '<span>OK play or pause · ◀ ▶ skip · ▼ ' + (TM.view === 'player' ? 'lyrics' : TM.view === 'lyrics' ? 'liner notes' : 'back to the player') + ' · 1–' + Math.max(1, tmFavs().length) + ' favourites</span>' + (TM.acc.name ? '<span>Spotify · ' + esc(TM.acc.name) + '</span>' : '');
+  $('#mFoot').innerHTML = '<span>OK play or pause · ◀ ▶ skip · ▼ ' + (TM.view === 'player' ? 'lyrics' : TM.view === 'lyrics' ? 'liner notes' : 'back to the player') + ' · 1–' + Math.max(1, tmFavs().length) + ' favourites · 0 weather radio</span>' + (TM.acc.name ? '<span>Spotify · ' + esc(TM.acc.name) + '</span>' : '');
 }
 /** The album wall: covers from your shelf, a different few each hour. */
 function tmWallHtml(){
@@ -201,6 +220,7 @@ function tmNotesHtml(){
 function tmKey(e){
   if (!TM.acc) return false;
   if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
+  if (e.key === '0'){ tmRadio(); return true; }
   if (!tmTrack() && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
   if (!tmTrack()) return false;
   if (e.key === 'Enter'){ tmToggle(); return true; }

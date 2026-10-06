@@ -454,6 +454,7 @@ export function headsUp(o, now){
   });
   const floods = o.floods || [];
   for (let i = 0; i < floods.length && i < 2; i++) out.push({ kind: 'flood', tone: floods[i].level <= 2 ? 'bad' : 'warn', title: floods[i].title, sub: floods[i].area });
+  (o.music || []).forEach(x => out.push(x));       // a new release, a gig this week (musicHeads in discover.js)
   const soon = o.nowcast ? rainSoon(o.nowcast, now) : null;
   if (soon && (!soon.raining || soon.stops)) out.push({ kind: 'rain', tone: 'gas', title: soon.text, sub: soon.raining ? 'Dry after that for a while' : soon.heavy ? 'Heavy at times' : 'Light' });
   else if (!o.nowcast){

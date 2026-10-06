@@ -517,12 +517,18 @@ test('the display\'s script runs on older TV browsers', () => {
     assert.doesNotMatch(js, re, name);
 });
 
+test('the display\'s scripts parse, with no name declared twice in the flattened modules', async () => {
+  const vm = await import('node:vm');
+  const html = read('display.html');
+  [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach((m, i) => { assert.doesNotThrow(() => new vm.Script(m[1], { filename: 'display.html script ' + (i + 1) }), 'script ' + (i + 1)); });
+});
+
 test('the built display matches the source', () => {
   execFileSync('python3', [new URL('../build.py', import.meta.url).pathname, '--check'], { stdio: 'pipe' });   // fails with "run python3 build.py"
 });
 
 test('the shared modules keep to what the display build can flatten', () => {
-  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music', 'musicdata', 'queue']) {
+  for (const m of ['format', 'browser', 'net', 'octopus', 'carbon', 'weather', 'pvgis', 'analysis', 'household', 'outdoors', 'remote', 'qr', 'voyage', 'spotify', 'music', 'musicdata', 'queue', 'discover']) {
     const text = read(`src/lib/${m}.js`);
     const left = text.split('\n').filter(l => /^(import|export)\b/.test(l) && !/^import \{[^}]*\} from '\.\/[\w-]+\.js';$/.test(l) && !/^export (const|let|function|async function|class) /.test(l));
     assert.deepEqual(left, [], `${m}.js: one-line imports from ./module.js, and export only declarations`);

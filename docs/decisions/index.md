@@ -15,3 +15,4 @@
 | [0011](0011-wall-display.md) | The wall display redesigned (Today, Energy, Travel, the cockpit, Night) in the phone's look, the phone's Screen page, and the phone as a remote through ntfy.sh |
 | [0012](0012-music-player.md) | A music player of our own, on Spotify: signed in on each device with PKCE, in the house style, built in five stages |
 | [0013](0013-house-queue.md) | A house queue the TV keeps and feeds to Spotify a song ahead; parties guests join with a code on a page outside the lock; each person's own Spotify |
+| [0014](0014-finding-music.md) | Finding music without Spotify's recommendations: ListenBrainz (and Last.fm), new releases, Ticketmaster gigs with the key on the phone, a weather radio, and a listening log kept on the phone |

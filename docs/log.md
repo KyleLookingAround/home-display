@@ -4,6 +4,13 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation** (music branch, stage 5): finding music, and your listening ([decision 0014](decisions/0014-finding-music.md)).
+  - **More like this** (the player's More): songs people play alongside the one playing, from ListenBrainz (and Last.fm with a key), found on Spotify, with the artists fans also like. Artist pages show "Fans also like" too.
+  - **New from your artists:** releases in the last three weeks from the artists you follow and play, on the Music tab; the last three days as a heads-up on Now and on the TV's Today.
+  - **Gigs near you:** your artists playing within 40 miles, from Ticketmaster, once a key is added in Settings, Music. A gig this week is a heads-up on Now.
+  - **Weather radio:** playlists for the weather and the time of the week, on the Music tab, and 0 on the TV's remote.
+  - **Your listening** (`music.html#listening`): top artists and songs over four weeks, six months or all time, when you listen round the clock, and every day as a calendar, from plays the phone keeps.
+  - **Finding:** a name in the new module clashed with one in `household.js` once the TV's modules were flattened together, which stopped the display's script. A test now parses the built display, so a clash fails the checks.
 - **Creation**: full screen on a phone. A button in the header of every page hides the browser's bars. Browsers end full screen whenever the page changes, so once it's on, each page goes back to full screen at your first tap; leaving it with the button (or Back) turns that off. iPhones can't do this in Safari, so there the button explains Add to Home Screen, which opens the app with no bars, and the button isn't shown when it's opened from there. The display's own Full screen button says the same on an iPhone.
 - **Creation** (music branch, stage 4): the house queue, parties and who's listening ([decision 0013](decisions/0013-house-queue.md)).
   - **The house queue:** with the TV paired and on Spotify, + on a phone adds to a queue the TV keeps. Up next in the player shows it: drag a song by its handle (or the arrow keys) to move it, the heart to vote it up, the cross to take it out. The TV hands Spotify the top song about 25 seconds before the one playing ends, and skipping plays the house's next.

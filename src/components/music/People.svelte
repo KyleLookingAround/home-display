@@ -4,6 +4,7 @@
    * sees their own music; tap someone else to switch. Only shown once there's more than one person.
    */
   import { music, switchAccount, people } from '../../state/music.svelte.js';
+  import { forget, peek } from '../../state/discover.svelte.js';
   let { always = false } = $props();
   const list = $derived(music.acc ? people() : []);
   const initials = n => String(n || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -14,7 +15,7 @@
     <span class="label">Who's listening</span>
     <div class="faces">
       {#each list as p (p.id)}
-        <button type="button" class="face" class:on={music.acc && music.acc.id === p.id} aria-pressed={music.acc && music.acc.id === p.id} onclick={() => switchAccount(p.id)}>
+        <button type="button" class="face" class:on={music.acc && music.acc.id === p.id} aria-pressed={music.acc && music.acc.id === p.id} onclick={() => { switchAccount(p.id); forget(); peek(); }}>
           <span class="av">{#if p.img}<img src={p.img} alt="" width="36" height="36">{:else}{initials(p.name)}{/if}</span>
           <span class="nm">{String(p.name || p.id).split(' ')[0]}</span>
         </button>

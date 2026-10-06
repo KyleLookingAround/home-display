@@ -17,6 +17,13 @@
   import Row from './Row.svelte';
   import Shelf from './Shelf.svelte';
   import People from './People.svelte';
+  import Radio from './Radio.svelte';
+  import NewReleases from './NewReleases.svelte';
+  import Gigs from './Gigs.svelte';
+  import Listening from './Listening.svelte';
+  import FansAlso from './FansAlso.svelte';
+  import { disc } from '../../state/discover.svelte.js';
+  import { topArtists } from '../../lib/discover.js';
   import { artistStory } from '../../lib/musicdata.js';
   import { cacheGet, cacheSet } from '../../state/cache.js';
 
@@ -24,7 +31,7 @@
   let route = $state({ kind: '', id: '' }), clientId = $state('');
   const readRoute = () => {
     const h = location.hash.slice(1), m = /^(playlist|album|artist)\/([A-Za-z0-9]+)$/.exec(h);
-    route = m ? { kind: m[1], id: m[2] } : /^(liked|recent|playlists|albums|artists|shelf)$/.test(h) ? { kind: 'list', id: h } : { kind: '', id: '' };
+    route = m ? { kind: m[1], id: m[2] } : /^(liked|recent|playlists|albums|artists|shelf)$/.test(h) ? { kind: 'list', id: h } : /^(listening|gigs)$/.test(h) ? { kind: h, id: '' } : { kind: '', id: '' };
     window.scrollTo(0, 0);
   };
   onMount(async () => {
@@ -123,7 +130,7 @@
 
   /* ---------- a playlist, album or artist, lit by its own cover ---------- */
   let detail = $state.raw(null), dErr = $state.raw(null), dTint = $state.raw(null), aStory = $state.raw(null), bioMore = $state(false);
-  $effect(() => { const r = route, acc = music.acc; untrack(() => { if (acc && r.kind && r.kind !== 'list') openDetail(r); else { detail = null; dTint = null; } }); });
+  $effect(() => { const r = route, acc = music.acc; untrack(() => { if (acc && r.kind && !/^(list|listening|gigs)$/.test(r.kind)) openDetail(r); else { detail = null; dTint = null; } }); });
   async function openDetail(r){
     detail = null; dErr = null; dTint = null; aStory = null; bioMore = false;
     try {
@@ -157,6 +164,7 @@
   const playList = (list, i) => { haptic(); return play({ uris: list.slice(i, i + 100).map(x => x.uri) }); };
   const isPlayingFrom = d => music.player && music.player.context && d && music.player.context.uri === d.uri;
   const connect = () => beginSignIn(clientId, location.href).catch(() => { location.href = './settings.html#music'; });
+  const youLine = $derived.by(() => { const top = topArtists(disc.log || [], Date.now() - 30 * 864e5, 1)[0]; return top ? 'Mostly ' + top.name + ' this month' : 'Your top artists and songs'; });
   const LISTS = { liked: 'Liked songs', recent: 'Recently played', playlists: 'Your playlists', albums: 'Your albums', artists: 'Your top artists', shelf: 'Your record shelf' };
 </script>
 
@@ -197,6 +205,14 @@
     {#if more[route.id]}<div class="actions"><button class="btn" type="button" disabled={loading === route.id} onclick={() => load(route.id, true)}>{loading === route.id ? 'Loading…' : 'Show more'}</button></div>{/if}
   </section>
 
+{:else if route.kind === 'listening'}
+  <a class="back" href="./music.html" onclick={back}><Icon name="back" size={16} />Music</a>
+  <Listening />
+
+{:else if route.kind === 'gigs'}
+  <a class="back" href="./music.html" onclick={back}><Icon name="back" size={16} />Music</a>
+  <Gigs all />
+
 {:else if route.kind}
   <a class="back" href="./music.html" onclick={back}><Icon name="back" size={16} />Music</a>
   {#if detail}
@@ -236,6 +252,7 @@
     {#if detail.albums && detail.albums.length}
       <Row title="Albums and singles">{#each detail.albums as a (a.id)}<Tile images={a.images} title={a.name} sub={String(a.release_date || '').slice(0, 4) + (a.album_type === 'single' ? ' · Single' : '')} href="#album/{a.id}" />{/each}</Row>
     {/if}
+    {#if detail.kind === 'artist'}<FansAlso name={detail ? detail.title : ''} />{/if}
   {:else if dErr}<p class="note">{spotifyErrorText(dErr).join(' ')}</p>
   {:else}<div class="skel" style="height:300px"></div>{/if}
 
@@ -292,11 +309,13 @@
       </div>
     </section>
 
+    <Radio />
     {#if lib.jump && lib.jump.length}
       <Row title="Jump back in">{#each lib.jump as c (c.uri)}<Tile images={c.images} title={c.name} sub={c.sub} round={c.type === 'artist'} href="#{c.type}/{c.id}" />{/each}</Row>
     {/if}
     {#if lib.playlists}<Row title="Your playlists" all="#playlists">{#each lib.playlists.slice(0, 12) as p (p.id)}<Tile images={p.images} title={p.name} sub={(p.tracks || p.items) && (p.tracks || p.items).total != null ? (p.tracks || p.items).total + ' songs' : ''} href="#playlist/{p.id}" />{/each}</Row>
     {:else}<div class="skel" style="height:200px"></div>{/if}
+    <NewReleases />
     {#if lib.artists && lib.artists.length}<Row title="Your top artists" all="#artists">{#each lib.artists.slice(0, 12) as a (a.id)}<Tile images={a.images} title={a.name} round href="#artist/{a.id}" />{/each}</Row>{/if}
     {#if lib.albums && lib.albums.length}<Row title="Your albums" all="#albums" alt={{ href: '#shelf', label: 'Shelf' }}>{#each lib.albums.slice(0, 12) as a (a.id)}<Tile images={a.images} title={a.name} sub={(a.artists || []).map(x => x.name).join(', ')} href="#album/{a.id}" />{/each}</Row>{/if}
     {#if lib.recent && lib.recent.length}
@@ -305,6 +324,13 @@
         <ul class="list">{#each lib.recent.slice(0, 5) as t, i (t.id + i)}<TrackRow {t} onplay={() => play({ uris: [t.uri] })} />{/each}</ul>
       </section>
     {/if}
+    <Gigs />
+    <a class="card you" href="#listening">
+      <span class="label">Your listening</span>
+      <b>{youLine}</b>
+      <span class="note">Top artists and songs, when you listen, and every day as a calendar</span>
+      <Icon name="next" size={18} />
+    </a>
   {/if}
 {/if}
 
@@ -319,6 +345,12 @@
   @keyframes spin{to{transform:rotateX(70deg) rotate(380deg)}}
 
   /* the answer: what's playing */
+  .you{text-decoration:none;color:inherit;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+  .you > *:not(:global(.ic)){grid-column:1}
+  .you :global(.ic){grid-column:2;grid-row:1 / span 3;color:var(--gas)}
+  .you b{font-size:17px;font-weight:600}
+  .you .note{margin:0}
+  .you:hover{border-color:var(--line-hot)}
   .now-answer{appearance:none;border:0;background:none;color:inherit;text-align:left;cursor:pointer;width:100%;font:inherit}
   .now-answer .big{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
   .glow{color:var(--ink);text-shadow:0 0 22px color-mix(in srgb,var(--tint,var(--gas)) 55%,transparent)}

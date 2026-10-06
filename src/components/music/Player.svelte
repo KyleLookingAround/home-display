@@ -16,6 +16,7 @@
   import LinerNotes from './LinerNotes.svelte';
   import Sheets from './Sheets.svelte';
   import HouseQueue from './HouseQueue.svelte';
+  import MoreLike from './MoreLike.svelte';
   import { tv } from '../../state/tv.svelte.js';
 
   const t = $derived(music.track);
@@ -41,7 +42,7 @@
   /* ---------- touch: drag the player down to close it; swipe the cover to skip; double-tap it to like ---------- */
   let dy = $state(0), dx = $state(0), axis = '', x0 = 0, y0 = 0, active = false, lastTap = 0, burst = $state(0), slide = $state('');
   function down(e){
-    if (e.button > 0 || e.target.closest('button, input, a, .lyrics-full, .queue-full, .picker')) return;
+    if (e.button > 0 || e.target.closest('button, input, a, .lyrics-full, .queue-full, .picker, .like')) return;
     active = true; axis = ''; x0 = e.clientX; y0 = e.clientY;
   }
   function moveP(e){
@@ -207,6 +208,7 @@
       {:else}<div class="empty-view"><Icon name="lyrics" size={40} /><p>{music.lyrics && music.lyrics.instrumental ? 'An instrumental.' : music.lyricsFor !== t.id && !music.lyrics ? 'Looking for the lyrics…' : 'LRCLIB, the free lyrics library, doesn\'t have this one yet.'}</p></div>{/if}
     {:else if music.view === 'about'}<About />
     {:else if music.view === 'notes'}<LinerNotes />
+    {:else if music.view === 'like'}<MoreLike />
     {:else}
       <div class="queue-full">
         <span class="label">Now playing</span>

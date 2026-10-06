@@ -44,6 +44,9 @@ const TRACKS = [
   tr('t3', 'Last Train to Piccadilly', 'al3', ['a3', 'Viaduct'], 245000),
   tr('t4', 'Bins Out Tonight', 'al1', ['a1', 'The Stockport Satellites'], 151000)
 ];
+const ARTISTS = [{ id: 'a1', name: 'The Stockport Satellites', images: img('amber') }, { id: 'a2', name: 'Agile Hearts', images: img('violet') }, { id: 'a3', name: 'Viaduct', images: img('cyan') }];
+const NEW_ALBUM = { id: 'al4', uri: 'spotify:album:al4', name: 'Platform 4', release_date: new Date().toISOString().slice(0, 10), release_date_precision: 'day', images: img('violet'), artists: [{ id: 'a3', name: 'Viaduct' }] };
+const TM_ASKED = [];
 const DEVICES = [
   { id: 'kitchen', name: 'Kitchen speaker', type: 'Speaker', is_active: true, volume_percent: 45, supports_volume: true },
   { id: 'tv', name: 'Living room TV', type: 'TV', is_active: false, volume_percent: 20, supports_volume: true },
@@ -51,15 +54,15 @@ const DEVICES = [
 ];
 /* ---------- the pretend open music libraries: MusicBrainz, Wikidata, Wikipedia, the Cover Art Archive ---------- */
 const MBX = {
-  '/isrc/GBTEST260001': { recordings: [{ id: 'r1', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'mba1', name: 'The Stockport Satellites' } }] }] },
-  '/recording/r1': { id: 'r1', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'mba1', name: 'The Stockport Satellites' } }],
+  '/isrc/GBTEST260001': { recordings: [{ id: 'aaaaaaaa-0000-4000-8000-000000000001', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'bbbbbbbb-0000-4000-8000-000000000001', name: 'The Stockport Satellites' } }] }] },
+  '/recording/aaaaaaaa-0000-4000-8000-000000000001': { id: 'aaaaaaaa-0000-4000-8000-000000000001', title: 'Harold Street', 'first-release-date': '2026-09-04', 'artist-credit': [{ name: 'The Stockport Satellites', artist: { id: 'bbbbbbbb-0000-4000-8000-000000000001', name: 'The Stockport Satellites' } }],
     releases: [{ id: 'rel1', title: 'Region G', date: '2026-09-04', status: 'Official' }],
     relations: [{ type: 'vocal', attributes: ['lead vocals'], artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'instrument', attributes: ['electric guitar'], artist: { id: 'p2', name: 'Jo Platt' } },
       { type: 'producer', attributes: [], artist: { id: 'p4', name: 'Martin Hannett' } }, { type: 'recorded at', place: { id: 'pl1', name: 'Strawberry Studios' } }, { type: 'performance', work: { id: 'w1', title: 'Harold Street' } }] },
   '/work/w1': { id: 'w1', relations: [{ type: 'composer', artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'lyricist', artist: { id: 'p1', name: 'Sam Rivers' } }, { type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q100' } }] },
   '/place/pl1': { id: 'pl1', name: 'Strawberry Studios', area: { name: 'Stockport' } },
-  '/artist/mba1': { id: 'mba1', name: 'The Stockport Satellites', type: 'Group', 'begin-area': { name: 'Stockport' }, 'life-span': { begin: '2019' }, relations: [{ type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q200' } }] },
-  '/artist': { artists: [{ id: 'mba1', name: 'The Stockport Satellites', score: 100 }] }
+  '/artist/bbbbbbbb-0000-4000-8000-000000000001': { id: 'bbbbbbbb-0000-4000-8000-000000000001', name: 'The Stockport Satellites', type: 'Group', 'begin-area': { name: 'Stockport' }, 'life-span': { begin: '2019' }, relations: [{ type: 'wikidata', url: { resource: 'https://www.wikidata.org/wiki/Q200' } }] },
+  '/artist': { artists: [{ id: 'bbbbbbbb-0000-4000-8000-000000000001', name: 'The Stockport Satellites', score: 100 }] }
 };
 const WIKI = { Q100: 'Harold Street (song)', Q200: 'The Stockport Satellites' };
 const SUMMARY = { 'Harold_Street_(song)': '"Harold Street" is a song by the Stockport Satellites, written about the street where the band rehearsed. It was recorded at Strawberry Studios in Stockport in a single night.',
@@ -69,6 +72,17 @@ async function openLibraries(page){
   await page.route(/^https:\/\/musicbrainz\.org\/ws\/2\//, r => { const u = new URL(r.request().url()), k = u.pathname.replace('/ws/2', ''); return MBX[k] ? r.fulfill({ json: MBX[k], headers: CORS }) : r.fulfill({ status: 404, json: { error: 'Not Found' }, headers: CORS }); });
   await page.route(/^https:\/\/www\.wikidata\.org\/w\/api\.php/, r => { const id = new URL(r.request().url()).searchParams.get('ids'); return r.fulfill({ json: { entities: { [id]: { sitelinks: WIKI[id] ? { enwiki: { title: WIKI[id] } } : {} } } }, headers: CORS }); });
   await page.route(/^https:\/\/en\.wikipedia\.org\/api\/rest_v1\/page\/summary\//, r => { const t = decodeURIComponent(r.request().url().split('/summary/')[1]); return SUMMARY[t] ? r.fulfill({ json: { type: 'standard', title: t.replace(/_/g, ' '), extract: SUMMARY[t], content_urls: { mobile: { page: 'https://en.m.wikipedia.org/wiki/' + t } } }, headers: CORS }) : r.fulfill({ status: 404, json: {}, headers: CORS }); });
+  await page.route(/^https:\/\/app\.ticketmaster\.com\/discovery\/v2\/events\.json/, r => {
+    const u = r.request().url(); TM_ASKED.push(u);
+    if (!/apikey=TMKEY/.test(u)) return r.fulfill({ status: 401, json: { fault: { faultstring: 'Invalid ApiKey' } } });
+    const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+    const ev = (id, act, n, venue) => ({ id, name: act + ' live', url: 'https://www.ticketmaster.co.uk/event/' + id, dates: { start: { localDate: day(n), localTime: '19:30:00', dateTime: day(n) + 'T18:30:00Z' }, status: { code: 'onsale' } },
+      _embedded: { attractions: [{ name: act }], venues: [{ name: venue, city: { name: 'Manchester' } }] }, images: [] });
+    return r.fulfill({ headers: CORS, json: { _embedded: { events: [ev('e1', 'The Stockport Satellites', 3, 'Band on the Wall'), ev('e2', 'Somebody Else', 4, 'O2 Ritz'), ev('e3', 'Viaduct', 40, 'Albert Hall')] }, page: { totalPages: 1 } } });
+  });
+  await page.route(/^https:\/\/labs\.api\.listenbrainz\.org\/similar-recordings\/json/, r => r.fulfill({ headers: CORS, json: /recording_mbids=aaaaaaaa-0000-4000-8000-000000000001/.test(r.request().url())
+    ? [['Negative Pricing', 'Agile Hearts', 90], ['Last Train to Piccadilly', 'Viaduct', 80], ['Not On Spotify', 'Nobody', 70]].map(([n, a, sc]) => ({ recording_name: n, artist_credit_name: a, score: sc })) : [] }));
+  await page.route(/^https:\/\/labs\.api\.listenbrainz\.org\/similar-artists\/json/, r => r.fulfill({ headers: CORS, json: [{ name: 'Viaduct', artist_mbid: 'cccccccc-0000-4000-8000-000000000003', score: 50 }, { name: 'Agile Hearts', artist_mbid: 'cccccccc-0000-4000-8000-000000000002', score: 40 }] }));
   await page.route(/^https:\/\/coverartarchive\.org\/release\/rel1$/, r => r.fulfill({ json: { images: [['Back', 'violet'], ['Front', 'amber'], ['Booklet', 'cyan']].map(([t, c]) => ({ types: [t], front: t === 'Front', image: cid(c, 640), thumbnails: { 500: cid(c, 300) } })) }, headers: CORS }));
 }
 const LRC = '[00:00.50]Streetlights hum along the viaduct\n[00:08.00]Kettle on at half past nine\n[00:16.00]The meter ticks, the prices drop\n[00:24.00]We wait for cheaper time\n[00:32.00]Harold Street, Harold Street\n[00:40.00]Stars above the chimney pots';
@@ -117,14 +131,22 @@ function spotify(opts = {}){
     if (p === '/me/tracks') return { json: { items: TRACKS.filter(t => S.liked.has(t.id)).map(t => ({ added_at: '2026-10-01T10:00:00Z', track: t })), next: null, total: S.liked.size } };
     if (p === '/me/playlists') return { json: { items: [{ id: 'p1', uri: 'spotify:playlist:p1', name: 'Friday night', images: img('violet'), owner: { display_name: 'Kyle' }, tracks: { total: 3 } }, { id: 'p2', uri: 'spotify:playlist:p2', name: 'Cheap hours', images: img('cyan'), owner: { display_name: 'Kyle' }, tracks: { total: 2 } }], next: null } };
     if (p === '/me/albums') return { json: { items: Object.values(ALBUMS).map(a => ({ added_at: '2026-09-01T00:00:00Z', album: a })), next: null } };
-    if (p === '/me/player/recently-played') return { json: { items: [[TRACKS[2], 'album', 'spotify:album:al3'], [TRACKS[1], 'playlist', 'spotify:playlist:p1']].map(([t, type, uri], i) => ({ played_at: new Date(Date.now() - (i + 1) * 40 * 60e3).toISOString(), track: t, context: { type, uri } })), next: null } };
+    if (p === '/me/player/recently-played') return { json: { items: [[TRACKS[2], 'album', 'spotify:album:al3'], [TRACKS[1], 'playlist', 'spotify:playlist:p1']].map(([t, type, uri], i) => ({ played_at: new Date(Date.now() - (i + 1) * 40 * 60e3).toISOString(), track: t, context: { type, uri } }))
+      .concat([1, 2, 3, 5, 8].map((d, i) => ({ played_at: new Date(Date.now() - d * 864e5 - i * 3600e3).toISOString(), track: TRACKS[i % 4], context: null }))), next: null } };
+    if (p === '/me/following') return { json: { artists: { items: [ARTISTS[2]], cursors: {} } } };
+    if (p === '/me/top/tracks') return { json: { items: TRACKS, next: null } };
     if (p === '/me/top/artists') return { json: { items: [{ id: 'a1', name: 'The Stockport Satellites', images: img('amber') }, { id: 'a3', name: 'Viaduct', images: img('cyan') }], next: null } };
     if (p === '/playlists/p1') return { json: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Friday night', images: img('violet'), owner: { display_name: 'Kyle' }, description: 'For the end of the week.' } };
     if (p === '/playlists/p1/items') return { json: { items: TRACKS.slice(0, 3).map(t => ({ added_at: '2026-10-01T10:00:00Z', item: t })), next: null, total: 3 } };
     if (/^\/albums\/al\d$/.test(p)){ const a = ALBUMS[p.split('/')[2]]; return { json: Object.assign({}, a, { tracks: { items: TRACKS.filter(t => t.album.id === a.id).map(t => Object.assign({}, t, { album: undefined })), next: null } }) }; }
     if (/^\/artists\/a\d$/.test(p)) return { json: { id: 'a1', uri: 'spotify:artist:a1', name: 'The Stockport Satellites', genres: ['indie rock', 'madchester'], images: img('amber') } };
     if (/^\/artists\/a\d\/top-tracks$/.test(p)) return { json: { tracks: [TRACKS[0], TRACKS[3]] } };
+    if (p === '/artists/a3/albums') return { json: { items: [NEW_ALBUM, ALBUMS.al3], next: null } };
     if (/^\/artists\/a\d\/albums$/.test(p)) return { json: { items: [ALBUMS.al1], next: null } };
+    // search by name, as "more like this" and the weather radio ask
+    if (p === '/search' && q.get('type') === 'playlist') return { json: { playlists: { items: [null, { id: 'wr1', uri: 'spotify:playlist:wr1', name: 'Rain on the viaduct', images: img('cyan'), owner: { display_name: 'Someone' }, tracks: { total: 40 } }, { id: 'wr2', uri: 'spotify:playlist:wr2', name: 'Kettle on', images: img('amber'), owner: { display_name: 'Someone' }, tracks: { total: 25 } }] } } };
+    if (p === '/search' && /track:"/.test(q.get('q'))){ const n = /track:"([^"]+)"/.exec(q.get('q'))[1]; return { json: { tracks: { items: TRACKS.filter(t => t.name === n) } } }; }
+    if (p === '/search' && /^artist:"/.test(q.get('q'))){ const n = /artist:"([^"]+)"/.exec(q.get('q'))[1]; return { json: { artists: { items: ARTISTS.filter(a => a.name === n) } } }; }
     if (p === '/search') return { json: { tracks: { items: [TRACKS[0], TRACKS[3]] }, artists: { items: [{ id: 'a1', name: 'The Stockport Satellites', images: img('amber') }] }, albums: { items: [ALBUMS.al1] }, playlists: { items: [null, { id: 'p1', name: 'Friday night', images: img('violet'), owner: { display_name: 'Kyle' } }] } } };
     return err(404, 'Not found: ' + p);
   };
@@ -810,6 +832,66 @@ test('music: who\'s listening, on the phone and on the TV', async () => {
   box.put('hse-screen-abcdefgh', { from: 'phone', cmd: 'listen', id: 'sam' });
   await until(() => tv.page.textContent('#mFoot').then(t => /Spotify · Sam Rivers/.test(t)), 'the TV as Sam', 8000);
   await until(() => sent.some(x => x.msg.state && x.msg.state.listening === 'sam' && x.msg.state.people.length === 2), 'the phones are told');
+  assert.deepEqual(tv.errors, []);
+  await tv.ctx.close();
+});
+
+/* ---------- stage 5: finding music, and your listening ---------- */
+test('music: weather radio, new releases, gigs, more like this, and your listening', async () => {
+  const sp = spotify();
+  const { page, ctx, errors } = await open('/music.html', { sp, keep: { 'hse.tmKey': 'TMKEY' } });
+  // the weather radio: a mood for now, and playlists for it to play
+  await until(() => page.locator('.radio .pl').count().then(n => n === 2), 'playlists for the mood', 8000);
+  assert.ok((await page.textContent('.radio .title')).trim().length > 3, 'a mood');
+  await page.locator('.radio .pl', { hasText: 'Kettle on' }).click();
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:playlist:wr2'), 'played the playlist');
+  // new from your artists, and gigs near home with the Ticketmaster key
+  await until(() => page.locator('.row', { hasText: 'New from your artists' }).textContent().then(t => /Platform 4\s*Viaduct · today/.test(t)).catch(() => false), 'a release out today', 10000);
+  await until(() => page.locator('.gigs li').count().then(n => n === 2), 'two gigs by your artists', 10000);
+  assert.match(await page.textContent('.gigs'), /The Stockport Satellites\s*Band on the Wall, Manchester · \w{3} 19:30.*Viaduct\s*Albert Hall/s);
+  assert.ok(TM_ASKED.some(u => /latlong=53\.41,-2\.16&radius=40/.test(u)), 'near home');
+  await page.waitForTimeout(400);
+  await shot(page, 'music-discover');
+  // your listening
+  await page.locator('a.you').click();
+  await until(() => page.locator('.grid li').count().then(n => n === 2), 'top artists', 8000);
+  assert.match(await page.textContent('main'), /Your listening[\s\S]*this week[\s\S]*Top songs[\s\S]*When you listen[\s\S]*Every day[\s\S]*plays kept on this phone/);
+  await page.waitForTimeout(400);
+  if (SHOTS) await page.screenshot({ path: join(SHOTS, 'music-listening.png'), fullPage: true });
+  await page.locator('.seg button', { hasText: 'All time' }).click();
+  await until(() => calls(sp, 'GET', '/me/top/artists').some(c => c.query.time_range === 'long_term'), 'all time');
+  // the artist page: fans also like
+  await page.goto(base + '/music.html#artist/a1');
+  await until(() => page.locator('.row', { hasText: 'Fans also like' }).textContent().then(t => /Viaduct.*Agile Hearts/s.test(t)).catch(() => false), 'fans also like', 15000);
+  // more like this, from the player's More
+  await page.locator('.mini').click({ position: { x: 120, y: 20 } });
+  const sheet = page.locator('.sheet.open');
+  await sheet.locator('button[aria-label="More"]').click();
+  await page.locator('.sheet-panel .opt', { hasText: 'More like this' }).click();
+  await until(() => sheet.locator('.like .tr').count().then(n => n === 2), 'two songs like it, found on Spotify', 15000);
+  assert.match(await sheet.locator('.like').textContent(), /Negative Pricing.*Last Train to Piccadilly.*Fans also like.*From ListenBrainz/s);
+  await page.waitForTimeout(400);
+  await shot(page, 'music-more-like');
+  await sheet.locator('.like button', { hasText: 'Play them' }).click();
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.uris && c.body.uris.join() === 'spotify:track:t2,spotify:track:t3'), 'played them');
+  // Now: a release out today, and a gig this week
+  await page.goto(base + '/index.html');
+  await until(() => page.textContent('.heads').then(t => /New from Viaduct\s*Platform 4 · Out today/.test(t) && /The Stockport Satellites at Band on the Wall/.test(t)).catch(() => false), 'heads-ups on Now', 10000);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('music on the TV: weather radio on 0, and new releases on Today', async () => {
+  const sp = spotify();
+  const tv = await open('/display.html#music', { width: 1920, height: 1080, sp, settings: {} });
+  await until(() => tv.page.textContent('#mFoot').then(t => /0 weather radio/.test(t)), 'the remote says how', 8000);
+  await tv.page.keyboard.press('0');
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && /^spotify:playlist:wr[12]$/.test(c.body.context_uri || '')), 'a playlist for the weather', 8000);
+  assert.match(await tv.page.textContent('#toast'), /Weather radio · .+: (Rain on the viaduct|Kettle on)/);
+  await tv.page.keyboard.press('1');
+  await until(() => tv.page.evaluate(() => location.hash === '#music'), 'still Music');
+  await tv.page.evaluate(() => { location.hash = '#today'; });
+  await until(() => tv.page.textContent('#dHeads').then(t => /New from Viaduct\s*Platform 4 · Out today/.test(t)), 'a heads-up on Today', 15000);
   assert.deepEqual(tv.errors, []);
   await tv.ctx.close();
 });

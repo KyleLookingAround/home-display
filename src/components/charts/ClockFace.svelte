@@ -4,7 +4,7 @@
    * overnight window and the evening peak are marked on the rim. Tap, point or use the arrow keys to read a half hour.
    */
   import { slotLabel, clamp } from '../../lib/format.js';
-  let { values = [], colour = 'var(--elec)', centre = '', centreSub = '', fmt = v => v.toFixed(2), aria = 'Use by time of day', selected = $bindable(null) } = $props();
+  let { values = [], colour = 'var(--elec)', centre = '', centreSub = '', fmt = v => v.toFixed(2), aria = 'Use by time of day', marks = true, selected = $bindable(null) } = $props();
   const S = 300, C = S / 2, r0 = 58, r1 = 132;
   const max = $derived(Math.max(0.001, ...values));
   const ang = i => (i / 48) * Math.PI * 2 - Math.PI / 2;
@@ -24,8 +24,8 @@
 <div class="chart clock" tabindex="0" role="group" aria-label={aria} onpointerdown={pick} onpointermove={ev => { if (ev.pointerType === 'mouse') pick(ev); }} onkeydown={keys}>
   <svg viewBox="0 0 {S} {S}" aria-hidden="true">
     <circle cx={C} cy={C} r={r1 + 6} fill="none" stroke="var(--line)"/>
-    <path d={arc(1, 11, r1 + 6)} fill="none" stroke="var(--cheap)" stroke-width="4" stroke-linecap="round"/>
-    <path d={arc(32, 38, r1 + 6)} fill="none" stroke="var(--peak)" stroke-width="4" stroke-linecap="round"/>
+    {#if marks}<path d={arc(1, 11, r1 + 6)} fill="none" stroke="var(--cheap)" stroke-width="4" stroke-linecap="round"/>
+    <path d={arc(32, 38, r1 + 6)} fill="none" stroke="var(--peak)" stroke-width="4" stroke-linecap="round"/>{/if}
     <circle cx={C} cy={C} r={r0 - 4} fill="rgba(4,5,13,.6)" stroke="var(--line)"/>
     {#each spokes as s, i}<line x1={s.x0} y1={s.y0} x2={s.x1} y2={s.y1} stroke={colour} stroke-width="4" stroke-linecap="round" opacity={selected == null || selected === i ? 1 : .45}/>{/each}
     {#each [[0, '00'], [12, '06'], [24, '12'], [36, '18']] as [i, t]}{@const p = pt(i, r1 + 20)}<text x={p[0]} y={p[1] + 4} text-anchor="middle">{t}</text>{/each}

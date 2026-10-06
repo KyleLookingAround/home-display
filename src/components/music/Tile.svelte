@@ -6,7 +6,7 @@
 </script>
 
 {#if href}
-  <a class="tile" {href}>{@render body()}</a>
+  <a class="tile" {href} {onclick}>{@render body()}</a>
 {:else}
   <button class="tile" type="button" {onclick}>{@render body()}</button>
 {/if}

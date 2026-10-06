@@ -36,7 +36,9 @@ const SRC = {
   holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays },
   // Spotify (tvmusic.js): every few seconds while the Music view is up, less often while only a line or a cover shows it.
   music:   { label: 'Spotify', every: () => shown() === 'music' ? 3e3 : (shown() === 'today' || shown() === 'screensaver') ? 15e3 : (TM.sleepAt || TM.sleepSong) ? 15e3 : MIN, need: () => !!tmSp(), run: pollSpotify },
-  shelf:   { label: 'Your albums', every: () => 6*60*MIN, need: () => !!tmSp(), run: tmShelf }
+  shelf:   { label: 'Your albums', every: () => 6*60*MIN, need: () => !!tmSp(), run: tmShelf },
+  // new releases from the artists the TV's listener follows and plays, for a heads-up on Today (src/lib/discover.js)
+  releases: { label: 'New releases', every: () => 12*60*MIN, need: () => !!tmSp(), run: () => fetchReleases(tmSp(), Date.now(), 21) }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
 
@@ -191,7 +193,7 @@ function renderToday(){
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds }, now).slice(0, 3));
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
   const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);

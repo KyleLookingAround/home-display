@@ -33,7 +33,8 @@
       <button type="button" class="opt" role="switch" aria-checked={music.vinyl} onclick={() => setVinyl(!music.vinyl)}>
         <Icon name="disc" /><span>Vinyl mode<small>The cover as a record on a turntable</small></span><i class="sw" class:on={music.vinyl}></i></button>
       {#if !t.episode}<button type="button" class="opt" onclick={() => setView('about')}><Icon name="info" /><span>About this song<small>The story, the credits, the artist</small></span></button>
-      <button type="button" class="opt" onclick={() => setView('notes')}><Icon name="book" /><span>Liner notes<small>The sleeve and booklet</small></span></button>{/if}
+      <button type="button" class="opt" onclick={() => setView('notes')}><Icon name="book" /><span>Liner notes<small>The sleeve and booklet</small></span></button>
+      <button type="button" class="opt" onclick={() => setView('like')}><Icon name="spark" /><span>More like this<small>What people play alongside it</small></span></button>{/if}
       <button type="button" class="opt" onclick={() => { music.over = 'sleep'; }}><Icon name="moon" /><span>Sleep timer<small>{tvCode ? 'The TV fades it out' : 'Needs your TV paired, on Screen'}</small></span></button>
       <button type="button" class="opt" onclick={() => { music.over = 'share'; }}><Icon name="share" /><span>Share this song<small>A code to scan, or the link</small></span></button>
       {#if t.album.id && !t.episode}<a class="opt" href="./music.html#album/{t.album.id}" onclick={() => closePlayer()}><Icon name="album" /><span>Go to the album<small>{t.album.name}</small></span></a>{/if}

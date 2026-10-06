@@ -11,8 +11,9 @@
   import Icon from './Icon.svelte';
   import Player from './Player.svelte';
   import { watchTv } from '../../state/tv.svelte.js';
+  import { peek, freshen } from '../../state/discover.svelte.js';
 
-  onMount(() => { watchMusic(); watchTv(); });
+  onMount(() => { watchMusic(); watchTv(); peek(); freshen(); });
 
   const t = $derived(music.track);
   const m = $derived(music.player);
