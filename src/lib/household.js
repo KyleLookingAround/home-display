@@ -456,9 +456,9 @@ export function commuteLine(trains, now){
   const leg = trains.leg, d = c.d, a = arriveBy(d, leg), at = (trains.toName || leg.to) + ' ' + hhmm(d.arr), go = hhmm((d.exp || d.sched) - leg.walk * 60e3);
   if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at.replace(/ (\d\d:\d\d)$/, ' at $1') + '.';
   const ride = 'the ' + hhmm(d.sched) + ': ' + at + ', ' + a.text.charAt(0).toLowerCase() + a.text.slice(1);
-  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave home by ' + go + '.';
+  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave ' + (leg.walkHere ? '' : 'home ') + 'by ' + go + '.';
   if (c.kind === 'late') return 'Nothing gets you in by ' + hhmm(leg.start) + ' now. The next is ' + ride + '.';
-  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave work by ' + go + '.';
+  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave ' + (leg.walkHere ? '' : 'work ') + 'by ' + go + '.';
   return ride.charAt(0).toUpperCase() + ride.slice(1) + '.';
 }
 /* ---------- the station sign: its words, the same on the phone and the TV ---------- */

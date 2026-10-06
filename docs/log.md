@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation**: maps, stage 2: the phone's location, when you turn it on (Settings, Location; `state/where.svelte.js`).
+  - The walk to the train is the walk from where you are, when you're within 3 km of the station ("With a 6 minute walk from where you are"; `legFromHere`), so "Leave in…" stays true wherever you are.
+  - "I'm at work: remember this place" keeps work's place on the phone (`hse.office`) and works out the walk from the station you get off at, which goes to the TV with your office days.
+  - At work on a day that wasn't down as an office day, the phone ticks it (`atPlace`), and says so under Office days.
+  - Asked for at most once a minute while a page is open, kept in memory only.
 - **Creation**: maps, stage 1: your journey on a map ([decision 0015](decisions/0015-maps-and-location.md)).
   - The train that matters (the one that gets you in, home once you finish, or the next you can make) on a dark map with the line, its stations, home and the walk to the station. The train moves between stations from its live times ("Between Hazel Grove and Stockport, on time"), and is followed once it has left until it gets you there.
   - Under the map: where you get on and off and when you're at work or home, and the weather in town for when you finish.

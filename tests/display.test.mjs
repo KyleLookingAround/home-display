@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'geo', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -472,6 +472,18 @@ test('maps: where a train is, from either board\'s live times', () => {
   assert.equal(A.trainText(A.trainAt(stops, t('08:21'), idx)), 'Nearly at Manchester Piccadilly, 1 min late');
   assert.equal(A.trainText(A.trainAt(stops, at('2026-10-06T08:13:20'), idx)), 'At Stockport, 1 min late', 'just left, still at the platform');
   assert.equal(A.trainAt([stops[0]], t('08:16'), idx), null);
+});
+
+test('location: at a place, and the walk to the train from where you are', () => {
+  const idx = A.stationIndex({ s: [['SPT', 'Stockport', 53.40545, -2.16304]] }), now = at('2026-10-06T07:30:00');
+  const leg = { from: 'SPT', to: 'MAN', walk: 15, after: 25, work: true };
+  const near = { lat: 53.4089, lon: -2.1625, acc: 20, at: now - 60e3 };
+  assert.deepEqual(plain(A.legFromHere(leg, near, idx, now)), Object.assign({}, leg, { walk: 6, walkHere: true }));
+  assert.equal(A.legFromHere(leg, Object.assign({}, near, { at: now - 6 * 60e3 }), idx, now), leg, 'an old position is no use');
+  assert.equal(A.legFromHere(leg, { lat: 53.48, lon: -2.24, at: now }, idx, now), leg, 'over 3 km away: not walking');
+  assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 30 }, { lat: 53.4790, lon: -2.2445 }), true, '100 m');
+  assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 30 }, { lat: 53.4831, lon: -2.2445 }), false, '550 m');
+  assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 450 }, { lat: 53.4815, lon: -2.2445 }), true, 'within a rough fix');
 });
 
 test('the station sign words a train the same on the phone and the TV', () => {

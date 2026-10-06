@@ -228,3 +228,16 @@ export function journeyLines(j, pos){
   else if (j.off) out.push(j.off.text + (j.there ? ' · ' + j.there : ''));
   return out;
 }
+
+/* ---------- where the phone is ---------- */
+/** Is a position at a place: within 250 m, or the position's accuracy up to 500 m? */
+export const atPlace = (here, place) => !!(here && place && distKm(here, place) * 1000 <= Math.max(250, Math.min(500, +here.acc || 0)));
+/**
+ * The commute's walk to the train from where the phone is, when it's fresh (five minutes) and within 3 km of the
+ * station you board at: further than that, you're not walking. `walkHere` marks it.
+ */
+export function legFromHere(leg, here, index, now){
+  if (!leg || !here || !index || !index[leg.from] || now - here.at > 5 * 60e3) return leg;
+  const km = distKm(here, index[leg.from]);
+  return km > 3 ? leg : Object.assign({}, leg, { walk: walkMins(km), walkHere: true });
+}

@@ -172,9 +172,9 @@ const SETTINGS = { trainFrom: 'SPT', trainWalk: 12, tramStop: 'East Didsbury', t
 const COMMUTE = { ...SETTINGS, trainTo: 'MAN', trainWalk: 5, workDays: [1, 2, 3, 4, 5], workWalk: 25, workStart: '08:30', workEnd: '17:30' };
 const TUESDAY_EARLY = new Date('2026-10-06T07:35:00+01:00');
 
-async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false } = {}){
+async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false, geo = null } = {}){
   helper = withHelper;
-  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: sw ? 'allow' : 'block' });
+  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: sw ? 'allow' : 'block', ...(geo ? { geolocation: geo, permissions: ['geolocation'] } : {}) });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -857,6 +857,40 @@ test('journey: your train on a map, moving between its live times, on the phone 
   const l = await layout(page);
   assert.ok(l.sh <= l.ih, `Travel fits (${l.sh})`); assert.ok(l.sw <= l.iw); assert.deepEqual(l.small, []);
   await shot(page, 'tv-travel-journey');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('location: the walk from where you are, work remembered, and an office day noticed', async () => {
+  const WORK = { latitude: 53.4781, longitude: -2.2445 }, NEAR_STATION = { latitude: 53.4089, longitude: -2.1625 };   // a made-up office in town; a street by Stockport station
+  // Settings: turn it on, and remember work while there
+  let { page, ctx, errors } = await open('/settings.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false, geo: WORK });
+  const loc = page.locator('#location');
+  await loc.getByLabel("Use this phone's location").check();
+  await loc.getByRole('button', { name: /I'm at work: remember this place/ }).click();
+  await page.waitForFunction(() => /Remembered: a \d+ minute walk from Manchester Piccadilly/.test(document.getElementById('location').textContent));
+  assert.match(await loc.textContent(), /a 16 minute walk from Manchester Piccadilly/);
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.office'))), { lat: 53.4781, lon: -2.2445 });
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.display')).workWalk), 16, 'the walk from the station is worked out');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // at work on a day that wasn't down as one: it is now
+  ({ page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: new Date('2026-10-06T09:30:00+01:00'), settings: { ...COMMUTE, workDays: [] }, withHelper: false, geo: WORK }));
+  await page.evaluate(() => { localStorage.setItem('hse.useLocation', '1'); localStorage.setItem('hse.office', JSON.stringify({ lat: 53.4781, lon: -2.2445 })); });
+  await page.reload(); await ready(page);
+  await page.waitForFunction(() => /You're at work, so today is an office day/.test(document.body.textContent), null, { timeout: 15000 });
+  assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem('hse.plan'))), { '2026-10-06': { in: true } });
+  await page.waitForFunction(() => [...document.querySelectorAll('.card h2')].some(h => h.textContent === 'Trains to work'));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // a street from Stockport station: the walk to the train is from here, not the usual 5 minutes
+  ({ page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: { ...COMMUTE, trainWalk: 30 }, withHelper: false, geo: NEAR_STATION }));
+  await page.evaluate(() => localStorage.setItem('hse.useLocation', '1'));
+  await page.reload(); await ready(page);
+  await page.waitForFunction(() => /With a \d+ minute walk from where you are/.test(document.body.textContent), null, { timeout: 15000 });
+  const walk = +(/With a (\d+) minute walk from where you are/.exec(await page.textContent('body'))[1]);
+  assert.ok(walk >= 4 && walk <= 9, `about 400 m from the station: ${walk} minutes`);
+  assert.match(await page.textContent('.commute'), /Leave by \d\d:\d\d\.$/, 'leave from here, not from home');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

@@ -2001,9 +2001,9 @@ function commuteLine(trains, now){
   const leg = trains.leg, d = c.d, a = arriveBy(d, leg), at = (trains.toName || leg.to) + ' ' + hhmm(d.arr), go = hhmm((d.exp || d.sched) - leg.walk * 60e3);
   if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at.replace(/ (\d\d:\d\d)$/, ' at $1') + '.';
   const ride = 'the ' + hhmm(d.sched) + ': ' + at + ', ' + a.text.charAt(0).toLowerCase() + a.text.slice(1);
-  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave home by ' + go + '.';
+  if (c.kind === 'on') return 'For ' + hhmm(leg.start) + ', ' + ride + '. Leave ' + (leg.walkHere ? '' : 'home ') + 'by ' + go + '.';
   if (c.kind === 'late') return 'Nothing gets you in by ' + hhmm(leg.start) + ' now. The next is ' + ride + '.';
-  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave work by ' + go + '.';
+  if (c.kind === 'after') return 'Finishing at ' + hhmm(leg.end) + ', ' + ride + '. Leave ' + (leg.walkHere ? '' : 'work ') + 'by ' + go + '.';
   return ride.charAt(0).toUpperCase() + ride.slice(1) + '.';
 }
 /* ---------- the station sign: its words, the same on the phone and the TV ---------- */
@@ -2450,6 +2450,19 @@ function journeyLines(j, pos){
   else if (j.off) out.push(j.off.text + (j.there ? ' · ' + j.there : ''));
   return out;
 }
+
+/* ---------- where the phone is ---------- */
+/** Is a position at a place: within 250 m, or the position's accuracy up to 500 m? */
+const atPlace = (here, place) => !!(here && place && distKm(here, place) * 1000 <= Math.max(250, Math.min(500, +here.acc || 0)));
+/**
+ * The commute's walk to the train from where the phone is, when it's fresh (five minutes) and within 3 km of the
+ * station you board at: further than that, you're not walking. `walkHere` marks it.
+ */
+function legFromHere(leg, here, index, now){
+  if (!leg || !here || !index || !index[leg.from] || now - here.at > 5 * 60e3) return leg;
+  const km = distKm(here, index[leg.from]);
+  return km > 3 ? leg : Object.assign({}, leg, { walk: walkMins(km), walkHere: true });
+}
 /* The phone as a remote for a screen, through ntfy.sh: a free relay that needs no account and allows browser calls. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
@@ -2575,7 +2588,7 @@ async function openDetails(code, secret, box){
   // and your usual week at work: the days, and when you start and finish
   const w = d.week;
   if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))
-    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end };
+    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end, walk: Math.max(0, Math.min(90, Math.round(+w.walk || 0))) };
   // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
@@ -6184,7 +6197,7 @@ async function takeDetails(box){
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
   if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
-  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; }
+  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; if (d.week.walk) changes.workWalk = d.week.walk; }
   if (d.plan || d.week){ if (d.plan){ D.plan = d.plan; store.setJ('plan', d.plan); } SRC.trains.last = 0; got.push('your office days'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];

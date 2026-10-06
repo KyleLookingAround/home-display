@@ -29,7 +29,9 @@ class App {
 
   house = $state.raw(null);                   // household settings: household.json, with this device's changes on top
   weather = $state.raw(null); weatherErr = $state.raw(null);
-  trains = $state.raw(null); trainsErr = $state.raw(null);
+  trains = $state.raw(null); trainsErr = $state.raw(null);   // the trains, with the walk from where you are (where.svelte.js)
+  trainsBase = $state.raw(null);              // as the board gave them
+  here = $state.raw(null);                    // where this phone is, { lat, lon, acc, at }, when location is on
   events = $state.raw(null); eventsErr = $state.raw(null);
   council = $state.raw(null);                 // the council's bin dates, when the weekly check has published them
   live = $state.raw(null); liveErr = $state.raw(null); liveState = $state('');   // the Home Mini: '' | looking | none | on

@@ -8,10 +8,11 @@ import Screens from '../components/settings/Screens.svelte';
 import Data from '../components/settings/Data.svelte';
 import Look from '../components/settings/Look.svelte';
 import Music from '../components/settings/Music.svelte';
+import Location from '../components/settings/Location.svelte';
 ---
 <App page="settings" title="Settings">
   <div class="cols">
-    <div class="page"><Account client:load /><Music client:load /><Household client:load /></div>
+    <div class="page"><Account client:load /><Music client:load /><Household client:load /><Location client:load /></div>
     <div class="page">
       <Notifications client:load />
       <Appliances client:load />

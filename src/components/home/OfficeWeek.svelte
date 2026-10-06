@@ -7,6 +7,7 @@
   import { app } from '../../state/app.svelte.js';
   import { savePlan, commuteToTv } from '../../state/house.js';
   import { tv, watchTv } from '../../state/tv.svelte.js';
+  import { where } from '../../state/where.svelte.js';
   import { onMount } from 'svelte';
   import { officeDay, DAY_NAMES } from '../../lib/household.js';
   import { addDays, startOfDay } from '../../lib/format.js';
@@ -54,6 +55,7 @@
     {/if}
     {#if day.changed}<button type="button" class="btn small" onclick={usual}>Back to your usual {DAY_NAMES[new Date(day.t).getDay()]}</button>{/if}
   </div>
+  {#if where.note}<p class="note at-work" role="status">{where.note}</p>{/if}
   <p class="note" role="status">{note || (tv.code ? 'Changes stay on this phone and go to the TV.' : (app.house.workDays && app.house.workDays.length ? 'Changes stay on this phone. Your usual week is in Settings, Household.' : 'Tap a day you\'re in, or set your usual days in Settings, Household.'))}</p>
 </div>
 
@@ -76,4 +78,5 @@
   .hours label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
   .hours select{font:500 15px var(--f-mono);color:var(--ink);background:var(--card-2);border:1px solid var(--line-hot);border-radius:var(--radius-sm);padding:6px 8px}
   .note{margin-top:var(--s2)}
+  .at-work{color:var(--neg)}
 </style>

@@ -12,6 +12,7 @@ import { loadBankHolidays, loadNowcast, loadRadar, loadAir, loadFloods } from '.
 import { loadGridMix } from '../lib/carbon.js';
 import { CI_REGION } from '../lib/format.js';
 import { tv, tvSend } from './tv.svelte.js';
+import { liveTrains, watchWhere } from './where.svelte.js';
 import { lockSecret, canSeal, sealDetails } from '../lib/remote.js';
 import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg, cleanPlan } from '../lib/household.js';
 
@@ -45,7 +46,7 @@ export async function saveHouse(form){
   store.setJ('display', Object.assign(mine, deviceChanges(form, shared)));
   started = null; await houseSettings();
   loadTrains(true); loadEvents(true);
-  if ('workDays' in form || 'workStart' in form || 'workEnd' in form) commuteToTv(0);
+  if ('workDays' in form || 'workStart' in form || 'workEnd' in form || 'workWalk' in form) commuteToTv(0);
 }
 /**
  * Sends the paired TV your office days, sealed with the site's PIN: your usual week and the days that differ. They
@@ -57,7 +58,7 @@ export function commuteToTv(wait = 1200){
   if (!tv.code || !app.house) return Promise.resolve('');
   const secret = lockSecret();
   if (!secret || !canSeal()) return Promise.resolve('To change the TV too, unlock the site on both with the same PIN, with Remember ticked.');
-  const s = app.house, details = { plan: s.plan || {}, week: { days: s.workDays || [], start: s.workStart, end: s.workEnd } };
+  const s = app.house, details = { plan: s.plan || {}, week: { days: s.workDays || [], start: s.workStart, end: s.workEnd, walk: s.workWalk } };
   return new Promise(done => {
     tvTimer = setTimeout(async () => {
       try { done(await tvSend('account', { box: await sealDetails(tv.code, secret, details) }) ? 'Sent to the TV.' : 'The TV didn\'t get it. Change a day again to retry.'); }
@@ -87,7 +88,7 @@ export async function loadTrains(force){
   // the commute turns round in the afternoon on a work day: the way home, from where you work
   const leg = commuteLeg(s, Date.now(), app.holidays);
   return cached('trains:' + [leg.from, leg.to, leg.walk, leg.after, leg.start || 0, leg.end || 0].join(':'), 2 * MIN, () => loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg })),
-    v => { app.trains = v; }, e => { app.trainsErr = e; }, force);
+    v => { app.trainsBase = v; app.trains = liveTrains(v); }, e => { app.trainsErr = e; }, force);
 }
 export async function loadEvents(force){
   const s = await houseSettings();
@@ -107,6 +108,7 @@ const wanted = {};
 let timers = null;
 export function watchHouse(ask = {}){
   boot(); houseSettings();
+  watchWhere(plan => { savePlan(plan); commuteToTv(); });   // where the phone is, when location is on
   const want = Object.assign({ weather: true, bins: true, trains: true, events: true, rain: true, floods: true }, ask);
   const fresh = Object.keys(want).filter(k => want[k] && !wanted[k] && LOADERS[k]);
   fresh.forEach(k => { wanted[k] = true; });

@@ -105,7 +105,7 @@
     {#if app.trains && app.trains.list && app.trains.list.length}
       <DepartureBoard trains={app.trains} {walk} />
       {#if commute}<p class="commute">{commute}</p>{/if}
-      <p class="note">Tap the board for the departures and when to leave. With a {walk} minute walk{caught.missed ? `, ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
+      <p class="note">Tap the board for the departures and when to leave. With a {walk} minute walk{app.trains.leg && app.trains.leg.walkHere ? ' from where you are' : ''}{caught.missed ? `, ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
     {:else if trains}<p class="note">No trains in the next couple of hours.</p>
     {:else if app.trainsErr}<p class="note">Departures didn't load: {errorText(app.trainsErr)[0]}</p>
     {:else if app.house && !app.house.trainFrom}<p class="note">Choose your station <a href="./settings.html#household">in Settings</a>.</p>

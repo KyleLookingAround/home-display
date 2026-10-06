@@ -125,7 +125,7 @@ export async function openDetails(code, secret, box){
   // and your usual week at work: the days, and when you start and finish
   const w = d.week;
   if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))
-    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end };
+    out.week = { days: w.days.map(Number).filter(x => x >= 0 && x <= 6).slice(0, 7), start: w.start, end: w.end, walk: Math.max(0, Math.min(90, Math.round(+w.walk || 0))) };
   // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
   const sp = d.spotify;
   if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)

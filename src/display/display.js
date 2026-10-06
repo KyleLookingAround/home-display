@@ -416,7 +416,7 @@ async function takeDetails(box){
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
   if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
-  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; }
+  if (d.week){ changes.workDays = d.week.days; changes.workStart = d.week.start; changes.workEnd = d.week.end; if (d.week.walk) changes.workWalk = d.week.walk; }
   if (d.plan || d.week){ if (d.plan){ D.plan = d.plan; store.setJ('plan', d.plan); } SRC.trains.last = 0; got.push('your office days'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
