@@ -84,12 +84,14 @@ export function forgetAccount(id){
 
 /* ---------- signing in ---------- */
 /** Sends you to Spotify to sign in. `back` is where to land afterwards. */
-export async function beginSignIn(clientId, back){
+export async function beginSignIn(clientId, back, forTv){
   if (!clientId) throw new SpotifyError('NOCLIENT');
   const verifier = randomText(64), state = randomText(16);
-  store.setJ('spotifyAuth', { verifier: verifier, state: state, back: back || location.href, at: Date.now() });
+  store.setJ('spotifyAuth', { verifier: verifier, state: state, back: back || location.href, at: Date.now(), forTv: !!forTv });
   const q = new URLSearchParams({ response_type: 'code', client_id: clientId, scope: SPOTIFY_SCOPES.join(' '), redirect_uri: redirectUri(),
     state: state, code_challenge_method: 'S256', code_challenge: await pkceChallenge(verifier) });
+  // For the TV, Spotify asks again, so the TV can have a different account from this phone.
+  if (forTv) q.set('show_dialog', 'true');
   location.assign(SPOTIFY_AUTH + '/authorize?' + q.toString());
 }
 /** True when this page is Spotify sending you back (?code= or ?error=, with our state). */
@@ -97,7 +99,11 @@ export function isSignInReturn(search){
   const q = new URLSearchParams(search == null ? location.search : search);
   return (q.has('code') || q.has('error')) && q.has('state');
 }
-/** Finishes signing in: trades the code for tokens, finds out who you are, and keeps the account. Returns { account, back }. */
+/**
+ * Finishes signing in: trades the code for tokens, finds out who you are, and keeps the account. Returns
+ * { account, back, forTv }. A sign-in for the TV isn't kept here: the phone seals it and sends it on, so the TV has
+ * its own refresh token and neither uses up the other's.
+ */
 export async function finishSignIn(clientId, search){
   const q = new URLSearchParams(search == null ? location.search : search), pending = store.getJ('spotifyAuth', null);
   store.del('spotifyAuth');
@@ -107,8 +113,8 @@ export async function finishSignIn(clientId, search){
   const acc = { id: '', name: '', product: '', client: clientId, refresh: t.refresh_token, access: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000, scope: t.scope || '' };
   const me = await api(acc, clientId, 'GET', '/me');
   acc.id = me.id; acc.name = me.display_name || me.id; acc.product = me.product || '';
-  rememberAccount(acc);
-  return { account: acc, back: pending.back };
+  if (!pending.forTv) rememberAccount(acc);
+  return { account: acc, back: pending.back, forTv: !!pending.forTv };
 }
 async function tokenRequest(fields){
   let res;

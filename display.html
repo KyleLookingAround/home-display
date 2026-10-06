@@ -184,6 +184,7 @@ body.lite .dmx{text-shadow:none}
 .btn .k{opacity:.55;margin-right:.45em;font-family:var(--f-mono)}
 .btn:focus,select:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
 .btn::-moz-focus-inner{border:0}
+.bar .btn{padding:.65em .75em;margin-right:.35rem}      /* six views and four actions on one row at 1080p */
 
 /* screensaver: a side window onto space. Space and billboards outside, then close things, the glass, the frame and the cabin. */
 .mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a;--amb:126,146,255}
@@ -220,6 +221,16 @@ body.cockpit #stars{opacity:0}
 .board .bb{display:block;font:700 2.5rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;margin:.2rem 0;text-shadow:0 0 20px rgba(var(--rgb),.85);overflow-wrap:anywhere}
 .board .bs{display:block;font:500 1.05rem/1.35 var(--f-body);color:#c4cbef}
 .board.long .bb{font-size:2rem}
+/* music on a billboard: the cover beside the song, or the album wall, six covers from your shelf */
+.board.has-img{width:31rem}
+.board.has-img .holo{display:flex;align-items:center}
+.board .art{flex:none;width:7.5rem;height:7.5rem;margin-right:1.1rem;border-radius:.3rem;overflow:hidden;box-shadow:0 0 1.6rem -.3rem rgba(var(--rgb),.9)}
+.board .art img,.board .wall img{display:block;width:100%;height:100%;object-fit:cover}
+.board .tx{flex:1 1 auto;min-width:0}
+.board.has-img .bb,.board.has-wall .bb{font:700 1.75rem/1.2 var(--f-body);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.board.has-wall{width:26rem}
+.board .wall{display:grid;grid-template-columns:7.4rem 7.4rem 7.4rem;grid-template-rows:7.4rem 7.4rem;grid-gap:.4rem;margin:.55rem 0 .45rem}
+.board .wall span{display:block;border-radius:.25rem;overflow:hidden;box-shadow:0 0 1rem -.3rem rgba(var(--rgb),.8)}
 @keyframes holo{0%,100%{opacity:1}46%{opacity:1}47%{opacity:.82}48%{opacity:1}74%{opacity:.94}75%{opacity:1}}
 @keyframes sweep{0%,55%{left:-45%}100%{left:145%}}
 @keyframes pulse{50%{opacity:.3}}
@@ -283,6 +294,63 @@ body.night #stars{opacity:.12}
 .night-clock{font:500 22vw/1 var(--f-mono);letter-spacing:.02em}
 @media (min-width:700px){.night-clock{font-size:8rem}}
 .night-sub{font:500 1.1rem/1.5 var(--f-mono);margin-top:.6rem}
+
+/* music: the cover, the song and its words, over the cover's own colours blurred into a nebula. Lyrics and liner
+   notes are views of the same screen, chosen with the down arrow. */
+.music-mode{position:relative}
+.msky{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none}
+.msky img{position:absolute;top:-15%;left:-15%;width:130%;height:130%;object-fit:cover;opacity:.42;filter:blur(48px) saturate(1.4);transition:opacity 1.2s}
+.msky img:not([src]){opacity:0}
+.msky::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,rgba(4,5,13,.25),rgba(4,5,13,.72) 62%),linear-gradient(0deg,rgba(4,5,13,.85),rgba(4,5,13,0) 45%)}
+.lite .msky img{filter:none;opacity:.25}
+.music-mode > .m-empty{margin:auto;max-width:56rem;text-align:center}
+.mwall{display:flex;justify-content:center;margin-top:2.2rem}
+.mwall img{width:7rem;height:7rem;margin:0 .3rem;border-radius:var(--radius-sm);object-fit:cover;box-shadow:0 .8rem 2rem rgba(0,0,0,.5);opacity:.85}
+.m-empty .big{font:700 2.2rem/1.15 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:.5rem 0 .6rem}
+.m-empty .note{font-size:1.1rem;line-height:1.5}
+.m-empty .note b{color:var(--gas);font-weight:600}
+.favs{list-style:none;margin:1.6rem auto 0;padding:0;display:inline-grid;grid-template-columns:1fr 1fr;grid-gap:.5rem 2.4rem;text-align:left}
+.favs li{font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:20rem}
+.favs b{display:inline-block;width:1.7rem;height:1.7rem;line-height:1.7rem;text-align:center;margin-right:.7rem;border-radius:var(--radius-sm);border:1px solid var(--gas);color:var(--gas);font-size:.95rem}
+.m-main{flex:1 1 auto;display:flex;align-items:center;min-height:0;padding:0 1rem}
+.m-cover{flex:none;width:26rem;height:26rem;margin-right:2.6rem;border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:0 1.6rem 4rem rgba(0,0,0,.65),0 0 0 1px var(--line);transition:width .6s,height .6s}
+.m-cover img{display:block;width:100%;height:100%;object-fit:cover}
+.view-lyrics .m-cover,.view-notes .m-cover{width:13rem;height:13rem}
+.m-info{flex:1 1 auto;min-width:0}
+.m-where{display:flex;align-items:center}
+.m-where .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mstate{flex:none;display:inline-flex;align-items:flex-end;height:1rem;width:1.3rem;margin-right:.7rem}
+.mstate i{display:block;width:.26rem;height:100%;margin-right:.13rem;background:var(--gas);border-radius:1px;transform-origin:50% 100%;animation:eq 1.1s ease-in-out infinite}
+.mstate i:nth-child(2){animation-delay:-.4s} .mstate i:nth-child(3){animation-delay:-.75s}
+.mstate.off i{animation:none;transform:scaleY(.3);background:var(--muted)}
+.lite .mstate i{animation:none;transform:scaleY(.7)}
+@keyframes eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+.m-title{font:700 2.3rem/1.15 var(--f-display);letter-spacing:.04em;text-transform:uppercase;margin:.55rem 0 .35rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:break-word}
+.m-artist{font-size:1.3rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-prog{margin-top:1.3rem;max-width:40rem}
+.m-rail{height:.3rem;border-radius:.15rem;background:rgba(233,236,255,.14);overflow:hidden}
+.m-rail i{display:block;height:100%;width:0;background:var(--gas);box-shadow:0 0 .8rem rgba(79,214,255,.7)}
+.m-times{display:flex;justify-content:space-between;font-size:.95rem;color:var(--muted);margin-top:.4rem}
+.m-lyrics{margin-top:1.4rem;min-height:7.2rem}
+.m-lyrics p{font:700 1.55rem/1.45 var(--f-body);color:rgba(233,236,255,.3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .4s}
+.m-lyrics p.now{color:var(--ink);text-shadow:0 0 1.2rem rgba(79,214,255,.35)}
+.m-lyrics p.done{color:rgba(233,236,255,.22)}
+.m-lyrics p.note{font:400 1.05rem/1.5 var(--f-body);color:var(--muted);white-space:normal}
+.view-lyrics .m-lyrics{margin-top:1rem}
+.view-lyrics .m-lyrics p{font-size:1.9rem;white-space:normal}
+.view-lyrics .m-title{font-size:1.6rem;-webkit-line-clamp:1}
+.view-lyrics .m-artist{font-size:1.1rem}
+.view-lyrics .m-prog,.view-notes .m-prog,.view-lyrics .m-next,.view-notes .m-next{display:none}
+.note-page{margin:0}
+.note-page img{display:block;max-width:100%;height:20rem;max-height:52vh;border-radius:var(--radius-sm);box-shadow:0 1rem 3rem rgba(0,0,0,.6);background:var(--card)}
+.note-page .label{margin-top:.6rem}
+.m-next{margin-top:1rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-next .label{margin-right:.5rem}
+/* Today: what's playing, under the date */
+.date + .np{margin-top:.35rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34rem}
+.np:empty{display:none}
+.np .np-ic{color:var(--gas);margin-right:.45rem}
+.np b{font-weight:600}
 @keyframes drift-sm{0%{transform:translate(-3vw,-1vh)}33%{transform:translate(2.5vw,1vh)}66%{transform:translate(-2vw,1.5vh)}100%{transform:translate(3vw,-.5vh)}}
 @keyframes drift{0%{transform:translate(-6vw,-4vh)}25%{transform:translate(5vw,-2vh)}50%{transform:translate(4vw,5vh)}75%{transform:translate(-5vw,3vh)}100%{transform:translate(6vw,-3vh)}}
 
@@ -293,6 +361,7 @@ body.night #stars{opacity:.12}
 .sheet .card{margin-top:.8rem}
 .fields{display:flex;flex-wrap:wrap;margin:0 -.5rem}
 .field{margin:.4rem .5rem;flex:1 1 13rem;min-width:0}
+.field.solo{flex:0 1 26rem}
 .field.wide{flex-basis:30rem}
 .field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 .field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.5em .6em;width:100%}
@@ -349,7 +418,7 @@ body.embed .bar,body.embed .toast{display:none!important}
   <!-- ================= TODAY: the household at a glance ================= -->
   <section class="mode" data-mode="today" aria-label="Today" hidden>
     <div class="top">
-      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p></div>
+      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p><p class="np" id="dMusic"></p></div>
       <div class="verdict" id="dVerdict"></div>
       <div class="wx" id="dWx"></div>
     </div>
@@ -451,6 +520,24 @@ body.embed .bar,body.embed .toast{display:none!important}
       <p class="night-sub" id="nSub"></p>
     </div>
   </section>
+
+  <!-- ================= MUSIC: Spotify, on this screen's own sign-in (tvmusic.js) ================= -->
+  <section class="mode music-mode" data-mode="music" aria-label="Music" hidden>
+    <div class="msky" aria-hidden="true"><img id="mNeb" alt=""></div>
+    <div class="m-empty" id="mEmpty"></div>
+    <div class="m-main" id="mMain" hidden>
+      <div class="m-cover"><img id="mCover" alt=""></div>
+      <div class="m-info">
+        <p class="m-where"><span class="mstate" id="mState"></span><span class="label" id="mWhere"></span></p>
+        <h1 class="m-title" id="mTitle"></h1>
+        <p class="m-artist" id="mArtist"></p>
+        <div class="m-prog"><div class="m-rail"><i id="mBar"></i></div><p class="m-times mono"><span id="mPos">0:00</span><span id="mLeft"></span></p></div>
+        <div class="m-lyrics" id="mLyrics"></div>
+        <p class="m-next" id="mNext"></p>
+      </div>
+    </div>
+    <p class="foot" id="mFoot"></p>
+  </section>
 </div>
 
 <!-- ================= SETTINGS ================= -->
@@ -470,6 +557,9 @@ body.embed .bar,body.embed .toast{display:none!important}
       <div class="field"><label for="fNightFrom">Night from</label><select id="fNightFrom" data-times></select></div>
       <div class="field"><label for="fNightTo">Night until</label><select id="fNightTo" data-times></select></div>
       <div class="field"><label for="fReload">Fresh start each night at</label><select id="fReload" data-times></select></div>
+    </div>
+    <div class="fields">
+      <div class="field solo"><label for="fMusicNight">Music at night</label><select id="fMusicNight"><option value="1">Fade it out as night starts</option><option value="0">Leave it playing</option></select></div>
     </div></section>
 
     <section class="card"><h3 class="label">Your phone as a remote</h3>
@@ -1426,7 +1516,8 @@ const MODES = [
   { id: 'energy', label: 'Energy', key: '2' },
   { id: 'travel', label: 'Travel', key: '3' },
   { id: 'screensaver', label: 'Screensaver', key: '4' },
-  { id: 'night', label: 'Night', key: '5' }
+  { id: 'night', label: 'Night', key: '5' },
+  { id: 'music', label: 'Music', key: '6' }
 ];
 const ROTATING = ['today', 'energy', 'travel'];
 /** Older links and settings named the overview "home". */
@@ -1454,7 +1545,8 @@ function inWindow(now, from, to){
 const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '', wifi: null, dates: [],
-  trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
+  trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15,
+  musicNight: true          // fade the music out as the night window starts (the TV does it)
 };
 function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});
@@ -1979,7 +2071,7 @@ const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi'];
+const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 function readRemote(data){
   let m, c;
@@ -1987,11 +2079,20 @@ function readRemote(data){
   if (!c || typeof c !== 'object') return null;
   if (c.from === 'phone' && REMOTE_CMDS.indexOf(c.cmd) >= 0){
     if (c.cmd === 'mode' && !MODES.some(x => x.id === c.mode)) return null;
-    if (c.cmd === 'account' && !(c.box && typeof c.box.iv === 'string' && typeof c.box.data === 'string' && c.box.data.length < 2000)) return null;
-    return { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null, box: c.cmd === 'account' ? { iv: c.box.iv, data: c.box.data } : null };
+    if (c.cmd === 'account' && !(c.box && typeof c.box.iv === 'string' && typeof c.box.data === 'string' && c.box.data.length < 3500)) return null;
+    const out = { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null, box: c.cmd === 'account' ? { iv: c.box.iv, data: c.box.data } : null };
+    // the sleep timer: minutes (0 turns it off, up to four hours) or the end of the song
+    if (c.cmd === 'sleep'){ const m = Math.round(+c.mins || 0); if (!(m >= 0 && m <= 240)) return null; out.mins = m; out.song = !!c.song; }
+    // favourites for the TV remote's number keys: playlists, albums or artists, by name
+    if (c.cmd === 'favs'){
+      if (!Array.isArray(c.favs) || c.favs.length > 9) return null;
+      out.favs = c.favs.filter(f => f && /^spotify:(playlist|album|artist):[A-Za-z0-9]{1,40}$/.test(f.uri) && typeof f.name === 'string').map(f => ({ uri: f.uri, name: f.name.slice(0, 80) }));
+    }
+    return out;
   }
   if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
-    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account, note: String(c.state.note || '').slice(0, 80) } };
+    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account,
+      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80) } };
   }
   return null;
 }
@@ -2021,7 +2122,7 @@ function boxKey(code, secret){
 }
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
- * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical }.
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp } }.
  */
 async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -2042,6 +2143,11 @@ async function openDetails(code, secret, box){
   if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
   if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
+  const sp = d.spotify;
+  if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
+    out.spotify = { id: String(sp.id), name: String(sp.name || sp.id).slice(0, 64), product: String(sp.product || '').slice(0, 20), client: sp.client, refresh: sp.refresh,
+      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '' };
   return Object.keys(out).length ? out : null;
 }
 /* QR codes, made here so nothing has to be loaded: byte mode, medium error correction, the smallest version that fits. */
@@ -2185,6 +2291,607 @@ function wifiCode(w){
   const esc = s => String(s).replace(/([\\;,:"])/g, '\\$1');
   const t = w.security === 'nopass' || !w.password ? 'nopass' : w.security === 'WEP' ? 'WEP' : 'WPA';
   return `WIFI:T:${t};S:${esc(w.ssid)};${t === 'nopass' ? '' : `P:${esc(w.password)};`}${w.hidden ? 'H:true;' : ''};`;
+}
+/* Spotify: signing in from the browser (PKCE, no secret), keeping the token fresh, and the Web API calls the player uses. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+//
+// Spotify allows browsers to call both its sign-in (accounts.spotify.com) and its Web API (api.spotify.com).
+// The sign-in uses PKCE: the page makes a one-off secret (the verifier), sends only its hash, and proves it
+// when trading the code for a token, so no client secret is ever needed or kept. Each account's tokens stay on
+// the device that signed in (hse.spotify); the TV gets them sealed with the PIN, like the Octopus account.
+
+const SPOTIFY_AUTH = 'https://accounts.spotify.com';
+const SPOTIFY_API = 'https://api.spotify.com/v1';
+const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-modify-playback-state', 'user-read-currently-playing', 'user-read-recently-played',
+  'user-top-read', 'user-library-read', 'user-library-modify', 'playlist-read-private', 'playlist-read-collaborative', 'user-follow-read', 'user-read-private'];
+
+class SpotifyError extends Error {
+  constructor(code, msg, status){ super(msg || code); this.code = code; this.status = status || 0; }
+}
+/** What went wrong, in plain words: [title, what to do]. */
+function spotifyErrorText(e){
+  switch (e && e.code){
+    case 'PREMIUM': return ['Needs Spotify Premium.', 'Spotify only lets Premium accounts be played, paused and skipped from another app.'];
+    case 'NO_DEVICE': return ['Nothing to play on.', 'Open Spotify on the TV, a speaker or your phone, then choose it under Play on.'];
+    case 'AUTH': return ['Spotify signed you out.', 'Connect Spotify again in Settings.'];
+    case 'LIMIT': return ['Spotify asked us to slow down.', 'Try again in a few seconds.'];
+    case 'NETWORK': return ['No signal.', 'Spotify couldn\'t be reached.'];
+    case 'NOCLIENT': return ['Spotify isn\'t set up yet.', 'Add the household\'s Spotify Client ID in Settings.'];
+    default: return ['Spotify said no.', (e && e.message) || ''];
+  }
+}
+
+/* ---------- PKCE ---------- */
+const URL_SAFE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+/** A random string of URL-safe characters (the verifier is 43 to 128 of them). */
+function randomText(n, rand){
+  const out = [];
+  if (!rand && typeof crypto !== 'undefined' && crypto.getRandomValues){
+    const b = crypto.getRandomValues(new Uint8Array(n));
+    for (let i = 0; i < n; i++) out.push(URL_SAFE[b[i] % URL_SAFE.length]);
+  } else for (let i = 0; i < n; i++) out.push(URL_SAFE[Math.floor((rand || Math.random)() * URL_SAFE.length)]);
+  return out.join('');
+}
+function base64url(buf){
+  const u = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]);
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+/** The challenge Spotify is sent: the verifier's SHA-256, base64url. */
+function pkceChallenge(verifier){
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(base64url);
+}
+/** Where Spotify sends you back: the Settings page next to this one, as registered in the Spotify app. */
+function redirectUri(href){
+  const u = new URL('settings.html', href || location.href);
+  u.search = ''; u.hash = '';
+  return u.href;
+}
+
+/* ---------- accounts on this device ---------- */
+// hse.spotify: { accounts: [{ id, name, product, refresh, access, exp, scope }], active: id }
+function spotifyStore(){
+  const s = store.getJ('spotify', null);
+  return s && Array.isArray(s.accounts) ? s : { accounts: [], active: null };
+}
+function saveSpotifyStore(s){ store.setJ('spotify', s); }
+function activeAccount(s){
+  s = s || spotifyStore();
+  return s.accounts.filter(a => a.id === s.active)[0] || s.accounts[0] || null;
+}
+/** Adds or replaces an account, makes it the one playing, and keeps it. */
+function rememberAccount(acc){
+  const s = spotifyStore();
+  s.accounts = s.accounts.filter(a => a.id !== acc.id).concat([acc]);
+  s.active = acc.id; saveSpotifyStore(s);
+  return s;
+}
+function forgetAccount(id){
+  const s = spotifyStore();
+  s.accounts = s.accounts.filter(a => a.id !== id);
+  if (s.active === id) s.active = s.accounts.length ? s.accounts[0].id : null;
+  saveSpotifyStore(s);
+  return s;
+}
+
+/* ---------- signing in ---------- */
+/** Sends you to Spotify to sign in. `back` is where to land afterwards. */
+async function beginSignIn(clientId, back, forTv){
+  if (!clientId) throw new SpotifyError('NOCLIENT');
+  const verifier = randomText(64), state = randomText(16);
+  store.setJ('spotifyAuth', { verifier: verifier, state: state, back: back || location.href, at: Date.now(), forTv: !!forTv });
+  const q = new URLSearchParams({ response_type: 'code', client_id: clientId, scope: SPOTIFY_SCOPES.join(' '), redirect_uri: redirectUri(),
+    state: state, code_challenge_method: 'S256', code_challenge: await pkceChallenge(verifier) });
+  // For the TV, Spotify asks again, so the TV can have a different account from this phone.
+  if (forTv) q.set('show_dialog', 'true');
+  location.assign(SPOTIFY_AUTH + '/authorize?' + q.toString());
+}
+/** True when this page is Spotify sending you back (?code= or ?error=, with our state). */
+function isSignInReturn(search){
+  const q = new URLSearchParams(search == null ? location.search : search);
+  return (q.has('code') || q.has('error')) && q.has('state');
+}
+/**
+ * Finishes signing in: trades the code for tokens, finds out who you are, and keeps the account. Returns
+ * { account, back, forTv }. A sign-in for the TV isn't kept here: the phone seals it and sends it on, so the TV has
+ * its own refresh token and neither uses up the other's.
+ */
+async function finishSignIn(clientId, search){
+  const q = new URLSearchParams(search == null ? location.search : search), pending = store.getJ('spotifyAuth', null);
+  store.del('spotifyAuth');
+  if (q.get('error')) throw new SpotifyError(q.get('error') === 'access_denied' ? 'DENIED' : 'AUTH', q.get('error') === 'access_denied' ? 'You didn\'t allow it.' : q.get('error'));
+  if (!pending || pending.state !== q.get('state')) throw new SpotifyError('AUTH', 'That sign-in didn\'t start here. Try again.');
+  const t = await tokenRequest({ grant_type: 'authorization_code', code: q.get('code'), redirect_uri: redirectUri(), client_id: clientId, code_verifier: pending.verifier });
+  const acc = { id: '', name: '', product: '', client: clientId, refresh: t.refresh_token, access: t.access_token, exp: Date.now() + (t.expires_in || 3600) * 1000, scope: t.scope || '' };
+  const me = await api(acc, clientId, 'GET', '/me');
+  acc.id = me.id; acc.name = me.display_name || me.id; acc.product = me.product || '';
+  if (!pending.forTv) rememberAccount(acc);
+  return { account: acc, back: pending.back, forTv: !!pending.forTv };
+}
+async function tokenRequest(fields){
+  let res;
+  try { res = await fetch(SPOTIFY_AUTH + '/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(fields).toString() }); }
+  catch(e){ throw new SpotifyError('NETWORK'); }
+  let j = null; try { j = await res.json(); } catch(e){}
+  if (!res.ok) throw new SpotifyError('AUTH', (j && (j.error_description || j.error)) || 'Spotify refused the sign-in.', res.status);
+  return j;
+}
+
+/* ---------- calling the Web API ---------- */
+const refreshing = {};
+/** A fresh access token for the account, refreshing it (and keeping any new refresh token) when it's nearly out. */
+function accessToken(acc, clientId){
+  if (acc.access && acc.exp > Date.now() + 60e3) return Promise.resolve(acc.access);
+  if (!acc.refresh) return Promise.reject(new SpotifyError('AUTH'));
+  if (refreshing[acc.id]) return refreshing[acc.id];
+  const p = tokenRequest({ grant_type: 'refresh_token', refresh_token: acc.refresh, client_id: clientId }).then(t => {
+    acc.access = t.access_token; acc.exp = Date.now() + (t.expires_in || 3600) * 1000;
+    if (t.refresh_token) acc.refresh = t.refresh_token;
+    const s = spotifyStore(), i = s.accounts.map(a => a.id).indexOf(acc.id);
+    if (i >= 0){ s.accounts[i] = Object.assign({}, s.accounts[i], { access: acc.access, exp: acc.exp, refresh: acc.refresh }); saveSpotifyStore(s); }
+    return acc.access;
+  }, e => { if (e.status === 400) acc.refresh = ''; throw e.status === 400 ? new SpotifyError('AUTH') : e; });
+  refreshing[acc.id] = p;
+  const done = () => { delete refreshing[acc.id]; };
+  p.then(done, done);
+  return p;
+}
+const wait = ms => new Promise(r => setTimeout(r, ms));
+/** One Web API call. Retries once after a refreshed token or a "slow down"; 204 answers null. */
+async function api(acc, clientId, method, path, body, tries){
+  tries = tries || 0;
+  const token = await accessToken(acc, clientId);
+  let res;
+  try {
+    res = await fetch(SPOTIFY_API + path, { method: method, headers: Object.assign({ Authorization: 'Bearer ' + token }, body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      body: body !== undefined ? JSON.stringify(body) : undefined });
+  } catch(e){ throw new SpotifyError('NETWORK'); }
+  if (res.status === 401 && tries < 1){ acc.exp = 0; return api(acc, clientId, method, path, body, tries + 1); }
+  if (res.status === 429 && tries < 1){ await wait(Math.min(10, +res.headers.get('Retry-After') || 2) * 1000); return api(acc, clientId, method, path, body, tries + 1); }
+  if (res.status === 204 || res.status === 202) return null;
+  let j = null; const text = await res.text();
+  try { j = text ? JSON.parse(text) : null; } catch(e){ j = null; }
+  if (res.ok) return j;
+  const err = j && j.error ? j.error : {}, reason = err.reason || '', msg = err.message || ('Spotify returned ' + res.status);
+  if (res.status === 401) throw new SpotifyError('AUTH', msg, 401);
+  if (res.status === 429) throw new SpotifyError('LIMIT', msg, 429);
+  if (reason === 'PREMIUM_REQUIRED' || (res.status === 403 && /premium/i.test(msg))) throw new SpotifyError('PREMIUM', msg, 403);
+  if (reason === 'NO_ACTIVE_DEVICE' || (res.status === 404 && /device/i.test(msg))) throw new SpotifyError('NO_DEVICE', msg, 404);
+  throw new SpotifyError('HTTP', msg, res.status);
+}
+/** Tries each path in turn, for endpoints Spotify has moved: the first that isn't gone answers. */
+async function apiFirst(acc, clientId, method, paths, body){
+  let last = null;
+  for (let i = 0; i < paths.length; i++){
+    try { return await api(acc, clientId, method, paths[i], body); }
+    catch(e){ last = e; if (!(e.code === 'HTTP' && (e.status === 404 || e.status === 410 || e.status === 403))) throw e; }
+  }
+  throw last;
+}
+
+/* ---------- what the player uses ---------- */
+const qs = o => { const p = []; Object.keys(o).forEach(k => { if (o[k] != null && o[k] !== '') p.push(encodeURIComponent(k) + '=' + encodeURIComponent(o[k])); }); return p.length ? '?' + p.join('&') : ''; };
+/** Bound to one account: `const sp = spotify(acc, clientId); await sp.player()`. */
+function spotify(acc, clientId){
+  const call = (m, p, b) => api(acc, clientId, m, p, b), dev = d => qs({ device_id: d || null });
+  return {
+    account: acc,
+    me: () => call('GET', '/me'),
+    player: () => call('GET', '/me/player?additional_types=episode'),
+    devices: () => call('GET', '/me/player/devices').then(j => (j && j.devices) || []),
+    queue: () => call('GET', '/me/player/queue'),
+    /** o: { device, context (a uri), uris, offset (a uri or a position), position (ms) } */
+    play: o => {
+      o = o || {}; const b = {};
+      if (o.context) b.context_uri = o.context;
+      if (o.uris) b.uris = o.uris;
+      if (o.offset != null) b.offset = typeof o.offset === 'number' ? { position: o.offset } : { uri: o.offset };
+      if (o.position) b.position_ms = Math.round(o.position);
+      return call('PUT', '/me/player/play' + dev(o.device), Object.keys(b).length ? b : undefined);
+    },
+    pause: d => call('PUT', '/me/player/pause' + dev(d)),
+    next: d => call('POST', '/me/player/next' + dev(d)),
+    previous: d => call('POST', '/me/player/previous' + dev(d)),
+    seek: (ms, d) => call('PUT', '/me/player/seek' + qs({ position_ms: Math.max(0, Math.round(ms)), device_id: d || null })),
+    volume: (pct, d) => call('PUT', '/me/player/volume' + qs({ volume_percent: Math.max(0, Math.min(100, Math.round(pct))), device_id: d || null })),
+    shuffle: (on, d) => call('PUT', '/me/player/shuffle' + qs({ state: on ? 'true' : 'false', device_id: d || null })),
+    repeat: (mode, d) => call('PUT', '/me/player/repeat' + qs({ state: mode, device_id: d || null })),
+    transfer: (d, play) => call('PUT', '/me/player', { device_ids: [d], play: !!play }),
+    addToQueue: (uri, d) => call('POST', '/me/player/queue' + qs({ uri: uri, device_id: d || null })),
+    search: (q, types, limit) => call('GET', '/search' + qs({ q: q, type: (types || ['track', 'artist', 'album', 'playlist']).join(','), limit: limit || 8, market: 'from_token' })),
+    playlists: off => call('GET', '/me/playlists' + qs({ limit: 50, offset: off || 0 })),
+    liked: off => call('GET', '/me/tracks' + qs({ limit: 50, offset: off || 0, market: 'from_token' })),
+    albums: off => call('GET', '/me/albums' + qs({ limit: 50, offset: off || 0, market: 'from_token' })),
+    recent: () => call('GET', '/me/player/recently-played?limit=50'),
+    top: (type, range, limit) => call('GET', '/me/top/' + type + qs({ time_range: range || 'medium_term', limit: limit || 20 })),
+    playlist: id => call('GET', '/playlists/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
+    playlistTracks: (id, off) => apiFirst(acc, clientId, 'GET', ['/playlists/' + encodeURIComponent(id) + '/items' + qs({ limit: 50, offset: off || 0, market: 'from_token' }),
+      '/playlists/' + encodeURIComponent(id) + '/tracks' + qs({ limit: 50, offset: off || 0, market: 'from_token' })]),
+    album: id => call('GET', '/albums/' + encodeURIComponent(id) + qs({ market: 'from_token' })),
+    artist: id => call('GET', '/artists/' + encodeURIComponent(id)),
+    artistTop: id => call('GET', '/artists/' + encodeURIComponent(id) + '/top-tracks' + qs({ market: 'from_token' })),
+    artistAlbums: (id, off) => call('GET', '/artists/' + encodeURIComponent(id) + '/albums' + qs({ include_groups: 'album,single', limit: 20, offset: off || 0, market: 'from_token' })),
+    following: after => call('GET', '/me/following' + qs({ type: 'artist', limit: 50, after: after || null })),
+    isLiked: ids => apiFirst(acc, clientId, 'GET', ['/me/tracks/contains' + qs({ ids: ids.join(',') }), '/me/library/contains' + qs({ uris: ids.map(i => 'spotify:track:' + i).join(',') })]),
+    like: (ids, on) => apiFirst(acc, clientId, on ? 'PUT' : 'DELETE', ['/me/tracks' + qs({ ids: ids.join(',') }), '/me/library' + qs({ uris: ids.map(i => 'spotify:track:' + i).join(',') })])
+  };
+}
+/* The music player's logic, with no DOM: Spotify's answers in one shape, durations, synced lyrics, and colours from a cover. */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+
+/** "3:24", or "1:02:05" for an hour or more. */
+function fmtDur(ms){
+  const s = Math.max(0, Math.floor((ms || 0) / 1000)), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, r = s % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(r).padStart(2, '0');
+}
+/** The image nearest a size in pixels, from Spotify's list of sizes (largest first). */
+function artUrl(images, size){
+  if (!images || !images.length) return '';
+  let best = images[0];
+  images.forEach(im => { if (im.width && Math.abs(im.width - size) < Math.abs((best.width || 0) - size)) best = im; });
+  return best.url || '';
+}
+const idOf = uri => String(uri || '').split(':').pop();
+/** A track or podcast episode, in the one shape the player draws. */
+function trackOf(t){
+  if (!t) return null;
+  const ep = t.type === 'episode', album = ep ? (t.show || {}) : (t.album || {});
+  const artists = ep ? [{ id: (t.show && t.show.id) || '', name: (t.show && t.show.name) || '' }] : (t.artists || []).map(a => ({ id: a.id, name: a.name, uri: a.uri }));
+  return {
+    id: t.id || idOf(t.uri), uri: t.uri, name: t.name || '', episode: ep,
+    artists: artists, artist: artists.map(a => a.name).join(', '),
+    album: { id: album.id || '', name: album.name || '', uri: album.uri || '', year: String(album.release_date || '').slice(0, 4) },
+    images: (ep ? t.images : album.images) || [], isrc: (t.external_ids && t.external_ids.isrc) || '', dur: t.duration_ms || 0, explicit: !!t.explicit, playable: t.is_playable !== false
+  };
+}
+/** Spotify's player state (null when nothing has played lately) as the player's model. `at` is when it was read. */
+function playerModel(j, at){
+  if (!j) return null;
+  const d = j.device || {};
+  return {
+    playing: !!j.is_playing, progress: j.progress_ms || 0, at: at || Date.now(),
+    track: trackOf(j.item),
+    device: d.id || d.name ? { id: d.id || null, name: d.name || 'Spotify', type: d.type || '', volume: d.volume_percent == null ? null : d.volume_percent, canVolume: d.supports_volume !== false } : null,
+    shuffle: !!j.shuffle_state, repeat: j.repeat_state || 'off',
+    context: j.context ? { type: j.context.type, uri: j.context.uri } : null,
+    ad: j.currently_playing_type === 'ad'
+  };
+}
+/** Where the song is now: the progress read, plus the time since, while it plays. */
+function progressAt(m, now){
+  if (!m || !m.track) return 0;
+  const p = m.progress + (m.playing ? Math.max(0, now - m.at) : 0);
+  return Math.min(p, m.track.dur || p);
+}
+/** The next repeat setting, as Spotify's own button goes: off, all, one. */
+const nextRepeat = r => r === 'off' ? 'context' : r === 'context' ? 'track' : 'off';
+/** A device's kind, for its icon: speaker, tv, phone, computer or other. */
+function deviceKind(type){
+  const t = String(type || '').toLowerCase();
+  if (/speaker|avr|stb|audiodongle|castaudio/.test(t)) return 'speaker';
+  if (/tv|castvideo|gameconsole/.test(t)) return 'tv';
+  if (/smartphone|tablet/.test(t)) return 'phone';
+  if (/computer/.test(t)) return 'computer';
+  return 'other';
+}
+/** The devices to offer, the one playing first, those that can't be controlled left out. */
+function playOn(devices, current){
+  return (devices || []).filter(d => !d.is_restricted).map(d => ({ id: d.id, name: d.name, type: d.type, kind: deviceKind(d.type), active: !!d.is_active || (current && current.id === d.id), volume: d.volume_percent, canVolume: d.supports_volume !== false }))
+    .sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
+}
+/** A list from Spotify's paging object (or a plain list), with its rows' tracks unwrapped: { items, next, total }. */
+function page(j, key){
+  const p = key && j ? j[key] : j;
+  if (!p) return { items: [], next: false, total: 0 };
+  // saved songs, playlist rows and recently played wrap each song (as track, or item in Spotify's newer answers)
+  const items = (p.items || []).map(x => x && (x.track !== undefined || (x.item !== undefined && x.added_at !== undefined)) ? { added: x.added_at || x.played_at || null, track: x.track || x.item, context: x.context || null } : x).filter(Boolean);
+  return { items: items, next: !!p.next, total: p.total || items.length, cursor: p.cursors ? p.cursors.after : null };
+}
+/** "Playing from" for the context: your liked songs, or the playlist's or album's name once it's known. */
+function contextLabel(ctx, name){
+  if (!ctx) return '';
+  if (/:collection(:|$)/.test(ctx.uri || '')) return 'Your liked songs';
+  return name || '';
+}
+
+/* ---------- synced lyrics (LRC) ---------- */
+/** "[01:02.34]words" lines as [{ t: ms, text }], in time order. Several stamps on a line each get it. Blank lines keep their beat. */
+function parseLrc(text){
+  const out = [];
+  String(text || '').split(/\r?\n/).forEach(line => {
+    const stamps = [], re = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
+    let m, last = 0;
+    while ((m = re.exec(line))){ stamps.push(Math.round((+m[1] * 60 + +m[2]) * 1000)); last = re.lastIndex; }
+    if (!stamps.length) return;
+    const words = line.slice(last).trim();
+    stamps.forEach(t => out.push({ t: t, text: words }));
+  });
+  return out.sort((a, b) => a.t - b.t);
+}
+/** The line being sung at a moment: its index, or -1 before the first. */
+function lyricAt(lines, ms){
+  let lo = 0, hi = (lines || []).length - 1, ans = -1;
+  while (lo <= hi){ const mid = (lo + hi) >> 1; if (lines[mid].t <= ms){ ans = mid; lo = mid + 1; } else hi = mid - 1; }
+  return ans;
+}
+/** LRCLIB's answer as { synced: [{ t, text }] | null, plain: [text] | null, instrumental }. */
+function lyricsOf(j){
+  if (!j) return null;
+  const synced = j.syncedLyrics ? parseLrc(j.syncedLyrics) : null;
+  const plain = j.plainLyrics ? String(j.plainLyrics).split(/\r?\n/) : null;
+  return { synced: synced && synced.length ? synced : null, plain: plain, instrumental: !!j.instrumental };
+}
+/** Synced lyrics from LRCLIB, a free open library that browsers may call. Null when it has none. */
+async function loadLyrics(t){
+  if (!t || t.episode) return null;
+  const q = new URLSearchParams({ artist_name: (t.artists[0] || {}).name || '', track_name: t.name, album_name: t.album.name, duration: String(Math.round(t.dur / 1000)) });
+  let res;
+  try { res = await fetch('https://lrclib.net/api/get?' + q.toString()); } catch(e){ return null; }
+  if (!res.ok) return null;
+  try { return lyricsOf(await res.json()); } catch(e){ return null; }
+}
+
+/* ---------- colours from the cover ---------- */
+const hex = (r, g, b) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+function hsl(r, g, b){
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+  if (!d) return [0, 0, l];
+  const s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn);
+  let h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+function rgb(h, s, l){
+  const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l), f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
+}
+/**
+ * The cover's colours, from its pixels (RGBA, as a canvas gives them): `main`, the most-used lively colour, made
+ * bright enough to glow on the dark page; `deep`, a dark shade of it for backgrounds; `ink`, text that reads on main.
+ * Null for an image that's all greys, so the page keeps its own colours.
+ */
+function coverColours(px){
+  if (!px || px.length < 4) return null;
+  const bins = {};
+  for (let i = 0; i < px.length; i += 4){
+    if (px[i + 3] < 128) continue;
+    const c = hsl(px[i], px[i + 1], px[i + 2]);
+    if (c[1] < .22 || c[2] < .12 || c[2] > .92) continue;           // greys, near-black and near-white don't count
+    const k = Math.floor(c[0] / 20);                                  // 18 hue buckets
+    const b = bins[k] || (bins[k] = { n: 0, h: 0, s: 0, l: 0, w: 0 });
+    const w = c[1];                                                    // livelier pixels count for more
+    b.n++; b.w += w; b.h += c[0] * w; b.s += c[1] * w; b.l += c[2] * w;
+  }
+  const best = Object.keys(bins).map(k => bins[k]).sort((a, b) => b.w - a.w)[0];
+  if (!best || best.n < px.length / 4 * 0.04) return null;
+  const h = best.h / best.w, s = Math.min(1, Math.max(.55, best.s / best.w));
+  const main = rgb(h, s, .64), deep = rgb(h, Math.min(s, .6), .16);
+  const lum = (.2126 * main[0] + .7152 * main[1] + .0722 * main[2]) / 255;
+  return { main: hex(main[0], main[1], main[2]), deep: hex(deep[0], deep[1], deep[2]), ink: lum > .5 ? '#06071a' : '#ffffff', hue: Math.round(h) };
+}
+
+/* ---------- the screensaver's billboards ---------- */
+/**
+ * Cards for the cockpit's billboards (the shape buildBillboards makes, with a cover as img): the song playing, often;
+ * or, when nothing is, the album wall (six covers from your shelf, as wall) and one album from it, both changing each hour.
+ */
+function musicCards(m, albums, now){
+  const out = [];
+  if (m && m.track && m.playing){
+    const t = m.track;
+    out.push({ id: 'music', kind: 'music', tone: 'cyan', head: 'Now playing', big: t.name, sub: t.artist + (m.device ? ' · ' + m.device.name : ''), img: artUrl(t.images, 300), weight: 2 });
+    return out;
+  }
+  const list = (albums || []).filter(a => a && a.images && a.images.length);
+  if (!list.length) return out;
+  const start = Math.floor((now == null ? Date.now() : now) / 3600e3) % list.length;
+  const at = i => list[(start + i) % list.length];
+  if (list.length >= 6) out.push({ id: 'albums', kind: 'music', tone: 'violet', head: 'Your record shelf', big: '', sub: list.length + ' albums saved in Spotify', wall: [0, 1, 2, 3, 4, 5].map(i => artUrl(at(i).images, 300)), weight: 1 });
+  const a = at(0);
+  out.push({ id: 'album-' + a.id, kind: 'music', tone: 'violet', head: 'From your shelf', big: a.name, sub: (a.artists || []).map(x => x.name).join(', '), img: artUrl(a.images, 300), weight: 1 });
+  return out;
+}
+/* The stories behind the music: credits, studios and where artists are from (MusicBrainz), the story of a song and an artist (Wikipedia, found through Wikidata), and liner notes (the Cover Art Archive). */
+// Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
+// import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
+//
+// None of these needs a key, and all allow browsers to call them (checked October 2026). MusicBrainz asks for no
+// more than one request a second, so its calls queue. A Spotify song carries its ISRC, the recording's code, which
+// MusicBrainz looks up exactly; without one, it's searched by title and artist.
+
+const MB = 'https://musicbrainz.org/ws/2';
+const mbWait = ms => new Promise(r => setTimeout(r, ms));
+let mbNext = 0;
+/** One MusicBrainz request, a second after the last; null when it has nothing (or is too busy twice). */
+async function mbGet(path, tries){
+  const now = Date.now(), at = Math.max(now, mbNext);
+  mbNext = at + 1100;
+  if (at > now) await mbWait(at - now);
+  let res;
+  try { res = await fetch(MB + path + (path.indexOf('?') >= 0 ? '&' : '?') + 'fmt=json'); } catch(e){ return null; }
+  if (res.status === 503 && !tries){ await mbWait(1500); return mbGet(path, 1); }
+  if (!res.ok) return null;
+  try { return await res.json(); } catch(e){ return null; }
+}
+const q = s => '"' + String(s || '').replace(/["\\]/g, ' ') + '"';
+const norm = s => String(s || '').toLowerCase().replace(/[’']/g, '').replace(/\s*[\(\[].*?[\)\]]\s*/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/* ---------- Greater Manchester ---------- */
+// the ten boroughs and the towns and places in them that MusicBrainz names as areas
+const GREATER_MANCHESTER = ['greater manchester', 'manchester', 'salford', 'stockport', 'bolton', 'bury', 'oldham', 'rochdale', 'tameside', 'trafford', 'wigan',
+  'ashton under lyne', 'altrincham', 'sale', 'stretford', 'urmston', 'hyde', 'stalybridge', 'denton', 'dukinfield', 'mossley', 'droylsden', 'audenshaw',
+  'prestwich', 'radcliffe', 'whitefield', 'ramsbottom', 'heywood', 'middleton', 'leigh', 'atherton', 'tyldesley', 'hindley', 'ince in makerfield',
+  'eccles', 'swinton', 'walkden', 'irlam', 'worsley', 'farnworth', 'horwich', 'westhoughton', 'chadderton', 'royton', 'shaw', 'failsworth', 'saddleworth', 'littleborough',
+  'didsbury', 'chorlton', 'chorlton cum hardy', 'levenshulme', 'withington', 'wythenshawe', 'fallowfield', 'rusholme', 'moss side', 'hulme', 'ancoats', 'longsight', 'gorton',
+  'burnage', 'ardwick', 'cheetham hill', 'crumpsall', 'blackley', 'moston', 'harpurhey', 'newton heath', 'clayton', 'openshaw', 'northern quarter',
+  'cheadle', 'cheadle hulme', 'bramhall', 'hazel grove', 'marple', 'romiley', 'reddish', 'heaton moor', 'heaton chapel', 'edgeley', 'bredbury', 'davenport', 'offerton', 'woodford', 'poynton'];
+function isGreaterManchester(name){
+  const n = norm(name);
+  return !!n && GREATER_MANCHESTER.indexOf(n) >= 0;
+}
+
+/* ---------- reading MusicBrainz ---------- */
+/** The Wikidata item (Q123) among a MusicBrainz entity's links, or ''. */
+function wikidataOf(e){
+  const r = ((e && e.relations) || []).filter(x => x.type === 'wikidata' && x.url)[0];
+  const m = r ? /\/(Q\d+)$/.exec(r.url.resource) : null;
+  return m ? m[1] : '';
+}
+const ROLE_ORDER = ['vocal', 'instrument', 'performer', 'programming'];
+/**
+ * A recording's credits: who played and sang what, who produced and engineered it, where it was recorded,
+ * when it first came out, and the song (work) it is a performance of.
+ */
+function creditsOf(rec){
+  if (!rec) return null;
+  const people = {}, producers = [], engineers = [], places = [];
+  let work = null;
+  (rec.relations || []).forEach(r => {
+    const a = r.artist, attrs = (r.attributes || []).filter(x => x !== 'additional' && x !== 'guest');
+    if (a && ROLE_ORDER.indexOf(r.type) >= 0){
+      const p = people[a.id] || (people[a.id] = { id: a.id, name: a.name, roles: [] });
+      (attrs.length ? attrs : [r.type === 'vocal' ? 'vocals' : r.type]).forEach(x => { if (p.roles.indexOf(x) < 0) p.roles.push(x); });
+    }
+    if (a && r.type === 'producer' && producers.indexOf(a.name) < 0) producers.push(a.name);
+    if (a && /^(engineer|recording|mix|mastering|audio)$/.test(r.type) && engineers.indexOf(a.name) < 0) engineers.push(a.name);
+    if (r.place && r.type === 'recorded at' && !places.some(p => p.id === r.place.id)) places.push({ id: r.place.id, name: r.place.name });
+    if (r.work && r.type === 'performance' && !work) work = { id: r.work.id, title: r.work.title };
+  });
+  const releases = (rec.releases || []).filter(x => x.status === 'Official' || !x.status).map(x => ({ id: x.id, title: x.title, date: x.date || '' }));
+  return {
+    id: rec.id, title: rec.title, released: rec['first-release-date'] || '',
+    artists: (rec['artist-credit'] || []).map(c => c.artist ? { id: c.artist.id, name: c.artist.name } : null).filter(Boolean),
+    performers: Object.keys(people).map(k => people[k]), producers: producers, engineers: engineers, places: places, work: work, releases: releases
+  };
+}
+/** The songwriters from a work: composers, lyricists and writers, each once, with what they wrote. */
+function writersOf(work){
+  const by = {};
+  ((work && work.relations) || []).forEach(r => {
+    if (!r.artist || !/^(composer|lyricist|writer|librettist)$/.test(r.type)) return;
+    const w = by[r.artist.id] || (by[r.artist.id] = { id: r.artist.id, name: r.artist.name, roles: [] });
+    if (w.roles.indexOf(r.type) < 0) w.roles.push(r.type);
+  });
+  return Object.keys(by).map(k => by[k]);
+}
+/** Where an artist comes from: { from, country, gm, formed, ended, group }. */
+function homeOf(a){
+  if (!a) return null;
+  const from = (a['begin-area'] && a['begin-area'].name) || (a.area && a.area.name) || '';
+  const span = a['life-span'] || {}, group = /group|orchestra|choir/i.test(a.type || '');
+  return { from: from, country: a.country || '', gm: isGreaterManchester(from) || isGreaterManchester(a.area && a.area.name),
+    formed: String(span.begin || '').slice(0, 4), ended: span.ended ? String(span.end || '').slice(0, 4) : '', group: group };
+}
+/** The badge for a song from round here: made by Greater Manchester artists, or recorded at a studio here. */
+function localBadge(home, places){
+  const studio = (places || []).filter(p => p.gm)[0];
+  if (studio) return { kind: 'studio', text: 'Recorded at ' + studio.name + (studio.area ? ', ' + studio.area : '') };
+  if (home && home.gm) return { kind: 'home', text: 'Made in Greater Manchester' + (home.from && norm(home.from) !== 'greater manchester' ? ' · from ' + home.from : '') };
+  return null;
+}
+/** "lead vocals, acoustic guitar" → "Lead vocals, acoustic guitar". */
+const rolesText = roles => { const s = (roles || []).join(', ').replace(/ \(drum set\)/g, ''); return s.charAt(0).toUpperCase() + s.slice(1); };
+
+/* ---------- finding things ---------- */
+/** The MusicBrainz recording for a Spotify song: by its ISRC, or by title and artist. */
+async function recordingFor(t){
+  if (!t) return null;
+  const artist = norm((t.artists[0] || {}).name);
+  let id = '';
+  if (t.isrc){
+    const j = await mbGet('/isrc/' + encodeURIComponent(t.isrc) + '?inc=artist-credits');
+    const recs = (j && j.recordings) || [];
+    const best = recs.filter(r => (r['artist-credit'] || []).some(c => norm(c.name) === artist))
+      .sort((a, b) => String(a['first-release-date'] || '9').localeCompare(String(b['first-release-date'] || '9')))[0] || recs[0];
+    if (best) id = best.id;
+  }
+  if (!id){
+    const j = await mbGet('/recording?limit=5&query=' + encodeURIComponent('recording:' + q(t.name.replace(/ - .*$/, '')) + ' AND artist:' + q((t.artists[0] || {}).name)));
+    const r = ((j && j.recordings) || []).filter(x => (x.score || 0) >= 80)[0];
+    if (r) id = r.id;
+  }
+  if (!id) return null;
+  return mbGet('/recording/' + id + '?inc=artist-credits+artist-rels+work-rels+place-rels+releases+url-rels');
+}
+/** The MusicBrainz artist for a name (the best exact match), with its links. */
+async function artistFor(name, mbid){
+  let id = mbid || '';
+  if (!id){
+    const j = await mbGet('/artist?limit=5&query=' + encodeURIComponent('artist:' + q(name)));
+    const want = norm(name), list = (j && j.artists) || [];
+    const a = list.filter(x => norm(x.name) === want).sort((x, y) => (y.score || 0) - (x.score || 0))[0] || list.filter(x => (x.score || 0) >= 95)[0];
+    if (a) id = a.id;
+  }
+  return id ? mbGet('/artist/' + id + '?inc=url-rels') : null;
+}
+
+/* ---------- Wikipedia, through Wikidata ---------- */
+/** The English Wikipedia article for a Wikidata item, or ''. */
+async function wikiTitle(qid){
+  if (!qid) return '';
+  try {
+    const res = await fetch('https://www.wikidata.org/w/api.php?action=wbgetentities&props=sitelinks&sitefilter=enwiki&format=json&origin=*&ids=' + qid);
+    if (!res.ok) return '';
+    const j = await res.json(), e = j.entities && j.entities[qid];
+    return e && e.sitelinks && e.sitelinks.enwiki ? e.sitelinks.enwiki.title : '';
+  } catch(e){ return ''; }
+}
+/** An article's opening, its picture and its address: { title, text, image, url }, or null. */
+async function wikiSummary(title){
+  if (!title) return null;
+  try {
+    const res = await fetch('https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title.replace(/ /g, '_')));
+    if (!res.ok) return null;
+    const j = await res.json();
+    if (j.type === 'disambiguation' || !j.extract) return null;
+    return { title: j.title, text: j.extract, image: (j.thumbnail && j.thumbnail.source) || '', url: (j.content_urls && j.content_urls.mobile && j.content_urls.mobile.page) || '' };
+  } catch(e){ return null; }
+}
+
+/* ---------- liner notes ---------- */
+/** The release with the most scans in the Cover Art Archive: [{ src, thumb, types }], front first, or []. */
+async function linerNotes(releases){
+  let best = [];
+  for (let i = 0; i < Math.min(4, (releases || []).length); i++){
+    let j = null;
+    try { const res = await fetch('https://coverartarchive.org/release/' + releases[i].id); if (res.ok) j = await res.json(); } catch(e){}
+    const imgs = ((j && j.images) || []).map(x => ({ src: x.image, thumb: (x.thumbnails && (x.thumbnails['500'] || x.thumbnails.large || x.thumbnails['250'])) || x.image, types: x.types || [], front: !!x.front }))
+      .sort((a, b) => (b.front ? 1 : 0) - (a.front ? 1 : 0));
+    if (imgs.length > best.length) best = imgs;
+    if (best.length >= 4) break;
+  }
+  return best;
+}
+
+/* ---------- all of it, for a song and for an artist ---------- */
+/**
+ * The story of the song playing: its credits, songwriters, studios (and whether they're round here), the artist's
+ * home, and the song's own Wikipedia article. Each part is null when it isn't known.
+ */
+async function songStory(t){
+  const rec = await recordingFor(t);
+  const c = creditsOf(rec);
+  if (!c) return { credits: null };
+  const work = c.work ? await mbGet('/work/' + c.work.id + '?inc=artist-rels+url-rels') : null;
+  const places = [];
+  for (let i = 0; i < c.places.length && i < 2; i++){
+    const p = await mbGet('/place/' + c.places[i].id);
+    const area = p && p.area ? p.area.name : '';
+    places.push({ id: c.places[i].id, name: c.places[i].name, area: area, gm: isGreaterManchester(area) });
+  }
+  const mbArtist = c.artists[0] ? await artistFor(c.artists[0].name, c.artists[0].id) : null;
+  const home = homeOf(mbArtist);
+  const story = await wikiSummary(await wikiTitle(wikidataOf(work) || wikidataOf(rec)));
+  return { credits: c, writers: writersOf(work), places: places, home: home, badge: localBadge(home, places), story: story, artistWiki: wikidataOf(mbArtist) };
+}
+/** An artist's story: where they're from, and their Wikipedia article. */
+async function artistStory(name){
+  const a = await artistFor(name);
+  if (!a) return null;
+  const home = homeOf(a);
+  return { home: home, badge: localBadge(home, []), bio: await wikiSummary(await wikiTitle(wikidataOf(a))) };
 }
 /* The screensaver's logic, pure: the sky and the engines, the billboards, the world outside, the road ahead and the cabin's dials. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
@@ -3475,7 +4182,11 @@ const Cockpit = (() => {
   // Bands, top to bottom: billboards in the sky (to .38), what's coming up (.4 to .6), then the landscape and the train.
   const NEAR = [{ y: .26, d: 1 }, { y: .26, d: 1.05 }], NARROW = [{ y: .21, d: 1 }, { y: .3, d: 1.05 }];
   function boardHtml(card){
-    return `<span class="bh">${esc(card.head)}</span><span class="bb">${esc(card.big)}</span>${card.sub ? `<span class="bs">${esc(card.sub)}</span>` : ''}`;
+    const sub = card.sub ? `<span class="bs">${esc(card.sub)}</span>` : '';
+    // music: the album wall (six covers), or a cover beside the words
+    if (card.wall) return `<span class="bh">${esc(card.head)}</span><span class="wall">${card.wall.map(u => `<span><img src="${esc(u)}" alt=""></span>`).join('')}</span>${sub}`;
+    const text = `<span class="bh">${esc(card.head)}</span>${card.big ? `<span class="bb">${esc(card.big)}</span>` : ''}${sub}`;
+    return card.img ? `<span class="art"><img src="${esc(card.img)}" alt=""></span><span class="tx">${text}</span>` : text;
   }
   function nextCard(list, avoid){
     for (let k = 0; k < list.length; k++){ const c = list[(rotI++) % list.length]; if (!avoid(c)) return c; }
@@ -3486,7 +4197,7 @@ const Cockpit = (() => {
     const card = nextCard(list, c => boards.some(b => b.id === c.id) || (!!train && train.ids.indexOf(c.id) >= 0));
     if (!card) return;
     const b = document.createElement('div');
-    b.className = `board tone-${card.tone}${String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id);
+    b.className = `board tone-${card.tone}${card.wall ? ' has-wall' : card.img ? ' has-img' : String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id);
     b.innerHTML = `<div class="holo">${boardHtml(card)}</div><i class="beam"></i><i class="buoy"></i>`;
     el('cBoards').appendChild(b);
     const holo = b.firstChild, s = 1 / lane.d;
@@ -3814,6 +4525,234 @@ function signHtml(trains, walk, now){
   if (!S.first3.length) plat = `<div class="row centre">${S.missed ? 'No more you can make' : 'No trains for now'}</div><div class="row centre dim">Please check the timetable</div>`;
   return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
 }
+/* ===================== display: music on the TV (Spotify) ===================== */
+// Plain script for TV browsers (Chromium 63): no ?. or ??. The TV is signed in to Spotify from a phone (sealed with
+// the PIN, like the Octopus account) and then reads and controls Spotify itself: the Music view, a line on Today, the
+// cover in the screensaver, favourites on the number keys, and the sleep timer and bedtime fade, which need a device
+// that's always on.
+const TM = { acc: null, lyrics: null, lyricsFor: '', queue: null, view: 'player', story: null, storyFor: '', notes: null, notesFor: '', notePage: 0,
+  sleepAt: 0, sleepSong: '', fading: false, wasNight: null, lastTrack: '', shownLine: -2 };
+const TM_VIEWS = ['player', 'lyrics', 'notes'];
+
+function tmSp(){
+  // In the phone's Screen page (embed), the picture borrows the phone's own sign-in while it's fresh, and never
+  // refreshes it, so the two can't trip over each other's tokens.
+  if (D.embed){ const a = activeAccount(); TM.acc = a && a.exp > Date.now() + 60e3 ? a : null; }
+  else if (!TM.acc) TM.acc = activeAccount();
+  return TM.acc ? spotify(TM.acc, TM.acc.client) : null;
+}
+const tmModel = () => SRC.music.data || null;
+const tmTrack = () => tmModel() ? tmModel().track : null;
+
+/** Read by the data scheduler: what's playing (playerModel), and the song's lyrics when it changes. */
+async function pollSpotify(){
+  const sp = tmSp();
+  if (!sp) return null;
+  const m = playerModel(await sp.player(), Date.now());
+  const id = m && m.track ? m.track.id : '';
+  if (id !== TM.lastTrack){
+    TM.lastTrack = id; TM.lyrics = null; TM.lyricsFor = ''; TM.story = null; TM.storyFor = ''; TM.notes = null; TM.notesFor = ''; TM.notePage = 0; TM.shownLine = -2;
+    if (m && m.track){
+      loadLyrics(m.track).then(l => { if (TM.lastTrack === m.track.id){ TM.lyrics = l; TM.lyricsFor = m.track.id; render(); } });
+      sp.queue().then(q => { TM.queue = ((q && q.queue) || []).map(trackOf).filter(Boolean).slice(0, 3); render(); }, () => {});
+      if (TM.view === 'notes') tmNotes();
+    }
+  }
+  return m;
+}
+/** Ask Spotify again shortly, after a command. */
+function tmSoon(ms){ const s = SRC.music; s.last = Date.now() - s.every() + (ms || 700); }
+async function tmAct(fn, after){
+  const sp = tmSp(); if (!sp) return;
+  try { await fn(sp); SRC.music.err = null; }
+  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
+  tmSoon(after);
+}
+const tmDevice = () => tmModel() && tmModel().device ? tmModel().device.id : null;
+function tmToggle(){
+  const m = tmModel();
+  if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
+  return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
+}
+const tmNext = () => tmAct(sp => sp.next(tmDevice()), 600);
+const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
+/** A favourite from the number keys: a playlist or album, from the top. */
+function tmFavourite(i){
+  const f = tmFavs()[i];
+  if (!f){ toast('No favourite on ' + (i + 1) + '. Choose them on your phone: Screen, then Spotify on the TV.', 5000); return; }
+  toast('Playing ' + f.name, 3000);
+  tmAct(sp => sp.play({ device: tmDevice(), context: f.uri }).catch(e => {
+    if (e.code !== 'NO_DEVICE') throw e;
+    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: f.uri }); });
+  }), 900);
+}
+/** Favourites: chosen on the phone, or else your first playlists. */
+function tmFavs(){
+  const mine = store.getJ('musicFavs', null);
+  if (mine && mine.length) return mine.slice(0, 9);
+  return (SRC.shelf.data && SRC.shelf.data.playlists || []).slice(0, 5).map(p => ({ uri: p.uri, name: p.name }));
+}
+/** Your saved albums and playlists, for the album wall and the default favourites: read a few times a day. */
+async function tmShelf(){
+  const sp = tmSp(); if (!sp) return null;
+  const al = await sp.albums(0), pl = await sp.playlists(0);
+  return { albums: page(al).items.map(x => x.album || x).filter(x => x && x.id).slice(0, 24), playlists: page(pl).items.filter(x => x && x.id) };
+}
+async function tmNotes(){
+  const t = tmTrack(); if (!t || TM.notesFor === t.id) return;
+  TM.notesFor = t.id; TM.notes = null; render();
+  try {
+    if (TM.storyFor !== t.id){ TM.story = await songStory(t); TM.storyFor = t.id; }
+    TM.notes = TM.story && TM.story.credits ? await linerNotes(TM.story.credits.releases) : [];
+  } catch(e){ TM.notes = []; }
+  if (tmTrack() && tmTrack().id === t.id) render();
+}
+
+/* ---------- the sleep timer, and fading out as the night window starts ---------- */
+/** From the phone: sleep in so many minutes (0 turns it off), or at the end of this song. */
+function tmSleep(mins, song){
+  TM.sleepAt = 0; TM.sleepSong = '';
+  if (song && tmTrack()){ TM.sleepSong = tmTrack().id; toast('The music stops at the end of this song.', 4000); }
+  else if (mins > 0){ TM.sleepAt = Date.now() + mins * MIN; toast('The music fades out in ' + mins + ' minutes.', 4000); }
+  else toast('Sleep timer off.', 3000);
+  render(); tellRemote('Sleep timer ' + (TM.sleepSong ? 'at the end of the song' : TM.sleepAt ? hhmm(TM.sleepAt) : 'off'));
+}
+/** Turns it down over a minute (or a few seconds), pauses, then puts the volume back for next time. */
+async function tmFade(secs){
+  const m = tmModel(), sp = tmSp();
+  if (TM.fading || !m || !m.playing || !sp) return;
+  TM.fading = true;
+  const id = tmDevice(), v0 = m.device && m.device.canVolume && m.device.volume != null ? m.device.volume : null, steps = 10;
+  try {
+    if (v0 != null) for (let i = 1; i < steps; i++){ await sp.volume(Math.round(v0 * (1 - i / steps)), id); await new Promise(r => setTimeout(r, secs * 1000 / steps)); }
+    await sp.pause(id);
+    if (v0 != null){ await new Promise(r => setTimeout(r, 1500)); await sp.volume(v0, id); }
+  } catch(e){}
+  TM.fading = false; TM.sleepAt = 0; TM.sleepSong = '';
+  tmSoon(500); render(); tellRemote('Music faded out');
+}
+/** Every second: the sleep timer's moment, and the start of the night window. */
+function tmTick(now){
+  if (!TM.acc) return;
+  if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
+  const m = tmModel();
+  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading) tmFade(60);
+  if (TM.sleepSong && m && m.track){
+    if (m.track.id !== TM.sleepSong){ TM.sleepSong = ''; tmAct(sp => sp.pause(tmDevice())); }
+    else if (m.track.dur - progressAt(m, now) < 9000 && !TM.fading) tmFade(8);
+  }
+  const night = D.set.night && inWindow(now, D.set.nightFrom, D.set.nightTo);
+  // only as the window starts: a screen that wakes up or reloads in the night (the fresh start is at 03:30) leaves it be
+  if (night && TM.wasNight === false && D.set.musicNight !== false && m && m.playing) tmFade(60);
+  TM.wasNight = night;
+  if (shown() === 'music') tmTickView(now);
+}
+
+/* ---------- the Music view ---------- */
+function tmTickView(now){
+  const m = tmModel(), t = tmTrack();
+  if (!m || !t) return;
+  const pos = progressAt(m, now);
+  const bar = $('#mBar'); if (bar) bar.style.width = (t.dur ? Math.min(100, pos / t.dur * 100) : 0).toFixed(2) + '%';
+  const p = $('#mPos'); if (p) p.textContent = fmtDur(pos);
+  const r = $('#mLeft'); if (r) r.textContent = '-' + fmtDur(Math.max(0, t.dur - pos));
+  const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
+  if (lines && TM.view !== 'notes'){ const i = lyricAt(lines, pos + 250); if (i !== TM.shownLine){ TM.shownLine = i; tmLyricsHtml(lines, i); } }
+}
+function tmLyricsHtml(lines, i){
+  const el = $('#mLyrics'); if (!el) return;
+  const full = TM.view === 'lyrics', from = full ? Math.max(0, i - 2) : Math.max(0, i), n = full ? 7 : 3;
+  el.innerHTML = lines.slice(from, from + n).map((l, k) => `<p class="${from + k === i ? 'now' : from + k < i ? 'done' : ''}">${esc(l.text || '♪')}</p>`).join('');
+}
+function renderMusic(){
+  const sec = $('section[data-mode="music"]');
+  const m = tmModel(), t = tmTrack();
+  sec.className = 'mode music-mode view-' + TM.view;
+  $('#mEmpty').hidden = !!(TM.acc && t);
+  $('#mMain').hidden = !(TM.acc && t);
+  if (!TM.acc){
+    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Spotify isn\'t on this screen yet</p><p class="note">On your phone: Screen, then <b>Connect Spotify on the TV</b>. It\'s sealed with the PIN, like the Octopus account.</p>';
+    $('#mFoot').innerHTML = '<span>Spotify</span>'; return;
+  }
+  if (!t){
+    const e = SRC.music.err;
+    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.')) + '</p>' + tmFavsHtml() + tmWallHtml();
+    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
+  }
+  const art = artUrl(t.images, 640);
+  if ($('#mCover').getAttribute('src') !== art){ $('#mCover').setAttribute('src', art); $('#mNeb').setAttribute('src', artUrl(t.images, 300)); }
+  $('#mWhere').textContent = (m.playing ? 'Playing on ' : 'Paused on ') + (m.device ? m.device.name : 'Spotify') + (TM.sleepAt ? ' · sleep at ' + hhmm(TM.sleepAt) : TM.sleepSong ? ' · stopping after this song' : '');
+  $('#mTitle').textContent = t.name;
+  $('#mArtist').textContent = t.artist + (t.album.name && !t.episode ? ' · ' + t.album.name : '');
+  $('#mState').className = 'mstate ' + (m.playing ? 'on' : 'off');
+  if (!$('#mState').firstChild) $('#mState').innerHTML = '<i></i><i></i><i></i>';
+  const q = TM.queue && TM.queue.length ? TM.queue[0] : null;
+  $('#mNext').innerHTML = q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
+  const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
+  if (TM.view === 'notes') tmNotesHtml();
+  else if (lines){ TM.shownLine = -2; tmTickView(Date.now()); }
+  else $('#mLyrics').innerHTML = TM.lyricsFor === t.id || TM.lyrics ? '<p class="note">' + (TM.lyrics && TM.lyrics.instrumental ? 'An instrumental.' : 'No timed lyrics for this one.') + '</p>' : '';
+  tmTickView(Date.now());
+  $('#mFoot').innerHTML = '<span>OK play or pause · ◀ ▶ skip · ▼ ' + (TM.view === 'player' ? 'lyrics' : TM.view === 'lyrics' ? 'liner notes' : 'back to the player') + ' · 1–' + Math.max(1, tmFavs().length) + ' favourites</span>' + (TM.acc.name ? '<span>Spotify · ' + esc(TM.acc.name) + '</span>' : '');
+}
+/** The album wall: covers from your shelf, a different few each hour. */
+function tmWallHtml(){
+  const al = (SRC.shelf.data && SRC.shelf.data.albums || []).filter(a => a.images && a.images.length);
+  if (!al.length) return '';
+  const start = Math.floor(Date.now() / 3600e3) % al.length, n = Math.min(7, al.length), out = [];
+  for (let i = 0; i < n; i++) out.push(`<img src="${esc(artUrl(al[(start + i) % al.length].images, 300))}" alt="">`);
+  return '<div class="mwall" aria-hidden="true">' + out.join('') + '</div>';
+}
+function tmFavsHtml(){
+  const f = tmFavs();
+  return f.length ? '<ol class="favs">' + f.map((x, i) => `<li><b class="mono">${i + 1}</b>${esc(x.name)}</li>`).join('') + '</ol>' : '';
+}
+function tmNotesHtml(){
+  const el = $('#mLyrics'), n = TM.notes;
+  if (!n){ el.innerHTML = '<p class="note">Finding the sleeve and booklet…</p>'; return; }
+  if (!n.length){ el.innerHTML = '<p class="note">No scans of this release in the Cover Art Archive yet.</p>'; return; }
+  const i = Math.max(0, Math.min(n.length - 1, TM.notePage)), im = n[i];
+  el.innerHTML = `<figure class="note-page"><img src="${esc(im.thumb)}" alt=""><figcaption class="label">${esc((im.types || []).join(', ') || 'Artwork')} · ${i + 1} of ${n.length} · ◀ ▶ to turn</figcaption></figure>`;
+}
+/**
+ * The remote in the Music view: OK plays or pauses, left and right skip (or turn the liner notes), down changes view,
+ * numbers play favourites. With nothing playing, the arrows and OK do what they do everywhere else.
+ */
+function tmKey(e){
+  if (!TM.acc) return false;
+  if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
+  if (!tmTrack()) return false;
+  if (e.key === 'Enter'){ tmToggle(); return true; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    const fwd = e.key === 'ArrowRight';
+    if (TM.view === 'notes' && TM.notes && TM.notes.length){ TM.notePage = Math.max(0, Math.min(TM.notes.length - 1, TM.notePage + (fwd ? 1 : -1))); tmNotesHtml(); }
+    else (fwd ? tmNext : tmPrev)();
+    return true;
+  }
+  if (e.key === 'ArrowDown'){ TM.view = TM_VIEWS[(TM_VIEWS.indexOf(TM.view) + 1) % TM_VIEWS.length]; if (TM.view === 'notes') tmNotes(); TM.shownLine = -2; renderMusic(); return true; }
+  return false;
+}
+/** Media keys, on any view: play and pause, next and previous. */
+const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaPlay: 'toggle', MediaPause: 'toggle', MediaTrackNext: 'next', MediaTrackPrevious: 'prev', 179: 'toggle', 415: 'toggle', 19: 'toggle', 176: 'next', 417: 'next', 177: 'prev', 412: 'prev' };
+function tmMediaKey(e){
+  const a = MEDIA_KEYS[e.key] || MEDIA_KEYS[e.keyCode];
+  if (!a || !TM.acc) return false;
+  if (a === 'toggle') tmToggle(); else if (a === 'next') tmNext(); else tmPrev();
+  return true;
+}
+
+/* ---------- elsewhere: a line on Today, and cards for the screensaver ---------- */
+function tmTodayHtml(){
+  const m = tmModel(), t = tmTrack();
+  if (!t || !m.playing) return '';
+  return `<span class="np-ic">♪</span><b>${esc(t.name)}</b> <span class="muted">· ${esc(t.artist)}${m.device ? ' · ' + esc(m.device.name) : ''}</span>`;
+}
+/** From the phone, sealed: this screen's own Spotify sign-in. */
+function tmTake(acc){
+  saveSpotifyStore({ accounts: [acc], active: acc.id });
+  TM.acc = acc; TM.lastTrack = '';
+  ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+}
 /* ===================== display: modes, remote control, scheduling, rendering ===================== */
 // Written for older TV browsers too: no ?. or ?? here (see docs/STACK.md, "Smart TV notes").
 
@@ -3849,7 +4788,10 @@ const SRC = {
   air:     { label: 'Air',     every: () => 60*MIN, need: () => true, run: loadAir },
   floods:  { label: 'Floods',  every: () => 15*MIN, need: () => true, run: loadFloods },
   grid:    { label: 'Grid mix', every: () => 30*MIN, need: () => true, run: () => loadGridMix(CI_REGION[region()]) },
-  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays }
+  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays },
+  // Spotify (tvmusic.js): every few seconds while the Music view is up, less often while only a line or a cover shows it.
+  music:   { label: 'Spotify', every: () => shown() === 'music' ? 3e3 : (shown() === 'today' || shown() === 'screensaver') ? 15e3 : (TM.sleepAt || TM.sleepSong) ? 15e3 : MIN, need: () => !!tmSp(), run: pollSpotify },
+  shelf:   { label: 'Your albums', every: () => 6*60*MIN, need: () => !!tmSp(), run: tmShelf }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
 
@@ -3905,6 +4847,7 @@ function tick(){
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
   tickSign(now);
+  tmTick(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
@@ -3943,6 +4886,7 @@ function render(){
   else if (m === 'travel') renderTravel();
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
+  else if (m === 'music') renderMusic();
 }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
@@ -3998,6 +4942,7 @@ function renderToday(){
   const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
   const cds = countdowns({ dates: s.dates, holidays: SRC.holidays.data, events: SRC.cal.data }, now);
   $('#dDate').textContent = longDay(new Date(now)) + (cds.length ? ' · ' + countdownText(cds[0]) : today ? ` · sunset ${hhmm(today.set)}` : '');
+  setHtml($('#dMusic'), tmTodayHtml());
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
@@ -4131,7 +5076,7 @@ function cockpitInfo(now){
   return {
     sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null), world: Object.assign(worldFor(x, now), { iss }), preview: D.preview,
     voyage, instruments: instrumentsFor(x, now, usual), detail: D.preview.detail || D.set.detail,
-    cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0),
+    cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0).concat(musicCards(tmModel(), SRC.shelf.data && SRC.shelf.data.albums, now)),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };
 }
@@ -4152,6 +5097,8 @@ function startRemote(){
     else if (r.cmd === 'reload'){ location.reload(); return; }
     else if (r.cmd === 'account'){ takeDetails(r.box); return; }
     else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
+    else if (r.cmd === 'sleep'){ tmSleep(r.mins, r.song); return; }
+    else if (r.cmd === 'favs'){ store.setJ('musicFavs', r.favs); toast(r.favs.length ? 'Favourites for the number keys, from your phone: ' + r.favs.map((f, i) => (i + 1) + ' ' + f.name).join(', ') : 'Favourites cleared: the number keys play your first playlists.', 6000); render(); D.sentState = ''; tellRemote('Favourites saved'); return; }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
@@ -4159,10 +5106,11 @@ function startRemote(){
 /** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
 function tellRemote(note){
   if (!D.remote || D.embed) return;
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds;
+  const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong;
   if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '' } });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -4180,6 +5128,7 @@ async function takeDetails(box){
   if (d.wifi){ changes.wifi = d.wifi; got.push('guest Wi-Fi'); }
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
+  if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
   toast(`From your phone: ${list}.`, 6000);
@@ -4243,6 +5192,7 @@ function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
   if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
+  if (!open() && tmMediaKey(e)){ e.preventDefault(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
@@ -4263,6 +5213,8 @@ function onKey(e){
     if (e.key === 'ArrowDown'){ e.preventDefault(); hideChrome(); return; }
     if (e.key === 'ArrowUp'){ e.preventDefault(); return; }
   } else {
+    // the Music view keeps the arrows, OK and the numbers for the music; up still opens the toolbar
+    if (shown() === 'music' && e.key !== 'ArrowUp' && tmKey(e)){ e.preventDefault(); return; }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); setMode(stepMode(D.mode, e.key === 'ArrowRight' ? 1 : -1)); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter'){ e.preventDefault(); showChrome(true); return; }
   }
@@ -4301,7 +5253,7 @@ function buildSheet(){
 }
 function fillSheet(){
   const s = D.set, setv = (id, v) => { const el = $('#' + id); if (el) el.value = String(v); };
-  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0);
+  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0); setv('fMusicNight', s.musicNight === false ? 0 : 1);
   const near = t => { const p = String(t).split(':'); const m = Math.round(((+p[0] || 0)*60 + (+p[1] || 0)) / 30) * 30 % 1440; return `${pad2(Math.floor(m/60))}:${pad2(m % 60)}`; };
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
   [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date ? ukDate(b.date) : ''); setv('bE' + i, b.every || 2); });
@@ -4315,7 +5267,7 @@ function fillSheet(){
 function readSheet(){
   const v = id => $('#' + id).value.trim();
   const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: parseUkDate(v('bD' + i)), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
-  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
+  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', musicNight: v('fMusicNight') !== '0', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
     bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
 }
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }

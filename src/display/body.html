@@ -16,7 +16,7 @@
   <!-- ================= TODAY: the household at a glance ================= -->
   <section class="mode" data-mode="today" aria-label="Today" hidden>
     <div class="top">
-      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p></div>
+      <div class="when"><div class="clock" data-clock>--:--</div><p class="date" id="dDate"></p><p class="np" id="dMusic"></p></div>
       <div class="verdict" id="dVerdict"></div>
       <div class="wx" id="dWx"></div>
     </div>
@@ -118,6 +118,24 @@
       <p class="night-sub" id="nSub"></p>
     </div>
   </section>
+
+  <!-- ================= MUSIC: Spotify, on this screen's own sign-in (tvmusic.js) ================= -->
+  <section class="mode music-mode" data-mode="music" aria-label="Music" hidden>
+    <div class="msky" aria-hidden="true"><img id="mNeb" alt=""></div>
+    <div class="m-empty" id="mEmpty"></div>
+    <div class="m-main" id="mMain" hidden>
+      <div class="m-cover"><img id="mCover" alt=""></div>
+      <div class="m-info">
+        <p class="m-where"><span class="mstate" id="mState"></span><span class="label" id="mWhere"></span></p>
+        <h1 class="m-title" id="mTitle"></h1>
+        <p class="m-artist" id="mArtist"></p>
+        <div class="m-prog"><div class="m-rail"><i id="mBar"></i></div><p class="m-times mono"><span id="mPos">0:00</span><span id="mLeft"></span></p></div>
+        <div class="m-lyrics" id="mLyrics"></div>
+        <p class="m-next" id="mNext"></p>
+      </div>
+    </div>
+    <p class="foot" id="mFoot"></p>
+  </section>
 </div>
 
 <!-- ================= SETTINGS ================= -->
@@ -137,6 +155,9 @@
       <div class="field"><label for="fNightFrom">Night from</label><select id="fNightFrom" data-times></select></div>
       <div class="field"><label for="fNightTo">Night until</label><select id="fNightTo" data-times></select></div>
       <div class="field"><label for="fReload">Fresh start each night at</label><select id="fReload" data-times></select></div>
+    </div>
+    <div class="fields">
+      <div class="field solo"><label for="fMusicNight">Music at night</label><select id="fMusicNight"><option value="1">Fade it out as night starts</option><option value="0">Leave it playing</option></select></div>
     </div></section>
 
     <section class="card"><h3 class="label">Your phone as a remote</h3>

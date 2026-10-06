@@ -21,7 +21,8 @@ export const MODES = [
   { id: 'energy', label: 'Energy', key: '2' },
   { id: 'travel', label: 'Travel', key: '3' },
   { id: 'screensaver', label: 'Screensaver', key: '4' },
-  { id: 'night', label: 'Night', key: '5' }
+  { id: 'night', label: 'Night', key: '5' },
+  { id: 'music', label: 'Music', key: '6' }
 ];
 export const ROTATING = ['today', 'energy', 'travel'];
 /** Older links and settings named the overview "home". */
@@ -49,7 +50,8 @@ export function inWindow(now, from, to){
 export const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '', wifi: null, dates: [],
-  trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15
+  trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15,
+  musicNight: true          // fade the music out as the night window starts (the TV does it)
 };
 export function displaySettings(saved){
   const s = Object.assign({}, DISPLAY_DEFAULTS, saved || {});

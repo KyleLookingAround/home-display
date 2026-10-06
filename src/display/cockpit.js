@@ -670,7 +670,11 @@ const Cockpit = (() => {
   // Bands, top to bottom: billboards in the sky (to .38), what's coming up (.4 to .6), then the landscape and the train.
   const NEAR = [{ y: .26, d: 1 }, { y: .26, d: 1.05 }], NARROW = [{ y: .21, d: 1 }, { y: .3, d: 1.05 }];
   function boardHtml(card){
-    return `<span class="bh">${esc(card.head)}</span><span class="bb">${esc(card.big)}</span>${card.sub ? `<span class="bs">${esc(card.sub)}</span>` : ''}`;
+    const sub = card.sub ? `<span class="bs">${esc(card.sub)}</span>` : '';
+    // music: the album wall (six covers), or a cover beside the words
+    if (card.wall) return `<span class="bh">${esc(card.head)}</span><span class="wall">${card.wall.map(u => `<span><img src="${esc(u)}" alt=""></span>`).join('')}</span>${sub}`;
+    const text = `<span class="bh">${esc(card.head)}</span>${card.big ? `<span class="bb">${esc(card.big)}</span>` : ''}${sub}`;
+    return card.img ? `<span class="art"><img src="${esc(card.img)}" alt=""></span><span class="tx">${text}</span>` : text;
   }
   function nextCard(list, avoid){
     for (let k = 0; k < list.length; k++){ const c = list[(rotI++) % list.length]; if (!avoid(c)) return c; }
@@ -681,7 +685,7 @@ const Cockpit = (() => {
     const card = nextCard(list, c => boards.some(b => b.id === c.id) || (!!train && train.ids.indexOf(c.id) >= 0));
     if (!card) return;
     const b = document.createElement('div');
-    b.className = `board tone-${card.tone}${String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id);
+    b.className = `board tone-${card.tone}${card.wall ? ' has-wall' : card.img ? ' has-img' : String(card.big).length > 11 ? ' long' : ''}`; b.setAttribute('data-card', card.id);
     b.innerHTML = `<div class="holo">${boardHtml(card)}</div><i class="beam"></i><i class="buoy"></i>`;
     el('cBoards').appendChild(b);
     const holo = b.firstChild, s = 1 / lane.d;

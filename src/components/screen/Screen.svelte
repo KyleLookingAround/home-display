@@ -9,6 +9,7 @@
   import { cleanCode, showCode, sendRemote, listenRemote, lockSecret, canSeal, sealDetails } from '../../lib/remote.js';
   import { houseSettings } from '../../state/house.js';
   import { hhmm } from '../../lib/format.js';
+  import TvMusic from './TvMusic.svelte';
 
   let code = $state(null), typed = $state(''), bad = $state(false);
   let view = $state('today'), tv = $state(null), asked = $state(0), quiet = $state(false), sent = $state('');
@@ -109,6 +110,8 @@
     {#if sending}<p class="note" role="status">{sending}</p>{/if}
   </section>
 {/if}
+
+{#if code}<TvMusic {code} {tv} />{/if}
 
 <section class="card" id="pair">
   <h2 class="label">Pairing</h2>

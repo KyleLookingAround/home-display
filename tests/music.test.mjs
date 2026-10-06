@@ -118,3 +118,17 @@ test('songwriters, where artists are from, and the Greater Manchester badge', ()
   assert.equal(D.localBadge(D.homeOf({ 'begin-area': { name: 'Dublin' } }), [{ name: 'Strawberry Studios', area: 'Stockport', gm: true }]).text, 'Recorded at Strawberry Studios, Stockport', 'a studio here wins');
   assert.equal(D.localBadge(D.homeOf({ 'begin-area': { name: 'Dublin' } }), [{ name: 'Rockfield Studios', area: 'Monmouth', gm: false }]), null);
 });
+
+test('the screensaver shows the song playing, or the album wall when nothing is', () => {
+  const m = M.playerModel({ is_playing: true, progress_ms: 1, item: TRACK, device: { id: 'd', name: 'Kitchen speaker', type: 'Speaker' } }, 0);
+  const c = M.musicCards(m, [], 0);
+  assert.equal(c.length, 1); assert.equal(c[0].big, 'Harold Street'); assert.equal(c[0].img, 'mid'); assert.match(c[0].sub, /Kitchen speaker/); assert.equal(c[0].weight, 2, 'often');
+  const albums = [1, 2, 3, 4, 5, 6, 7].map(i => ({ id: 'a' + i, name: 'Album ' + i, images: [{ url: 'u' + i, width: 300 }], artists: [{ name: 'X' }] }));
+  const paused = Object.assign({}, m, { playing: false });
+  const at = h => M.musicCards(paused, albums, h * 3600e3);
+  assert.deepEqual(at(0).map(x => x.id), ['albums', 'album-a1']);
+  assert.deepEqual(at(0)[0].wall, ['u1', 'u2', 'u3', 'u4', 'u5', 'u6'], 'the wall: six covers');
+  assert.deepEqual(at(1)[0].wall, ['u2', 'u3', 'u4', 'u5', 'u6', 'u7'], 'moving along each hour'); assert.equal(at(1)[1].big, 'Album 2');
+  assert.deepEqual(M.musicCards(paused, albums.slice(0, 3), 0).map(x => x.id), ['album-a1'], 'no wall with fewer than six');
+  assert.deepEqual(M.musicCards(null, null, 0), []);
+});

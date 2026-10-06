@@ -12,7 +12,13 @@
 - **Spotify, signed in on each device.**
   - The household's Spotify app (development mode, up to 25 named users) has a Client ID, which isn't a secret and lives in `household.json`.
   - Signing in goes to Spotify and back to Settings, which trades the code for tokens with the PKCE verifier. The tokens stay on that device (`hse.spotify`); each page refreshes them when they run out.
-  - The TV will get them sealed with the PIN, as it gets the Octopus account ([0011](0011-wall-display.md)).
+  - The TV gets its own, sealed with the PIN, as it gets the Octopus account ([0011](0011-wall-display.md)). "Connect Spotify on the TV" on the phone's Screen page signs in at Spotify (which asks which account), then seals the result and sends it instead of keeping it, so the TV has its own refresh token and neither device uses up the other's.
+- **The TV keeps the music's time.** It reads Spotify itself (every three seconds while its Music view shows, every fifteen while Today or the screensaver show what's on), so the sleep timer and the bedtime fade work with every phone locked.
+  - The sleep timer (15 minutes to an hour, or the end of the song) is set from the phone's player or Screen page, and fades over the last minute in ten steps, pauses, then puts the volume back for next time.
+  - The bedtime fade happens once, as the night clock's window starts, and never on a screen that wakes up or reloads inside it. Each screen can turn it off.
+  - Favourites on the number keys are chosen on the phone (playlists and albums, up to nine), or else the first five playlists.
+  - In the Music view the remote's arrows, OK and numbers belong to the music, and up still opens the toolbar. Media keys work everywhere.
+  - The phone's Screen picture of the Music view borrows the phone's sign-in only while it's fresh and never refreshes it, so the two can't trip over each other.
 - **The phone reads Spotify's player every few seconds while a page is open** (sooner while playing, and just after a song ends) and works out the position in between. Commands show at once and are checked a moment later. Nothing is polled while the page is hidden.
 - **The design: the album is the room you're in, and the room is this app.** The player shouldn't look like a copy of Spotify's; Kyle asked that it match the look and feel of the rest of the app.
   - **The house style throughout:**
@@ -41,3 +47,4 @@
 - Everything is tested against a pretend Spotify (`tests/music.browser.mjs`) that answers as the real one does, including Spotify's newer row shape (`item` for `track`) and the endpoints it has moved, which `apiFirst` tries in turn.
 - Spotify's limits for development-mode apps apply: rate limits are generous for one household, but the player backs off on "slow down".
 - A sixth tab, Music, sits between Home and Screen; the tab bar still fits a 390-pixel phone.
+- A sixth view on the TV, Music (key 6), after Night, so the keys 1 to 5 stay as they were. The toolbar's buttons are a little narrower so ten fit on one row at 1080p.

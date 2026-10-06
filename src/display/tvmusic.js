@@ -1,0 +1,228 @@
+/* ===================== display: music on the TV (Spotify) ===================== */
+// Plain script for TV browsers (Chromium 63): no ?. or ??. The TV is signed in to Spotify from a phone (sealed with
+// the PIN, like the Octopus account) and then reads and controls Spotify itself: the Music view, a line on Today, the
+// cover in the screensaver, favourites on the number keys, and the sleep timer and bedtime fade, which need a device
+// that's always on.
+const TM = { acc: null, lyrics: null, lyricsFor: '', queue: null, view: 'player', story: null, storyFor: '', notes: null, notesFor: '', notePage: 0,
+  sleepAt: 0, sleepSong: '', fading: false, wasNight: null, lastTrack: '', shownLine: -2 };
+const TM_VIEWS = ['player', 'lyrics', 'notes'];
+
+function tmSp(){
+  // In the phone's Screen page (embed), the picture borrows the phone's own sign-in while it's fresh, and never
+  // refreshes it, so the two can't trip over each other's tokens.
+  if (D.embed){ const a = activeAccount(); TM.acc = a && a.exp > Date.now() + 60e3 ? a : null; }
+  else if (!TM.acc) TM.acc = activeAccount();
+  return TM.acc ? spotify(TM.acc, TM.acc.client) : null;
+}
+const tmModel = () => SRC.music.data || null;
+const tmTrack = () => tmModel() ? tmModel().track : null;
+
+/** Read by the data scheduler: what's playing (playerModel), and the song's lyrics when it changes. */
+async function pollSpotify(){
+  const sp = tmSp();
+  if (!sp) return null;
+  const m = playerModel(await sp.player(), Date.now());
+  const id = m && m.track ? m.track.id : '';
+  if (id !== TM.lastTrack){
+    TM.lastTrack = id; TM.lyrics = null; TM.lyricsFor = ''; TM.story = null; TM.storyFor = ''; TM.notes = null; TM.notesFor = ''; TM.notePage = 0; TM.shownLine = -2;
+    if (m && m.track){
+      loadLyrics(m.track).then(l => { if (TM.lastTrack === m.track.id){ TM.lyrics = l; TM.lyricsFor = m.track.id; render(); } });
+      sp.queue().then(q => { TM.queue = ((q && q.queue) || []).map(trackOf).filter(Boolean).slice(0, 3); render(); }, () => {});
+      if (TM.view === 'notes') tmNotes();
+    }
+  }
+  return m;
+}
+/** Ask Spotify again shortly, after a command. */
+function tmSoon(ms){ const s = SRC.music; s.last = Date.now() - s.every() + (ms || 700); }
+async function tmAct(fn, after){
+  const sp = tmSp(); if (!sp) return;
+  try { await fn(sp); SRC.music.err = null; }
+  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
+  tmSoon(after);
+}
+const tmDevice = () => tmModel() && tmModel().device ? tmModel().device.id : null;
+function tmToggle(){
+  const m = tmModel();
+  if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
+  return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
+}
+const tmNext = () => tmAct(sp => sp.next(tmDevice()), 600);
+const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
+/** A favourite from the number keys: a playlist or album, from the top. */
+function tmFavourite(i){
+  const f = tmFavs()[i];
+  if (!f){ toast('No favourite on ' + (i + 1) + '. Choose them on your phone: Screen, then Spotify on the TV.', 5000); return; }
+  toast('Playing ' + f.name, 3000);
+  tmAct(sp => sp.play({ device: tmDevice(), context: f.uri }).catch(e => {
+    if (e.code !== 'NO_DEVICE') throw e;
+    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: f.uri }); });
+  }), 900);
+}
+/** Favourites: chosen on the phone, or else your first playlists. */
+function tmFavs(){
+  const mine = store.getJ('musicFavs', null);
+  if (mine && mine.length) return mine.slice(0, 9);
+  return (SRC.shelf.data && SRC.shelf.data.playlists || []).slice(0, 5).map(p => ({ uri: p.uri, name: p.name }));
+}
+/** Your saved albums and playlists, for the album wall and the default favourites: read a few times a day. */
+async function tmShelf(){
+  const sp = tmSp(); if (!sp) return null;
+  const al = await sp.albums(0), pl = await sp.playlists(0);
+  return { albums: page(al).items.map(x => x.album || x).filter(x => x && x.id).slice(0, 24), playlists: page(pl).items.filter(x => x && x.id) };
+}
+async function tmNotes(){
+  const t = tmTrack(); if (!t || TM.notesFor === t.id) return;
+  TM.notesFor = t.id; TM.notes = null; render();
+  try {
+    if (TM.storyFor !== t.id){ TM.story = await songStory(t); TM.storyFor = t.id; }
+    TM.notes = TM.story && TM.story.credits ? await linerNotes(TM.story.credits.releases) : [];
+  } catch(e){ TM.notes = []; }
+  if (tmTrack() && tmTrack().id === t.id) render();
+}
+
+/* ---------- the sleep timer, and fading out as the night window starts ---------- */
+/** From the phone: sleep in so many minutes (0 turns it off), or at the end of this song. */
+function tmSleep(mins, song){
+  TM.sleepAt = 0; TM.sleepSong = '';
+  if (song && tmTrack()){ TM.sleepSong = tmTrack().id; toast('The music stops at the end of this song.', 4000); }
+  else if (mins > 0){ TM.sleepAt = Date.now() + mins * MIN; toast('The music fades out in ' + mins + ' minutes.', 4000); }
+  else toast('Sleep timer off.', 3000);
+  render(); tellRemote('Sleep timer ' + (TM.sleepSong ? 'at the end of the song' : TM.sleepAt ? hhmm(TM.sleepAt) : 'off'));
+}
+/** Turns it down over a minute (or a few seconds), pauses, then puts the volume back for next time. */
+async function tmFade(secs){
+  const m = tmModel(), sp = tmSp();
+  if (TM.fading || !m || !m.playing || !sp) return;
+  TM.fading = true;
+  const id = tmDevice(), v0 = m.device && m.device.canVolume && m.device.volume != null ? m.device.volume : null, steps = 10;
+  try {
+    if (v0 != null) for (let i = 1; i < steps; i++){ await sp.volume(Math.round(v0 * (1 - i / steps)), id); await new Promise(r => setTimeout(r, secs * 1000 / steps)); }
+    await sp.pause(id);
+    if (v0 != null){ await new Promise(r => setTimeout(r, 1500)); await sp.volume(v0, id); }
+  } catch(e){}
+  TM.fading = false; TM.sleepAt = 0; TM.sleepSong = '';
+  tmSoon(500); render(); tellRemote('Music faded out');
+}
+/** Every second: the sleep timer's moment, and the start of the night window. */
+function tmTick(now){
+  if (!TM.acc) return;
+  if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
+  const m = tmModel();
+  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading) tmFade(60);
+  if (TM.sleepSong && m && m.track){
+    if (m.track.id !== TM.sleepSong){ TM.sleepSong = ''; tmAct(sp => sp.pause(tmDevice())); }
+    else if (m.track.dur - progressAt(m, now) < 9000 && !TM.fading) tmFade(8);
+  }
+  const night = D.set.night && inWindow(now, D.set.nightFrom, D.set.nightTo);
+  // only as the window starts: a screen that wakes up or reloads in the night (the fresh start is at 03:30) leaves it be
+  if (night && TM.wasNight === false && D.set.musicNight !== false && m && m.playing) tmFade(60);
+  TM.wasNight = night;
+  if (shown() === 'music') tmTickView(now);
+}
+
+/* ---------- the Music view ---------- */
+function tmTickView(now){
+  const m = tmModel(), t = tmTrack();
+  if (!m || !t) return;
+  const pos = progressAt(m, now);
+  const bar = $('#mBar'); if (bar) bar.style.width = (t.dur ? Math.min(100, pos / t.dur * 100) : 0).toFixed(2) + '%';
+  const p = $('#mPos'); if (p) p.textContent = fmtDur(pos);
+  const r = $('#mLeft'); if (r) r.textContent = '-' + fmtDur(Math.max(0, t.dur - pos));
+  const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
+  if (lines && TM.view !== 'notes'){ const i = lyricAt(lines, pos + 250); if (i !== TM.shownLine){ TM.shownLine = i; tmLyricsHtml(lines, i); } }
+}
+function tmLyricsHtml(lines, i){
+  const el = $('#mLyrics'); if (!el) return;
+  const full = TM.view === 'lyrics', from = full ? Math.max(0, i - 2) : Math.max(0, i), n = full ? 7 : 3;
+  el.innerHTML = lines.slice(from, from + n).map((l, k) => `<p class="${from + k === i ? 'now' : from + k < i ? 'done' : ''}">${esc(l.text || '♪')}</p>`).join('');
+}
+function renderMusic(){
+  const sec = $('section[data-mode="music"]');
+  const m = tmModel(), t = tmTrack();
+  sec.className = 'mode music-mode view-' + TM.view;
+  $('#mEmpty').hidden = !!(TM.acc && t);
+  $('#mMain').hidden = !(TM.acc && t);
+  if (!TM.acc){
+    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Spotify isn\'t on this screen yet</p><p class="note">On your phone: Screen, then <b>Connect Spotify on the TV</b>. It\'s sealed with the PIN, like the Octopus account.</p>';
+    $('#mFoot').innerHTML = '<span>Spotify</span>'; return;
+  }
+  if (!t){
+    const e = SRC.music.err;
+    $('#mEmpty').innerHTML = '<p class="label">Music</p><p class="big">Nothing playing</p><p class="note">' + (e ? esc(spotifyErrorText(e).join(' ')) : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, or play on any Spotify device.' : 'Play on any Spotify device and it shows here.')) + '</p>' + tmFavsHtml() + tmWallHtml();
+    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
+  }
+  const art = artUrl(t.images, 640);
+  if ($('#mCover').getAttribute('src') !== art){ $('#mCover').setAttribute('src', art); $('#mNeb').setAttribute('src', artUrl(t.images, 300)); }
+  $('#mWhere').textContent = (m.playing ? 'Playing on ' : 'Paused on ') + (m.device ? m.device.name : 'Spotify') + (TM.sleepAt ? ' · sleep at ' + hhmm(TM.sleepAt) : TM.sleepSong ? ' · stopping after this song' : '');
+  $('#mTitle').textContent = t.name;
+  $('#mArtist').textContent = t.artist + (t.album.name && !t.episode ? ' · ' + t.album.name : '');
+  $('#mState').className = 'mstate ' + (m.playing ? 'on' : 'off');
+  if (!$('#mState').firstChild) $('#mState').innerHTML = '<i></i><i></i><i></i>';
+  const q = TM.queue && TM.queue.length ? TM.queue[0] : null;
+  $('#mNext').innerHTML = q ? '<span class="label">Up next</span> ' + esc(q.name) + ' <span class="muted">· ' + esc(q.artist) + '</span>' : '';
+  const lines = TM.lyrics && TM.lyrics.synced && TM.lyricsFor === t.id ? TM.lyrics.synced : null;
+  if (TM.view === 'notes') tmNotesHtml();
+  else if (lines){ TM.shownLine = -2; tmTickView(Date.now()); }
+  else $('#mLyrics').innerHTML = TM.lyricsFor === t.id || TM.lyrics ? '<p class="note">' + (TM.lyrics && TM.lyrics.instrumental ? 'An instrumental.' : 'No timed lyrics for this one.') + '</p>' : '';
+  tmTickView(Date.now());
+  $('#mFoot').innerHTML = '<span>OK play or pause · ◀ ▶ skip · ▼ ' + (TM.view === 'player' ? 'lyrics' : TM.view === 'lyrics' ? 'liner notes' : 'back to the player') + ' · 1–' + Math.max(1, tmFavs().length) + ' favourites</span>' + (TM.acc.name ? '<span>Spotify · ' + esc(TM.acc.name) + '</span>' : '');
+}
+/** The album wall: covers from your shelf, a different few each hour. */
+function tmWallHtml(){
+  const al = (SRC.shelf.data && SRC.shelf.data.albums || []).filter(a => a.images && a.images.length);
+  if (!al.length) return '';
+  const start = Math.floor(Date.now() / 3600e3) % al.length, n = Math.min(7, al.length), out = [];
+  for (let i = 0; i < n; i++) out.push(`<img src="${esc(artUrl(al[(start + i) % al.length].images, 300))}" alt="">`);
+  return '<div class="mwall" aria-hidden="true">' + out.join('') + '</div>';
+}
+function tmFavsHtml(){
+  const f = tmFavs();
+  return f.length ? '<ol class="favs">' + f.map((x, i) => `<li><b class="mono">${i + 1}</b>${esc(x.name)}</li>`).join('') + '</ol>' : '';
+}
+function tmNotesHtml(){
+  const el = $('#mLyrics'), n = TM.notes;
+  if (!n){ el.innerHTML = '<p class="note">Finding the sleeve and booklet…</p>'; return; }
+  if (!n.length){ el.innerHTML = '<p class="note">No scans of this release in the Cover Art Archive yet.</p>'; return; }
+  const i = Math.max(0, Math.min(n.length - 1, TM.notePage)), im = n[i];
+  el.innerHTML = `<figure class="note-page"><img src="${esc(im.thumb)}" alt=""><figcaption class="label">${esc((im.types || []).join(', ') || 'Artwork')} · ${i + 1} of ${n.length} · ◀ ▶ to turn</figcaption></figure>`;
+}
+/**
+ * The remote in the Music view: OK plays or pauses, left and right skip (or turn the liner notes), down changes view,
+ * numbers play favourites. With nothing playing, the arrows and OK do what they do everywhere else.
+ */
+function tmKey(e){
+  if (!TM.acc) return false;
+  if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
+  if (!tmTrack()) return false;
+  if (e.key === 'Enter'){ tmToggle(); return true; }
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    const fwd = e.key === 'ArrowRight';
+    if (TM.view === 'notes' && TM.notes && TM.notes.length){ TM.notePage = Math.max(0, Math.min(TM.notes.length - 1, TM.notePage + (fwd ? 1 : -1))); tmNotesHtml(); }
+    else (fwd ? tmNext : tmPrev)();
+    return true;
+  }
+  if (e.key === 'ArrowDown'){ TM.view = TM_VIEWS[(TM_VIEWS.indexOf(TM.view) + 1) % TM_VIEWS.length]; if (TM.view === 'notes') tmNotes(); TM.shownLine = -2; renderMusic(); return true; }
+  return false;
+}
+/** Media keys, on any view: play and pause, next and previous. */
+const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaPlay: 'toggle', MediaPause: 'toggle', MediaTrackNext: 'next', MediaTrackPrevious: 'prev', 179: 'toggle', 415: 'toggle', 19: 'toggle', 176: 'next', 417: 'next', 177: 'prev', 412: 'prev' };
+function tmMediaKey(e){
+  const a = MEDIA_KEYS[e.key] || MEDIA_KEYS[e.keyCode];
+  if (!a || !TM.acc) return false;
+  if (a === 'toggle') tmToggle(); else if (a === 'next') tmNext(); else tmPrev();
+  return true;
+}
+
+/* ---------- elsewhere: a line on Today, and cards for the screensaver ---------- */
+function tmTodayHtml(){
+  const m = tmModel(), t = tmTrack();
+  if (!t || !m.playing) return '';
+  return `<span class="np-ic">♪</span><b>${esc(t.name)}</b> <span class="muted">· ${esc(t.artist)}${m.device ? ' · ' + esc(m.device.name) : ''}</span>`;
+}
+/** From the phone, sealed: this screen's own Spotify sign-in. */
+function tmTake(acc){
+  saveSpotifyStore({ accounts: [acc], active: acc.id });
+  TM.acc = acc; TM.lastTrack = '';
+  ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
+}

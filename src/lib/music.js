@@ -152,3 +152,25 @@ export function coverColours(px){
   const lum = (.2126 * main[0] + .7152 * main[1] + .0722 * main[2]) / 255;
   return { main: hex(main[0], main[1], main[2]), deep: hex(deep[0], deep[1], deep[2]), ink: lum > .5 ? '#06071a' : '#ffffff', hue: Math.round(h) };
 }
+
+/* ---------- the screensaver's billboards ---------- */
+/**
+ * Cards for the cockpit's billboards (the shape buildBillboards makes, with a cover as img): the song playing, often;
+ * or, when nothing is, the album wall (six covers from your shelf, as wall) and one album from it, both changing each hour.
+ */
+export function musicCards(m, albums, now){
+  const out = [];
+  if (m && m.track && m.playing){
+    const t = m.track;
+    out.push({ id: 'music', kind: 'music', tone: 'cyan', head: 'Now playing', big: t.name, sub: t.artist + (m.device ? ' · ' + m.device.name : ''), img: artUrl(t.images, 300), weight: 2 });
+    return out;
+  }
+  const list = (albums || []).filter(a => a && a.images && a.images.length);
+  if (!list.length) return out;
+  const start = Math.floor((now == null ? Date.now() : now) / 3600e3) % list.length;
+  const at = i => list[(start + i) % list.length];
+  if (list.length >= 6) out.push({ id: 'albums', kind: 'music', tone: 'violet', head: 'Your record shelf', big: '', sub: list.length + ' albums saved in Spotify', wall: [0, 1, 2, 3, 4, 5].map(i => artUrl(at(i).images, 300)), weight: 1 });
+  const a = at(0);
+  out.push({ id: 'album-' + a.id, kind: 'music', tone: 'violet', head: 'From your shelf', big: a.name, sub: (a.artists || []).map(x => x.name).join(', '), img: artUrl(a.images, 300), weight: 1 });
+  return out;
+}

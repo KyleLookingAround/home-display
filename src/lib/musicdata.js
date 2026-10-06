@@ -7,16 +7,16 @@
 // MusicBrainz looks up exactly; without one, it's searched by title and artist.
 
 export const MB = 'https://musicbrainz.org/ws/2';
-const wait = ms => new Promise(r => setTimeout(r, ms));
+const mbWait = ms => new Promise(r => setTimeout(r, ms));
 let mbNext = 0;
 /** One MusicBrainz request, a second after the last; null when it has nothing (or is too busy twice). */
 export async function mbGet(path, tries){
   const now = Date.now(), at = Math.max(now, mbNext);
   mbNext = at + 1100;
-  if (at > now) await wait(at - now);
+  if (at > now) await mbWait(at - now);
   let res;
   try { res = await fetch(MB + path + (path.indexOf('?') >= 0 ? '&' : '?') + 'fmt=json'); } catch(e){ return null; }
-  if (res.status === 503 && !tries){ await wait(1500); return mbGet(path, 1); }
+  if (res.status === 503 && !tries){ await mbWait(1500); return mbGet(path, 1); }
   if (!res.ok) return null;
   try { return await res.json(); } catch(e){ return null; }
 }

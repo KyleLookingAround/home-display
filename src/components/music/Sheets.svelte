@@ -6,6 +6,8 @@
    */
   import { music, setView, setVinyl, closePlayer, say } from '../../state/music.svelte.js';
   import { qrSvg } from '../../lib/qr.js';
+  import { store } from '../../lib/browser.js';
+  import { cleanCode, sendRemote } from '../../lib/remote.js';
   import Icon from './Icon.svelte';
   const t = $derived(music.track);
   const link = $derived(t ? (t.episode ? 'https://open.spotify.com/episode/' : 'https://open.spotify.com/track/') + t.id : '');
@@ -13,6 +15,14 @@
   async function share(){ try { await navigator.share({ title: t.name, text: `${t.name} by ${t.artist}`, url: link }); } catch (e){} }
   async function copy(){ try { await navigator.clipboard.writeText(link); say('Link copied'); } catch (e){ say('Couldn\'t copy: ' + link); } }
   const close = () => { music.over = ''; };
+  // The sleep timer runs on the paired TV, which is always on (display/tvmusic.js), so it works with this phone locked.
+  const tvCode = $derived(music.over ? cleanCode(store.get('remoteTV')) : null);
+  const SLEEP = [[15, 'In 15 minutes'], [30, 'In 30 minutes'], [45, 'In 45 minutes'], [60, 'In an hour'], ['song', 'At the end of this song'], [0, 'Turn it off']];
+  async function sleep(v){
+    const ok = await sendRemote(tvCode, { from: 'phone', cmd: 'sleep', mins: v === 'song' ? 0 : v, song: v === 'song' });
+    say(!ok ? 'The relay didn\'t take that. Try again.' : v === 0 ? 'Sleep timer off' : v === 'song' ? 'Stopping after this song' : `Fading out in ${v} minutes`);
+    if (ok) close();
+  }
 </script>
 
 {#if music.over && t}
@@ -24,9 +34,20 @@
         <Icon name="disc" /><span>Vinyl mode<small>The cover as a record on a turntable</small></span><i class="sw" class:on={music.vinyl}></i></button>
       {#if !t.episode}<button type="button" class="opt" onclick={() => setView('about')}><Icon name="info" /><span>About this song<small>The story, the credits, the artist</small></span></button>
       <button type="button" class="opt" onclick={() => setView('notes')}><Icon name="book" /><span>Liner notes<small>The sleeve and booklet</small></span></button>{/if}
+      <button type="button" class="opt" onclick={() => { music.over = 'sleep'; }}><Icon name="moon" /><span>Sleep timer<small>{tvCode ? 'The TV fades it out' : 'Needs your TV paired, on Screen'}</small></span></button>
       <button type="button" class="opt" onclick={() => { music.over = 'share'; }}><Icon name="share" /><span>Share this song<small>A code to scan, or the link</small></span></button>
       {#if t.album.id && !t.episode}<a class="opt" href="./music.html#album/{t.album.id}" onclick={() => closePlayer()}><Icon name="album" /><span>Go to the album<small>{t.album.name}</small></span></a>{/if}
       {#if t.artists[0] && t.artists[0].id && !t.episode}<a class="opt" href="./music.html#artist/{t.artists[0].id}" onclick={() => closePlayer()}><Icon name="person" /><span>Go to the artist<small>{t.artists[0].name}</small></span></a>{/if}
+    </div>
+  {:else if music.over === 'sleep'}
+    <div class="sheet-panel" role="dialog" aria-label="Sleep timer">
+      <div class="shead"><span class="label">Sleep timer</span><button class="ib" type="button" aria-label="Close" onclick={close}><Icon name="down" /></button></div>
+      {#if tvCode}
+        {#each SLEEP as [v, l]}<button type="button" class="opt" onclick={() => sleep(v)}><Icon name={v === 0 ? 'other' : 'moon'} /><span>{l}{#if v !== 0}<small>{v === 'song' ? 'Then it pauses' : 'Fading out over the last minute'}</small>{/if}</span></button>{/each}
+        <p class="note foot">The TV keeps the time, so it works with this phone locked. It needs Spotify on the TV too.</p>
+      {:else}
+        <p class="note foot">The sleep timer runs on the TV, which is always on. Pair your TV first, then sign it in to Spotify: <a href="./screen.html#spotify" onclick={() => closePlayer()}>Screen</a>.</p>
+      {/if}
     </div>
   {:else if music.over === 'share'}
     <div class="sheet-panel share" role="dialog" aria-label="Share this song">
@@ -66,6 +87,7 @@
   .share .shead{justify-self:stretch}
   .qr{width:min(64vw,230px);aspect-ratio:1;background:#fff;border-radius:var(--radius-sm);padding:6px}
   .qr :global(svg){display:block;width:100%;height:100%}
+  .foot{margin:6px 10px 0}
   .what{margin:0;display:grid;gap:2px}
   .what b{font-size:17px}
   .what span{color:var(--muted);font-size:14px}

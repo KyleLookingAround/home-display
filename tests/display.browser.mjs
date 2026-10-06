@@ -195,7 +195,7 @@ async function layout(page){
 }
 async function shot(page, name){ if (SHOTS) await page.screenshot({ path: join(SHOTS, name + '.png') }); }
 
-const MODES = ['today', 'energy', 'travel', 'screensaver', 'night'];
+const MODES = ['today', 'energy', 'travel', 'screensaver', 'night', 'music'];
 
 test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll', async () => {
   for (const withHelper of [true, false]) {
@@ -359,6 +359,8 @@ test('display: the remote control drives everything', async () => {
   assert.equal(await page.evaluate(() => location.hash), '#energy');
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
+  assert.equal(await visibleMode(page), 'music');
+  await page.keyboard.press('ArrowLeft');                // with no music on, the arrows still change view
   assert.equal(await visibleMode(page), 'night');
   await page.keyboard.press('3');
   assert.equal(await visibleMode(page), 'travel');
@@ -372,6 +374,8 @@ test('display: the remote control drives everything', async () => {
   await page.keyboard.press('Enter');
   assert.equal(await visibleMode(page), 'screensaver');
   await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.mode), 'music');
+  await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'wifiBtn', 'guest Wi-Fi is on the toolbar');
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'setBtn');

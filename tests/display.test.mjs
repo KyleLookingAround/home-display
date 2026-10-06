@@ -23,8 +23,10 @@ test('modes come from the link and wrap round with left and right', () => {
   assert.equal(A.modeFromHash('#TRAVEL', 'energy'), 'travel');
   assert.equal(A.modeFromHash('#nonsense', 'energy'), 'energy');
   assert.equal(A.modeFromHash('', 'night'), 'night');
-  assert.equal(A.stepMode('today', -1), 'night');
-  assert.equal(A.stepMode('night', 1), 'today');
+  assert.equal(A.stepMode('today', -1), 'music');
+  assert.equal(A.stepMode('night', 1), 'music');
+  assert.equal(A.stepMode('music', 1), 'today');
+  assert.equal(A.modeFromHash('#music', 'today'), 'music');
   assert.equal(A.stepMode('energy', 1), 'travel');
   assert.equal(A.displaySettings({ mode: 'home' }).mode, 'today');
 });
@@ -61,6 +63,26 @@ test('details go to the TV sealed with the PIN: the wrong PIN or code opens noth
   assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'wifi' })).cmd, 'wifi');
   assert.equal(R.readRemote(msg({ from: 'phone', cmd: 'shell', mode: 'x' })), null);
   assert.equal(R.cleanCode('abcd-efgh'), 'ABCDEFGH'); assert.equal(R.cleanCode('abcd-efg0'), null);
+});
+
+test('the TV gets its own Spotify sign-in sealed, and takes only a sleep timer and favourites besides', async () => {
+  const R = await import('../src/lib/remote.js');
+  const spotify = { id: 'kyle', name: 'Kyle', product: 'premium', client: '4ee18df2817b461d9e6fb53740703f89', refresh: 'AQD-refresh-token-for-the-tv', access: 'BQ-access', exp: 123 };
+  const box = await R.sealDetails('ABCDEFGH', 'hashed-pin', { spotify });
+  assert.doesNotMatch(JSON.stringify(box), /refresh-token|BQ-access/, 'nothing readable in the box');
+  const got = await R.openDetails('ABCDEFGH', 'hashed-pin', box);
+  assert.deepEqual(got.spotify, Object.assign({}, spotify, { scope: '' }));
+  const bad = await R.sealDetails('ABCDEFGH', 'hashed-pin', { spotify: Object.assign({}, spotify, { client: 'not-a-client-id' }) });
+  assert.equal(await R.openDetails('ABCDEFGH', 'hashed-pin', bad), null, 'a malformed sign-in is dropped');
+  const msg = m => R.readRemote(JSON.stringify({ event: 'message', message: JSON.stringify(m) }));
+  assert.deepEqual([msg({ from: 'phone', cmd: 'sleep', mins: 30 }).mins, msg({ from: 'phone', cmd: 'sleep', song: true }).song], [30, true]);
+  assert.equal(msg({ from: 'phone', cmd: 'sleep', mins: 9999 }), null, 'four hours at most');
+  const favs = msg({ from: 'phone', cmd: 'favs', favs: [{ uri: 'spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', name: 'Today\'s Top Hits' }, { uri: 'https://evil.example', name: 'x' }, { uri: 'spotify:album:4aawyAB9vmqN3uQ7FjRGTy', name: 'y'.repeat(200) }] }).favs;
+  assert.deepEqual(favs.map(f => f.uri), ['spotify:playlist:37i9dQZF1DXcBWIGoYBM5M', 'spotify:album:4aawyAB9vmqN3uQ7FjRGTy'], 'only Spotify links');
+  assert.equal(favs[1].name.length, 80);
+  assert.equal(msg({ from: 'phone', cmd: 'favs', favs: new Array(10).fill({ uri: 'spotify:album:4aawyAB9vmqN3uQ7FjRGTy', name: 'x' }) }), null, 'nine at most');
+  const st = msg({ from: 'screen', state: { mode: 'music', shown: 'music', spotify: 'Kyle', sleepAt: 5, sleepSong: 1 } }).state;
+  assert.deepEqual([st.spotify, st.sleepAt, st.sleepSong], ['Kyle', 5, true]);
 });
 
 test('QR codes scan back to what went in, Wi-Fi codes included', async () => {

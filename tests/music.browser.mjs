@@ -142,9 +142,9 @@ let base, browser;
 before(async () => { await new Promise(r => server.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${server.address().port}`; browser = await chromium.launch(); });
 after(async () => { await browser.close(); server.close(); });
 
-const ACCOUNT = (o = {}) => ({ accounts: [Object.assign({ id: 'kyle', name: 'Kyle', product: 'premium', client: 'test-client', refresh: 'ref1', access: 'acc1', exp: Date.now() + 3600e3, scope: '' }, o)], active: 'kyle' });
+const ACCOUNT = (o = {}) => ({ accounts: [Object.assign({ id: 'kyle', name: 'Kyle', product: 'premium', client: 'feedc0ffee0123456789abcdef012345', refresh: 'ref1', access: 'acc1', exp: Date.now() + 3600e3, scope: '' }, o)], active: 'kyle' });
 
-async function open(path, { width = 390, height = 844, sp = spotify(), signedIn = true, account = {}, settings = { spotifyClientId: 'test-client' } } = {}){
+async function open(path, { width = 390, height = 844, sp = spotify(), signedIn = true, account = {}, settings = { spotifyClientId: 'feedc0ffee0123456789abcdef012345' }, keep = {} } = {}){
   const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: 'block' });
   const page = await ctx.newPage(), errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -164,11 +164,11 @@ async function open(path, { width = 390, height = 844, sp = spotify(), signedIn 
   });
   await page.route(/^https:\/\/accounts\.spotify\.com\/api\/token/, r => {
     const f = Object.fromEntries(new URLSearchParams(r.request().postData())); sp.token.push(f);
-    const ok = f.grant_type === 'authorization_code' ? f.code === 'good-code' && f.client_id === 'test-client' && f.code_verifier : f.grant_type === 'refresh_token' && f.refresh_token === 'ref1';
+    const ok = f.grant_type === 'authorization_code' ? f.code === 'good-code' && f.client_id === 'feedc0ffee0123456789abcdef012345' && f.code_verifier : f.grant_type === 'refresh_token' && f.refresh_token === 'ref1';
     return r.fulfill({ status: ok ? 200 : 400, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify(ok ? { access_token: f.grant_type === 'refresh_token' ? 'acc2' : 'acc1', token_type: 'Bearer', expires_in: 3600, refresh_token: 'ref1', scope: 'user-read-playback-state' } : { error: 'invalid_grant' }) });
   });
   await openLibraries(page);
-  await page.addInitScript(([s, a]) => { try { localStorage.setItem('hse.display', s); if (a) localStorage.setItem('hse.spotify', a); } catch (e) {} }, [JSON.stringify(settings), signedIn ? JSON.stringify(ACCOUNT(account)) : null]);
+  await page.addInitScript(([s, a, k]) => { try { localStorage.setItem('hse.display', s); if (a) localStorage.setItem('hse.spotify', a); for (const x in k) localStorage.setItem(x, k[x]); } catch (e) {} }, [JSON.stringify(settings), signedIn ? JSON.stringify(ACCOUNT(account)) : null, keep]);
   await page.goto(base + path);
   await page.waitForTimeout(600);
   return { page, ctx, errors, sp };
@@ -193,12 +193,12 @@ test('music: connecting Spotify signs in with PKCE and lands back where you star
   await page.waitForURL(/music\.html/, { timeout: 8000 });
   await until(() => page.locator('.mini').count().then(n => n === 1), 'the strip after signing in');
   const a = sp.authorize, f = sp.token[0];
-  assert.equal(a.code_challenge_method, 'S256'); assert.equal(a.client_id, 'test-client');
+  assert.equal(a.code_challenge_method, 'S256'); assert.equal(a.client_id, 'feedc0ffee0123456789abcdef012345');
   assert.match(a.redirect_uri, /\/settings\.html$/);
   assert.equal(createHash('sha256').update(f.code_verifier).digest('base64url'), a.code_challenge, 'the verifier matches the challenge sent earlier');
   assert.ok(a.scope.split(' ').includes('user-modify-playback-state'));
   const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('hse.spotify')));
-  assert.equal(kept.accounts[0].name, 'Kyle'); assert.equal(kept.accounts[0].refresh, 'ref1'); assert.equal(kept.accounts[0].client, 'test-client');
+  assert.equal(kept.accounts[0].name, 'Kyle'); assert.equal(kept.accounts[0].refresh, 'ref1'); assert.equal(kept.accounts[0].client, 'feedc0ffee0123456789abcdef012345');
   assert.equal(await page.evaluate(() => localStorage.getItem('hse.spotifyAuth')), null, 'the one-off verifier is gone');
   await page.goto(base + '/settings.html#music'); await page.waitForTimeout(500);
   assert.match(await page.textContent('#music'), /Kyle.*Premium/s);
@@ -339,7 +339,7 @@ test('music: an expired sign-in is refreshed, and what goes wrong is said plainl
   let sp = spotify();
   let o = await open('/index.html', { sp, account: { access: 'old', exp: Date.now() - 1000 } });
   await o.page.locator('.mini').waitFor();
-  assert.ok(sp.token.some(f => f.grant_type === 'refresh_token' && f.refresh_token === 'ref1' && f.client_id === 'test-client'));
+  assert.ok(sp.token.some(f => f.grant_type === 'refresh_token' && f.refresh_token === 'ref1' && f.client_id === 'feedc0ffee0123456789abcdef012345'));
   assert.equal(await o.page.evaluate(() => JSON.parse(localStorage.getItem('hse.spotify')).accounts[0].access), 'acc2', 'the new token is kept');
   await o.ctx.close();
   // Spotify turns a token down mid-session: refreshed and tried again, once
@@ -472,6 +472,162 @@ test('music: looks like the rest of the app, sharp corners and all', async () =>
   const play = await page.evaluate(() => getComputedStyle(document.querySelector('.sheet .ctl .big')).backgroundColor);
   assert.equal(play, 'rgb(79, 214, 255)', 'the play button is the app\'s cyan');
   assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.sheet .glance')).borderTopLeftRadius), '4px');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+/* ---------- the TV ---------- */
+// ntfy.sh, faked: each stream delivers the given messages, and what's sent is kept.
+async function relay(page, deliver, retry = 60000){
+  const sent = [];
+  await page.route(/^https:\/\/ntfy\.sh\//, async r => {
+    const req = r.request();
+    if (req.method() === 'POST'){ sent.push({ topic: new URL(req.url()).pathname.slice(1), msg: JSON.parse(req.postData() || '{}') }); return r.fulfill({ json: { event: 'message' }, headers: CORS }); }
+    const body = deliver().map(m => 'data: ' + JSON.stringify({ event: 'message', message: JSON.stringify(m) }) + '\n\n').join('');
+    return r.fulfill({ status: 200, contentType: 'text/event-stream', headers: CORS, body: `retry: ${retry}\n\n` + body });
+  });
+  return sent;
+}
+/** Every bit of text showing on the TV is at least 24px, the ten-foot rule. */
+const smallText = page => page.evaluate(() => [...document.querySelectorAll('section[data-mode="music"] *')].filter(e => e.offsetWidth && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()))
+  .filter(e => parseFloat(getComputedStyle(e).fontSize) < 23.9).map(e => e.tagName + '.' + e.className + ': ' + e.textContent.slice(0, 30)));
+
+test('music on the TV: signed in from the phone, sealed, then the Music view with the remote', async () => {
+  const LOCK = 'a1b2c3-hashed-pin', CODE = 'ABCDEFGH';
+  // the phone: paired with the TV, signed in to Spotify itself, and unlocked with the site PIN
+  const phone = await open('/screen.html', { keep: { staticrypt_passphrase: LOCK, 'hse.remoteTV': CODE } });
+  const fromTv = { from: 'screen', state: { mode: 'today', shown: 'today', at: Date.now(), spotify: 'Kyle', sleepAt: 0 } };
+  const phoneSent = await relay(phone.page, () => [fromTv]);
+  await phone.page.reload();
+  const card = phone.page.locator('#spotify');
+  await until(() => card.textContent().then(t => /The TV plays as\s*Kyle/.test(t)).catch(() => false), 'the TV says who it plays as', 8000);
+  await card.locator('.actions button', { hasText: 'Change account' }).click();
+  await phone.page.waitForURL(/screen\.html#spotify/, { timeout: 8000 });
+  assert.equal(phone.sp.authorize.show_dialog, 'true', 'Spotify asks which account, for the TV');
+  await until(() => phoneSent.some(s => s.msg.cmd === 'account' && s.msg.box), 'the sign-in sealed and sent', 8000);
+  const sealed = phoneSent.find(s => s.msg.cmd === 'account').msg;
+  assert.doesNotMatch(JSON.stringify(sealed), /ref1|acc1|kyle/i, 'the relay sees only the sealed box');
+  const mine = await phone.page.evaluate(() => JSON.parse(localStorage.getItem('hse.spotify')));
+  assert.equal(mine.accounts.length, 1, 'the phone keeps only its own sign-in');
+  // the sleep timer and favourites, from the phone
+  await card.locator('.seg button', { hasText: '30 min' }).click();
+  await until(() => phoneSent.some(s => s.msg.cmd === 'sleep' && s.msg.mins === 30), 'sleep in 30 minutes sent');
+  await card.locator('button', { hasText: 'Choose favourites' }).click();
+  await card.locator('.pick button', { hasText: 'Cheap hours' }).click();
+  await card.locator('.pick button', { hasText: 'Region G' }).click();
+  assert.match(await card.locator('.pick button', { hasText: 'Region G' }).textContent(), /2$/, 'numbered in the order chosen');
+  await phone.page.waitForTimeout(300);
+  await shot(phone.page, 'music-screen-tv');
+  await card.locator('button', { hasText: 'Send to the TV' }).click();
+  await until(() => phoneSent.some(s => s.msg.cmd === 'favs'), 'favourites sent');
+  const favs = phoneSent.find(s => s.msg.cmd === 'favs').msg.favs;
+  assert.deepEqual(favs.map(f => f.uri), ['spotify:playlist:p2', 'spotify:album:al1']);
+  // and from the player, wherever you are: More, then Sleep timer
+  await phone.page.evaluate(() => scrollTo(0, 0));
+  await phone.page.locator('.mini').click({ position: { x: 120, y: 20 } });
+  await phone.page.locator('.sheet.open button[aria-label="More"]').click();
+  await phone.page.locator('.sheet-panel .opt', { hasText: 'Sleep timer' }).click();
+  await phone.page.locator('.sheet-panel[aria-label="Sleep timer"]').waitFor();
+  await phone.page.waitForTimeout(400);
+  await shot(phone.page, 'music-sleep');
+  await phone.page.locator('.sheet-panel .opt', { hasText: 'At the end of this song' }).click();
+  await until(() => phoneSent.some(s => s.msg.cmd === 'sleep' && s.msg.song === true), 'stop at the end of the song, sent');
+  assert.deepEqual(phone.errors, []);
+  await phone.ctx.close();
+
+  // the TV: no Spotify of its own until the sealed box arrives
+  const tv = await open('/display.html#music', { width: 1920, height: 1080, signedIn: false, settings: {}, keep: { staticrypt_passphrase: LOCK, 'hse.remote': CODE } });
+  const tvSent = await relay(tv.page, () => [sealed, { from: 'phone', cmd: 'favs', favs }, { from: 'phone', cmd: 'sleep', mins: 30 }]);
+  await tv.page.reload();
+  await until(() => tv.page.evaluate(() => !!localStorage.getItem('hse.spotify')), 'the TV opened the box', 8000);
+  const kept = await tv.page.evaluate(() => JSON.parse(localStorage.getItem('hse.spotify')).accounts[0]);
+  assert.equal(kept.refresh, 'ref1'); assert.equal(kept.client, 'feedc0ffee0123456789abcdef012345');
+  await until(() => tv.page.textContent('#mTitle').then(t => t === 'Harold Street'), 'the song on the TV', 8000);
+  assert.match(await tv.page.textContent('#mWhere'), /Playing on Kitchen speaker · sleep at \d\d:\d\d/);
+  assert.match(await tv.page.textContent('#mArtist'), /The Stockport Satellites · Region G/);
+  await until(() => tv.page.locator('#mLyrics p.now').count().then(n => n === 1), 'the line being sung');
+  await until(() => tv.page.textContent('#mNext').then(t => /Up next\s*Negative Pricing/.test(t)), 'up next');
+  await until(() => tvSent.some(s => s.msg.state && s.msg.state.spotify === 'Kyle' && s.msg.state.sleepAt > Date.now()), 'the TV tells the phone');
+  assert.deepEqual(await smallText(tv.page), [], 'nothing under 24px');
+  await tv.page.waitForTimeout(1300);
+  await shot(tv.page, 'tv-music');
+  // the remote: OK pauses, right skips, 2 plays the second favourite
+  await tv.page.keyboard.press('Enter');
+  await until(() => calls(tv.sp, 'PUT', '/me/player/pause').length === 1, 'paused');
+  assert.equal(await tv.page.getAttribute('#mState', 'class'), 'mstate off', 'shown at once');
+  await tv.page.keyboard.press('ArrowRight');
+  await until(() => calls(tv.sp, 'POST', '/me/player/next').length === 1, 'skipped');
+  await until(() => tv.page.textContent('#mTitle').then(t => t === 'Negative Pricing'), 'the next song', 8000);
+  await tv.page.keyboard.press('2');
+  await until(() => calls(tv.sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:album:al1'), 'favourite 2 played');
+  assert.equal(await tv.page.evaluate(() => location.hash), '#music', 'the number keys stay in Music');
+  await until(() => tv.page.textContent('#mTitle').then(t => t === 'Harold Street'), 'the album playing', 8000);
+  // down: the words, then the liner notes, turned with right
+  await tv.page.keyboard.press('ArrowDown');
+  assert.match(await tv.page.getAttribute('section[data-mode="music"]', 'class'), /view-lyrics/);
+  assert.equal(await tv.page.getAttribute('#picker [data-mode="music"]', 'class'), 'btn', 'the toolbar\'s button keeps its look');
+  await tv.page.keyboard.press('ArrowDown');
+  await until(() => tv.page.locator('.note-page img').count().then(n => n === 1), 'the liner notes', 20000);
+  assert.match(await tv.page.textContent('.note-page'), /1 of 3/);
+  await tv.page.keyboard.press('ArrowRight');
+  assert.match(await tv.page.textContent('.note-page'), /2 of 3/);
+  assert.deepEqual(await smallText(tv.page), []);
+  await tv.page.waitForTimeout(700);
+  await shot(tv.page, 'tv-music-notes');
+  // up still opens the toolbar
+  await tv.page.keyboard.press('ArrowUp');
+  assert.ok(await tv.page.evaluate(() => document.body.classList.contains('chrome-on')));
+  assert.deepEqual(tv.errors, []);
+  await tv.ctx.close();
+});
+
+test('music on the TV: on Today, in the screensaver, and fading out at bedtime', async () => {
+  const sp = spotify();
+  const { page, ctx, errors } = await open('/display.html#today', { width: 1920, height: 1080, sp, settings: {} });
+  let queue = [];
+  await relay(page, () => { const q = queue; queue = []; return q; }, 300);
+  await page.reload();
+  await until(() => page.textContent('#dMusic').then(t => /Harold Street · The Stockport Satellites · Kitchen speaker/.test(t)), 'a line on Today');
+  await shot(page, 'tv-today-music');
+  // the screensaver: the cover beside the song, on a billboard
+  await page.keyboard.press('4');
+  await until(() => page.locator('.board.has-img').count().then(n => n > 0), 'the song on a billboard', 30000);
+  assert.match(await page.locator('.board.has-img').first().textContent(), /Now playing\s*Harold Street\s*The Stockport Satellites · Kitchen speaker/);
+  assert.match(await page.locator('.board.has-img img').first().getAttribute('src'), /i\.scdn\.co/);
+  await until(() => page.locator('.board.has-img').first().boundingBox().then(b => b && b.x < 1300), 'the billboard in view', 30000);
+  await shot(page, 'tv-screensaver-music');
+  // media keys work on any view
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'MediaPlayPause', bubbles: true })));
+  await until(() => calls(sp, 'PUT', '/me/player/pause').length === 1, 'paused from a media key');
+  // the Music view with nothing playing lists the favourites: your first playlists until you choose
+  sp.state = null;
+  await page.keyboard.press('6');
+  await until(() => page.textContent('#mEmpty').then(t => /Nothing playing.*1\s*Friday night\s*2\s*Cheap hours/s.test(t)), 'nothing playing, and the favourites', 8000);
+  assert.equal(await page.locator('.mwall img').count(), 3, 'the album wall: your saved albums');
+  assert.deepEqual(await smallText(page), []);
+  await shot(page, 'tv-music-idle');
+  // the sleep timer, at the end of the song: down in ten steps, a pause, then the volume put back for next time
+  sp.state = { is_playing: true, progress_ms: 196000, timestamp: Date.now(), item: TRACKS[0], shuffle_state: false, repeat_state: 'off', device: DEVICES[0], currently_playing_type: 'track', context: null };
+  await until(() => page.isVisible('#mMain'), 'playing again', 8000);
+  queue = [{ from: 'phone', cmd: 'sleep', song: true }];
+  await until(() => page.textContent('#mWhere').then(t => /stopping after this song/.test(t)), 'the sleep timer set');
+  await until(() => calls(sp, 'PUT', '/me/player/pause').length === 2, 'faded and paused', 15000);
+  await page.waitForTimeout(1800);
+  const vols = calls(sp, 'PUT', '/me/player/volume').map(c => +c.query.volume_percent);
+  assert.deepEqual(vols, [1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => Math.round(45 * (1 - i / 10))).concat([45]), 'down in steps from 45, then back to 45');
+  // as the night clock's window starts, it fades by itself (here, set to start a moment ago)
+  sp.state.is_playing = true; sp.state.progress_ms = 0;
+  await until(() => page.getAttribute('#mState', 'class').then(c => c === 'mstate on'), 'playing again', 8000);
+  const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()).split(':').map(Number);
+  const slot = n => String(Math.floor(n / 60) % 24).padStart(2, '0') + ':' + String(n % 60).padStart(2, '0'), from = h * 60 + (m < 30 ? 0 : 30);
+  await page.keyboard.press('s');                                   // the night clock off first, whatever the time of day
+  await page.selectOption('#fNight', '0'); await page.click('#setForm button[type=submit]');
+  await page.waitForTimeout(1500);
+  await page.keyboard.press('s');
+  await page.selectOption('#fNight', '1'); await page.selectOption('#fNightFrom', slot(from)); await page.selectOption('#fNightTo', slot(from + 180));
+  assert.equal(await page.inputValue('#fMusicNight'), '1', 'on unless you turn it off');
+  await page.click('#setForm button[type=submit]');
+  await until(() => calls(sp, 'PUT', '/me/player/volume').length > vols.length, 'starts fading at night', 8000);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

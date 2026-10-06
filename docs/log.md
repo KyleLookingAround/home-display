@@ -4,6 +4,14 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation** (music branch, stage 3): music on the TV.
+  - **Signed in from the phone:** Screen, then "Connect Spotify on the TV". Spotify asks which account; the sign-in is sealed with the site PIN and sent, and the TV keeps its own.
+  - **The Music view** (key 6): the cover, the song, where it's playing, the time, three lines of the words and what's next, over the cover's colours. Down shows the words large, then the liner notes (left and right turn the pages). OK plays and pauses, left and right skip, 1 to 9 play favourites. With nothing on, the favourites and a wall of your albums.
+  - **Elsewhere on the TV:** what's playing under the date on Today; in the screensaver, the song on a billboard with its cover, or with nothing on, the album wall (six covers) and an album from your shelf. Media keys work on any view.
+  - **The sleep timer**, from the phone's player (More) or Screen: in 15, 30, 45 or 60 minutes, or at the end of the song. The TV fades the music out over the last minute, pauses, and puts the volume back.
+  - **The bedtime fade:** the TV fades the music out as the night clock's window starts (a setting on each screen).
+  - **Favourites** for the number keys, chosen on Screen from your playlists and albums.
+  - **Finding:** the Music view first set its look on the toolbar's Music button (the first thing with `data-mode="music"`); it now looks for its own section, and a test checks the button keeps its look.
 - **Update** (music branch): the music player brought into the house style, at Kyle's word ("make sure the music app matches the look and feel").
   - The app's cards, mono labels and corners throughout, sharp ones included.
   - The Music tab opens with what's playing in Syncopate, as Now opens with the price verdict.

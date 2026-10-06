@@ -26,7 +26,7 @@ export const showCode = c => c ? c.slice(0, 4) + '-' + c.slice(4) : '';
 export const remoteTopic = code => 'hse-screen-' + String(code).toLowerCase();
 
 /** What a phone may ask. Anything else on the topic is ignored. */
-export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi'];
+export const REMOTE_CMDS = ['mode', 'wake', 'hello', 'reload', 'account', 'wifi', 'sleep', 'favs'];
 /** A message from the relay's stream (its `data`), as a request for a screen or a screen's answer, or null. */
 export function readRemote(data){
   let m, c;
@@ -34,11 +34,20 @@ export function readRemote(data){
   if (!c || typeof c !== 'object') return null;
   if (c.from === 'phone' && REMOTE_CMDS.indexOf(c.cmd) >= 0){
     if (c.cmd === 'mode' && !MODES.some(x => x.id === c.mode)) return null;
-    if (c.cmd === 'account' && !(c.box && typeof c.box.iv === 'string' && typeof c.box.data === 'string' && c.box.data.length < 2000)) return null;
-    return { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null, box: c.cmd === 'account' ? { iv: c.box.iv, data: c.box.data } : null };
+    if (c.cmd === 'account' && !(c.box && typeof c.box.iv === 'string' && typeof c.box.data === 'string' && c.box.data.length < 3500)) return null;
+    const out = { from: 'phone', cmd: c.cmd, mode: c.cmd === 'mode' ? c.mode : null, box: c.cmd === 'account' ? { iv: c.box.iv, data: c.box.data } : null };
+    // the sleep timer: minutes (0 turns it off, up to four hours) or the end of the song
+    if (c.cmd === 'sleep'){ const m = Math.round(+c.mins || 0); if (!(m >= 0 && m <= 240)) return null; out.mins = m; out.song = !!c.song; }
+    // favourites for the TV remote's number keys: playlists, albums or artists, by name
+    if (c.cmd === 'favs'){
+      if (!Array.isArray(c.favs) || c.favs.length > 9) return null;
+      out.favs = c.favs.filter(f => f && /^spotify:(playlist|album|artist):[A-Za-z0-9]{1,40}$/.test(f.uri) && typeof f.name === 'string').map(f => ({ uri: f.uri, name: f.name.slice(0, 80) }));
+    }
+    return out;
   }
   if (c.from === 'screen' && c.state && MODES.some(x => x.id === c.state.shown)){
-    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account, note: String(c.state.note || '').slice(0, 80) } };
+    return { from: 'screen', state: { mode: MODES.some(x => x.id === c.state.mode) ? c.state.mode : c.state.shown, shown: c.state.shown, at: +c.state.at || 0, account: !!c.state.account,
+      spotify: String(c.state.spotify || '').slice(0, 64), sleepAt: +c.state.sleepAt || 0, sleepSong: !!c.state.sleepSong, note: String(c.state.note || '').slice(0, 80) } };
   }
   return null;
 }
@@ -68,7 +77,7 @@ function boxKey(code, secret){
 }
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
- * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical }.
+ * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp } }.
  */
 export async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -89,5 +98,10 @@ export async function openDetails(code, secret, box){
   if (d.wifi && d.wifi.ssid) out.wifi = { ssid: String(d.wifi.ssid).slice(0, 64), password: String(d.wifi.password || '').slice(0, 64), security: d.wifi.security === 'WEP' || d.wifi.security === 'nopass' ? d.wifi.security : 'WPA', hidden: !!d.wifi.hidden };
   if (Array.isArray(d.dates)) out.dates = d.dates.filter(x => x && x.name && /^\d{4}-\d\d-\d\d$/.test(x.date)).slice(0, 60).map(x => ({ name: String(x.name).slice(0, 60), date: x.date, kind: ['birthday', 'anniversary', 'once'].indexOf(x.kind) >= 0 ? x.kind : 'birthday' }));
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
+  // the TV's own Spotify sign-in (signed in on the phone for the TV, so neither uses up the other's refresh token)
+  const sp = d.spotify;
+  if (sp && /^[\w.-]{1,64}$/.test(String(sp.id)) && /^[0-9a-f]{32}$/.test(String(sp.client)) && typeof sp.refresh === 'string' && sp.refresh.length >= 4 && sp.refresh.length < 600)
+    out.spotify = { id: String(sp.id), name: String(sp.name || sp.id).slice(0, 64), product: String(sp.product || '').slice(0, 20), client: sp.client, refresh: sp.refresh,
+      access: typeof sp.access === 'string' && sp.access.length < 600 ? sp.access : '', exp: +sp.exp || 0, scope: '' };
   return Object.keys(out).length ? out : null;
 }

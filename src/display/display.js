@@ -33,7 +33,10 @@ const SRC = {
   air:     { label: 'Air',     every: () => 60*MIN, need: () => true, run: loadAir },
   floods:  { label: 'Floods',  every: () => 15*MIN, need: () => true, run: loadFloods },
   grid:    { label: 'Grid mix', every: () => 30*MIN, need: () => true, run: () => loadGridMix(CI_REGION[region()]) },
-  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays }
+  holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays },
+  // Spotify (tvmusic.js): every few seconds while the Music view is up, less often while only a line or a cover shows it.
+  music:   { label: 'Spotify', every: () => shown() === 'music' ? 3e3 : (shown() === 'today' || shown() === 'screensaver') ? 15e3 : (TM.sleepAt || TM.sleepSong) ? 15e3 : MIN, need: () => !!tmSp(), run: pollSpotify },
+  shelf:   { label: 'Your albums', every: () => 6*60*MIN, need: () => !!tmSp(), run: tmShelf }
 };
 Object.keys(SRC).forEach(k => Object.assign(SRC[k], { data: null, at: 0, err: null, fails: 0, last: 0, busy: false }));
 
@@ -89,6 +92,7 @@ function tick(){
   const clock = hhmm(now);
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
   tickSign(now);
+  tmTick(now);
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open()) setOverride('night');
@@ -127,6 +131,7 @@ function render(){
   else if (m === 'travel') renderTravel();
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
+  else if (m === 'music') renderMusic();
 }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
@@ -182,6 +187,7 @@ function renderToday(){
   const today = W ? W.days.filter(d => d.k === dayKey(now))[0] : null;
   const cds = countdowns({ dates: s.dates, holidays: SRC.holidays.data, events: SRC.cal.data }, now);
   $('#dDate').textContent = longDay(new Date(now)) + (cds.length ? ' · ' + countdownText(cds[0]) : today ? ` · sunset ${hhmm(today.set)}` : '');
+  setHtml($('#dMusic'), tmTodayHtml());
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
@@ -315,7 +321,7 @@ function cockpitInfo(now){
   return {
     sky, engine: engineFor(cur ? cur.p : null, ci ? ci.index : null), world: Object.assign(worldFor(x, now), { iss }), preview: D.preview,
     voyage, instruments: instrumentsFor(x, now, usual), detail: D.preview.detail || D.set.detail,
-    cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0),
+    cards: buildBillboards(x, now).filter(c => ahead.indexOf(c.id) < 0).concat(musicCards(tmModel(), SRC.shelf.data && SRC.shelf.data.albums, now)),
     hud: { price: cur ? pence(cur.p) : '--', priceTone: cur ? toneOf(cur.p) : 'muted', temp: known ? Math.round(sky.temp) + '°' : '--', wx: known ? weatherText(sky.code).text : '', date: longDay(new Date(now)) }
   };
 }
@@ -336,6 +342,8 @@ function startRemote(){
     else if (r.cmd === 'reload'){ location.reload(); return; }
     else if (r.cmd === 'account'){ takeDetails(r.box); return; }
     else if (r.cmd === 'wifi'){ if (D.override){ D.override = null; applyMode(); } showWifi(); }
+    else if (r.cmd === 'sleep'){ tmSleep(r.mins, r.song); return; }
+    else if (r.cmd === 'favs'){ store.setJ('musicFavs', r.favs); toast(r.favs.length ? 'Favourites for the number keys, from your phone: ' + r.favs.map((f, i) => (i + 1) + ' ' + f.name).join(', ') : 'Favourites cleared: the number keys play your first playlists.', 6000); render(); D.sentState = ''; tellRemote('Favourites saved'); return; }
     D.sentState = ''; tellRemote();
   });
   D.sentState = ''; tellRemote();
@@ -343,10 +351,11 @@ function startRemote(){
 /** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
 function tellRemote(note){
   if (!D.remote || D.embed) return;
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds;
+  const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
+  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong;
   if (key === D.sentState && !note) return;
   D.sentState = key;
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, note: note || '' } });
+  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '' } });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -364,6 +373,7 @@ async function takeDetails(box){
   if (d.wifi){ changes.wifi = d.wifi; got.push('guest Wi-Fi'); }
   if (d.dates){ changes.dates = d.dates; got.push(d.dates.length + (d.dates.length === 1 ? ' date' : ' dates')); }
   if (d.ical){ changes.ical = d.ical; got.push('your calendar'); }
+  if (d.spotify){ tmTake(d.spotify); got.push('Spotify (' + d.spotify.name + ')'); }
   if (Object.keys(changes).length) applySettings(displaySettings(Object.assign({}, D.set, changes)));
   const list = got.length > 1 ? got.slice(0, -1).join(', ') + ' and ' + got[got.length - 1] : got[0];
   toast(`From your phone: ${list}.`, 6000);
@@ -427,6 +437,7 @@ function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
   if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
+  if (!open() && tmMediaKey(e)){ e.preventDefault(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
@@ -447,6 +458,8 @@ function onKey(e){
     if (e.key === 'ArrowDown'){ e.preventDefault(); hideChrome(); return; }
     if (e.key === 'ArrowUp'){ e.preventDefault(); return; }
   } else {
+    // the Music view keeps the arrows, OK and the numbers for the music; up still opens the toolbar
+    if (shown() === 'music' && e.key !== 'ArrowUp' && tmKey(e)){ e.preventDefault(); return; }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){ e.preventDefault(); setMode(stepMode(D.mode, e.key === 'ArrowRight' ? 1 : -1)); return; }
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter'){ e.preventDefault(); showChrome(true); return; }
   }
@@ -485,7 +498,7 @@ function buildSheet(){
 }
 function fillSheet(){
   const s = D.set, setv = (id, v) => { const el = $('#' + id); if (el) el.value = String(v); };
-  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0);
+  setv('fMode', s.mode); setv('fRotate', s.rotate); setv('fSaver', s.saver); setv('fDetail', s.detail); setv('fNight', s.night ? 1 : 0); setv('fMusicNight', s.musicNight === false ? 0 : 1);
   const near = t => { const p = String(t).split(':'); const m = Math.round(((+p[0] || 0)*60 + (+p[1] || 0)) / 30) * 30 % 1440; return `${pad2(Math.floor(m/60))}:${pad2(m % 60)}`; };
   setv('fNightFrom', near(s.nightFrom)); setv('fNightTo', near(s.nightTo)); setv('fReload', near(s.reloadAt)); setv('fRegion', region());
   [0, 1, 2, 3].forEach(i => { const b = s.bins[i] || { name: '', colour: ['black', 'blue', 'brown', 'green'][i], date: '', every: 2 }; setv('bN' + i, b.name); setv('bC' + i, b.colour); setv('bD' + i, b.date ? ukDate(b.date) : ''); setv('bE' + i, b.every || 2); });
@@ -499,7 +512,7 @@ function fillSheet(){
 function readSheet(){
   const v = id => $('#' + id).value.trim();
   const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: parseUkDate(v('bD' + i)), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
-  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
+  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', musicNight: v('fMusicNight') !== '0', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
     bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
 }
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }

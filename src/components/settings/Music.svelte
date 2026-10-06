@@ -22,8 +22,10 @@
     if (isSignInReturn()){
       busy = true;
       try {
-        const { account, back } = await finishSignIn(clientId);
+        const { account, back, forTv } = await finishSignIn(clientId);
         history.replaceState(null, '', location.pathname + '#music');
+        // signed in for the TV: hand it to the Screen page, which seals it and sends it
+        if (forTv){ sessionStorage.setItem('hse-tvSpotify', JSON.stringify(account)); location.assign(back || './screen.html#spotify'); return; }
         reloadAccount();
         msg = `Connected as ${account.name}.` + (account.product && account.product !== 'premium' ? ' This account isn\'t Premium, so the player can show what\'s on but not play, pause or skip.' : '');
         if (back && !/settings\.html/.test(back)) setTimeout(() => location.assign(back), 900);

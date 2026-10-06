@@ -184,6 +184,7 @@ body.lite .dmx{text-shadow:none}
 .btn .k{opacity:.55;margin-right:.45em;font-family:var(--f-mono)}
 .btn:focus,select:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
 .btn::-moz-focus-inner{border:0}
+.bar .btn{padding:.65em .75em;margin-right:.35rem}      /* six views and four actions on one row at 1080p */
 
 /* screensaver: a side window onto space. Space and billboards outside, then close things, the glass, the frame and the cabin. */
 .mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a;--amb:126,146,255}
@@ -220,6 +221,16 @@ body.cockpit #stars{opacity:0}
 .board .bb{display:block;font:700 2.5rem/1.15 var(--f-mono);font-variant-numeric:tabular-nums;margin:.2rem 0;text-shadow:0 0 20px rgba(var(--rgb),.85);overflow-wrap:anywhere}
 .board .bs{display:block;font:500 1.05rem/1.35 var(--f-body);color:#c4cbef}
 .board.long .bb{font-size:2rem}
+/* music on a billboard: the cover beside the song, or the album wall, six covers from your shelf */
+.board.has-img{width:31rem}
+.board.has-img .holo{display:flex;align-items:center}
+.board .art{flex:none;width:7.5rem;height:7.5rem;margin-right:1.1rem;border-radius:.3rem;overflow:hidden;box-shadow:0 0 1.6rem -.3rem rgba(var(--rgb),.9)}
+.board .art img,.board .wall img{display:block;width:100%;height:100%;object-fit:cover}
+.board .tx{flex:1 1 auto;min-width:0}
+.board.has-img .bb,.board.has-wall .bb{font:700 1.75rem/1.2 var(--f-body);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.board.has-wall{width:26rem}
+.board .wall{display:grid;grid-template-columns:7.4rem 7.4rem 7.4rem;grid-template-rows:7.4rem 7.4rem;grid-gap:.4rem;margin:.55rem 0 .45rem}
+.board .wall span{display:block;border-radius:.25rem;overflow:hidden;box-shadow:0 0 1rem -.3rem rgba(var(--rgb),.8)}
 @keyframes holo{0%,100%{opacity:1}46%{opacity:1}47%{opacity:.82}48%{opacity:1}74%{opacity:.94}75%{opacity:1}}
 @keyframes sweep{0%,55%{left:-45%}100%{left:145%}}
 @keyframes pulse{50%{opacity:.3}}
@@ -283,6 +294,63 @@ body.night #stars{opacity:.12}
 .night-clock{font:500 22vw/1 var(--f-mono);letter-spacing:.02em}
 @media (min-width:700px){.night-clock{font-size:8rem}}
 .night-sub{font:500 1.1rem/1.5 var(--f-mono);margin-top:.6rem}
+
+/* music: the cover, the song and its words, over the cover's own colours blurred into a nebula. Lyrics and liner
+   notes are views of the same screen, chosen with the down arrow. */
+.music-mode{position:relative}
+.msky{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none}
+.msky img{position:absolute;top:-15%;left:-15%;width:130%;height:130%;object-fit:cover;opacity:.42;filter:blur(48px) saturate(1.4);transition:opacity 1.2s}
+.msky img:not([src]){opacity:0}
+.msky::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,rgba(4,5,13,.25),rgba(4,5,13,.72) 62%),linear-gradient(0deg,rgba(4,5,13,.85),rgba(4,5,13,0) 45%)}
+.lite .msky img{filter:none;opacity:.25}
+.music-mode > .m-empty{margin:auto;max-width:56rem;text-align:center}
+.mwall{display:flex;justify-content:center;margin-top:2.2rem}
+.mwall img{width:7rem;height:7rem;margin:0 .3rem;border-radius:var(--radius-sm);object-fit:cover;box-shadow:0 .8rem 2rem rgba(0,0,0,.5);opacity:.85}
+.m-empty .big{font:700 2.2rem/1.15 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:.5rem 0 .6rem}
+.m-empty .note{font-size:1.1rem;line-height:1.5}
+.m-empty .note b{color:var(--gas);font-weight:600}
+.favs{list-style:none;margin:1.6rem auto 0;padding:0;display:inline-grid;grid-template-columns:1fr 1fr;grid-gap:.5rem 2.4rem;text-align:left}
+.favs li{font-size:1.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:20rem}
+.favs b{display:inline-block;width:1.7rem;height:1.7rem;line-height:1.7rem;text-align:center;margin-right:.7rem;border-radius:var(--radius-sm);border:1px solid var(--gas);color:var(--gas);font-size:.95rem}
+.m-main{flex:1 1 auto;display:flex;align-items:center;min-height:0;padding:0 1rem}
+.m-cover{flex:none;width:26rem;height:26rem;margin-right:2.6rem;border-radius:var(--radius);overflow:hidden;background:var(--card);box-shadow:0 1.6rem 4rem rgba(0,0,0,.65),0 0 0 1px var(--line);transition:width .6s,height .6s}
+.m-cover img{display:block;width:100%;height:100%;object-fit:cover}
+.view-lyrics .m-cover,.view-notes .m-cover{width:13rem;height:13rem}
+.m-info{flex:1 1 auto;min-width:0}
+.m-where{display:flex;align-items:center}
+.m-where .label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mstate{flex:none;display:inline-flex;align-items:flex-end;height:1rem;width:1.3rem;margin-right:.7rem}
+.mstate i{display:block;width:.26rem;height:100%;margin-right:.13rem;background:var(--gas);border-radius:1px;transform-origin:50% 100%;animation:eq 1.1s ease-in-out infinite}
+.mstate i:nth-child(2){animation-delay:-.4s} .mstate i:nth-child(3){animation-delay:-.75s}
+.mstate.off i{animation:none;transform:scaleY(.3);background:var(--muted)}
+.lite .mstate i{animation:none;transform:scaleY(.7)}
+@keyframes eq{0%,100%{transform:scaleY(.3)}50%{transform:scaleY(1)}}
+.m-title{font:700 2.3rem/1.15 var(--f-display);letter-spacing:.04em;text-transform:uppercase;margin:.55rem 0 .35rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:break-word}
+.m-artist{font-size:1.3rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-prog{margin-top:1.3rem;max-width:40rem}
+.m-rail{height:.3rem;border-radius:.15rem;background:rgba(233,236,255,.14);overflow:hidden}
+.m-rail i{display:block;height:100%;width:0;background:var(--gas);box-shadow:0 0 .8rem rgba(79,214,255,.7)}
+.m-times{display:flex;justify-content:space-between;font-size:.95rem;color:var(--muted);margin-top:.4rem}
+.m-lyrics{margin-top:1.4rem;min-height:7.2rem}
+.m-lyrics p{font:700 1.55rem/1.45 var(--f-body);color:rgba(233,236,255,.3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .4s}
+.m-lyrics p.now{color:var(--ink);text-shadow:0 0 1.2rem rgba(79,214,255,.35)}
+.m-lyrics p.done{color:rgba(233,236,255,.22)}
+.m-lyrics p.note{font:400 1.05rem/1.5 var(--f-body);color:var(--muted);white-space:normal}
+.view-lyrics .m-lyrics{margin-top:1rem}
+.view-lyrics .m-lyrics p{font-size:1.9rem;white-space:normal}
+.view-lyrics .m-title{font-size:1.6rem;-webkit-line-clamp:1}
+.view-lyrics .m-artist{font-size:1.1rem}
+.view-lyrics .m-prog,.view-notes .m-prog,.view-lyrics .m-next,.view-notes .m-next{display:none}
+.note-page{margin:0}
+.note-page img{display:block;max-width:100%;height:20rem;max-height:52vh;border-radius:var(--radius-sm);box-shadow:0 1rem 3rem rgba(0,0,0,.6);background:var(--card)}
+.note-page .label{margin-top:.6rem}
+.m-next{margin-top:1rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.m-next .label{margin-right:.5rem}
+/* Today: what's playing, under the date */
+.date + .np{margin-top:.35rem;font-size:1.05rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34rem}
+.np:empty{display:none}
+.np .np-ic{color:var(--gas);margin-right:.45rem}
+.np b{font-weight:600}
 @keyframes drift-sm{0%{transform:translate(-3vw,-1vh)}33%{transform:translate(2.5vw,1vh)}66%{transform:translate(-2vw,1.5vh)}100%{transform:translate(3vw,-.5vh)}}
 @keyframes drift{0%{transform:translate(-6vw,-4vh)}25%{transform:translate(5vw,-2vh)}50%{transform:translate(4vw,5vh)}75%{transform:translate(-5vw,3vh)}100%{transform:translate(6vw,-3vh)}}
 
@@ -293,6 +361,7 @@ body.night #stars{opacity:.12}
 .sheet .card{margin-top:.8rem}
 .fields{display:flex;flex-wrap:wrap;margin:0 -.5rem}
 .field{margin:.4rem .5rem;flex:1 1 13rem;min-width:0}
+.field.solo{flex:0 1 26rem}
 .field.wide{flex-basis:30rem}
 .field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 .field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.5em .6em;width:100%}
