@@ -91,7 +91,8 @@ function spotify(opts = {}){
     if (p === '/me/tracks') return { json: { items: TRACKS.filter(t => S.liked.has(t.id)).map(t => ({ added_at: '2026-10-01T10:00:00Z', track: t })), next: null, total: S.liked.size } };
     if (p === '/me/playlists') return { json: { items: [{ id: 'p1', uri: 'spotify:playlist:p1', name: 'Friday night', images: img('violet'), owner: { display_name: 'Kyle' }, tracks: { total: 3 } }, { id: 'p2', uri: 'spotify:playlist:p2', name: 'Cheap hours', images: img('cyan'), owner: { display_name: 'Kyle' }, tracks: { total: 2 } }], next: null } };
     if (p === '/me/albums') return { json: { items: Object.values(ALBUMS).map(a => ({ added_at: '2026-09-01T00:00:00Z', album: a })), next: null } };
-    if (p === '/me/player/recently-played') return { json: { items: [TRACKS[2], TRACKS[1]].map((t, i) => ({ played_at: new Date(Date.now() - (i + 1) * 40 * 60e3).toISOString(), track: t })), next: null } };
+    if (p === '/me/player/recently-played') return { json: { items: [[TRACKS[2], 'album', 'spotify:album:al3'], [TRACKS[1], 'playlist', 'spotify:playlist:p1']].map(([t, type, uri], i) => ({ played_at: new Date(Date.now() - (i + 1) * 40 * 60e3).toISOString(), track: t, context: { type, uri } })), next: null } };
+    if (p === '/me/top/artists') return { json: { items: [{ id: 'a1', name: 'The Stockport Satellites', images: img('amber') }, { id: 'a3', name: 'Viaduct', images: img('cyan') }], next: null } };
     if (p === '/playlists/p1') return { json: { id: 'p1', uri: 'spotify:playlist:p1', name: 'Friday night', images: img('violet'), owner: { display_name: 'Kyle' }, description: 'For the end of the week.' } };
     if (p === '/playlists/p1/items') return { json: { items: TRACKS.slice(0, 3).map(t => ({ added_at: '2026-10-01T10:00:00Z', item: t })), next: null, total: 3 } };
     if (/^\/albums\/al\d$/.test(p)){ const a = ALBUMS[p.split('/')[2]]; return { json: Object.assign({}, a, { tracks: { items: TRACKS.filter(t => t.album.id === a.id).map(t => Object.assign({}, t, { album: undefined })), next: null } }) }; }
@@ -218,18 +219,31 @@ test('music: the strip on every page, and the full player', async () => {
   await until(() => calls(sp, 'PUT', '/me/player/seek').some(c => c.query.position_ms === '30000'), 'seek to 0:30');
   await sheet.locator('button[aria-label="Add to liked songs"]').click();
   await until(() => calls(sp, 'PUT', '/me/tracks').length === 1, 'liked');
-  // the lyrics follow the song: at 0:30 the fourth line is being sung
-  await until(() => sheet.locator('.line.now').textContent().then(t => /cheaper time/.test(t)).catch(() => false), 'the line at 0:30');
+  // a glance at the lyric being sung (at 0:30, the fourth line) and what's next
+  await until(() => sheet.locator('.glance.lyr .gl.now').textContent().then(t => /cheaper time/.test(t)).catch(() => false), 'the lyric at 0:30');
+  await until(() => sheet.locator('.glance.nx').textContent().then(t => /Negative Pricing/.test(t)), 'up next: Negative Pricing');
+  await sheet.locator('.where .vol input').fill('30');
+  await until(() => calls(sp, 'PUT', '/me/player/volume').some(c => c.query.volume_percent === '30'), 'volume 30');
+  await page.waitForTimeout(500);
   await shot(page, 'music-player');
-  // Up next
-  await sheet.locator('button[role="tab"]', { hasText: 'Up next' }).click();
-  await until(() => sheet.locator('.queue li').count().then(n => n === 2), 'two songs up next');
-  // Play on: move it to the TV and turn it down
+  // the lyrics, full
+  await sheet.locator('.glance.lyr').click();
+  await until(() => sheet.locator('.lyrics-full .line.now').textContent().then(t => /cheaper time/.test(t)).catch(() => false), 'the line at 0:30');
+  await page.waitForTimeout(500);
+  await shot(page, 'music-lyrics');
+  await sheet.locator('.lyrics-full .line', { hasText: 'Harold Street, Harold Street' }).click();
+  await until(() => calls(sp, 'PUT', '/me/player/seek').some(c => c.query.position_ms === '32000'), 'tapping a line jumps there');
+  // Up next, full
+  await sheet.locator('.vtabs button', { hasText: 'Up next' }).click();
+  await until(() => sheet.locator('.queue-full ol li').count().then(n => n === 2), 'two songs up next');
+  await shot(page, 'music-queue');
+  await sheet.locator('button[aria-label="Back to the player"]').click();
+  // double-tap the cover to like the song (already liked: stays liked); then Play on
+  // Play on: move it to the TV
   await sheet.locator('.dev').click();
   await sheet.locator('.picker .d', { hasText: 'Living room TV' }).waitFor();
+  await page.waitForTimeout(300);
   await shot(page, 'music-play-on');
-  await sheet.locator('.picker .vol input').fill('30');
-  await until(() => calls(sp, 'PUT', '/me/player/volume').some(c => c.query.volume_percent === '30'), 'volume 30');
   await sheet.locator('.picker .d', { hasText: 'Living room TV' }).click();
   await until(() => calls(sp, 'PUT', '/me/player').some(c => c.body.device_ids[0] === 'tv'), 'moved to the TV');
   await until(() => sheet.locator('.dev').textContent().then(t => /Living room TV/.test(t)), 'the player says the TV');
@@ -247,16 +261,22 @@ test('music: the strip on every page, and the full player', async () => {
 test('music: the Music tab searches, plays and queues, and opens albums, playlists and artists', async () => {
   const sp = spotify();
   const { page, ctx, errors } = await open('/music.html', { sp });
-  await page.locator('.libtabs').waitFor();
-  await until(() => page.locator('.tile', { hasText: 'Friday night' }).count().then(n => n === 1), 'playlists');
+  await until(() => page.locator('.row', { hasText: 'Your playlists' }).locator('.tile', { hasText: 'Friday night' }).count().then(n => n === 1), 'your playlists');
+  await until(() => page.locator('.row', { hasText: 'Jump back in' }).locator('.tile').count().then(n => n === 2), 'jump back in: where you played from lately');
+  assert.match(await page.locator('.row', { hasText: 'Jump back in' }).textContent(), /Platform 3.*Friday night/s);
+  assert.match(await page.textContent('.hello h2'), /^Good (morning|afternoon|evening), Kyle$|^Up late, Kyle$/);
+  assert.match(await page.locator('.row', { hasText: 'Your top artists' }).textContent(), /Viaduct/);
+  await page.waitForTimeout(300);
   await shot(page, 'music-library');
-  await page.click('button[role="tab"]:has-text("Liked songs")');
+  await page.click('.sc:has-text("Liked songs")');
   await until(() => page.locator('.tr', { hasText: 'Last Train to Piccadilly' }).count().then(n => n === 1), 'liked songs');
-  await page.click('button[role="tab"]:has-text("Recent")');
+  await page.goto(base + '/music.html#recent');
   await until(() => page.locator('.when', { hasText: 'min ago' }).count().then(n => n >= 1), 'recently played, with when');
+  await page.goto(base + '/music.html'); await page.locator('.hello').waitFor();
   // search
   await page.fill('input[type=search]', 'harold');
   await until(() => page.locator('.tr', { hasText: 'Bins Out Tonight' }).count().then(n => n === 1), 'search results');
+  assert.match(await page.textContent('.topcard'), /Harold Street.*Song/s, 'the best match leads');
   await page.locator('.tr', { hasText: 'Bins Out Tonight' }).locator('.add').click();
   await until(() => calls(sp, 'POST', '/me/player/queue').some(c => c.query.uri === 'spotify:track:t4'), 'queued');
   await until(() => page.locator('.toast', { hasText: 'Added to Up next' }).count().then(n => n === 1), 'says so');
@@ -279,8 +299,11 @@ test('music: the Music tab searches, plays and queues, and opens albums, playlis
   await page.goto(base + '/music.html#playlist/p1');
   await until(() => page.locator('.tr').count().then(n => n === 3), 'the playlist\'s songs');
   assert.match(await page.textContent('.detail'), /Friday night.*Kyle · 3 songs.*For the end of the week/s);
-  await page.click('.dhead .btn.primary');
+  await page.click('.detail .playbig[aria-label="Play Friday night"]');
   await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:playlist:p1'), 'the playlist played');
+  // now it's what's playing, its button pauses it
+  await page.locator('.detail .playbig[aria-label="Pause Friday night"]').click({ timeout: 6000 });
+  await until(() => calls(sp, 'PUT', '/me/player/pause').length === 1, 'the playlist paused');
   // no sideways scroll, and the strip doesn't hide the last row
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
   assert.deepEqual(errors, []);
@@ -328,7 +351,7 @@ test('music: on a laptop the player opens beside the page', async () => {
   await page.locator('.sheet.open').waitFor();
   await page.waitForTimeout(450);
   const s = await page.locator('.sheet').boundingBox();
-  assert.ok(Math.abs(s.width - 460) < 2 && Math.abs(s.x + s.width - 1280) < 2, 'a drawer on the right');
+  assert.ok(Math.abs(s.width - 480) < 2 && Math.abs(s.x + s.width - 1280) < 2, 'a drawer on the right');
   await shot(page, 'music-laptop');
   await page.keyboard.press('Escape');
   await until(() => page.locator('.sheet.open').count().then(n => n === 0), 'Escape closes it');

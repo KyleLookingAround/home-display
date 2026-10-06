@@ -23,7 +23,7 @@ class Music {
   ctxName = $state('');             // the playlist or album it's playing from
   open = $state(false);             // the full player is showing
   picker = $state(false);           // "Play on" is showing
-  pane = $state(store.get('musicPane') || 'lyrics');   // lyrics | queue
+  view = $state('player');          // what the full player shows: player | lyrics | queue
   err = $state.raw(null);           // { title, body, code } from the last thing that went wrong
   toast = $state('');
   now = $state(Date.now());         // moves on while a song plays, for the progress bar
@@ -92,7 +92,7 @@ async function trackChanged(t){
   music.lyrics = null; music.lyricsFor = ''; music.liked = false;
   if (!t){ applyColours(null); return; }
   findColours(artUrl(t.images, 300));
-  if (music.open && music.pane === 'queue') loadQueue();
+  loadQueue();
   if (!t.episode) sp().isLiked([t.id]).then(r => { if (lastTrack === t.id) music.liked = !!(r && r[0]); }, () => {});
   const ly = await loadLyrics(t);
   if (lastTrack === t.id){ music.lyrics = ly; music.lyricsFor = t.id; }
@@ -108,21 +108,29 @@ async function contextChanged(ctx){
   } catch (e){}
 }
 
-/* ---------- the cover's colours, for the whole page ---------- */
-function findColours(url){
-  if (!url) return applyColours(null);
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => {
-    try {
-      const c = document.createElement('canvas'); c.width = c.height = 32;
-      const x = c.getContext('2d'); x.drawImage(img, 0, 0, 32, 32);
-      applyColours(coverColours(x.getImageData(0, 0, 32, 32).data));
-    } catch (e){ applyColours(null); }
-  };
-  img.onerror = () => applyColours(null);
-  img.src = url;
+/* ---------- colours from covers: the song playing lights the whole page; album and playlist pages use their own ---------- */
+const colourCache = new Map();
+/** A cover's colours ({ main, deep, ink }), read from its pixels once; null for a grey cover or one that won't load. */
+export function colourOf(url){
+  if (!url) return Promise.resolve(null);
+  if (colourCache.has(url)) return colourCache.get(url);
+  const p = new Promise(done => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = c.height = 32;
+        const x = c.getContext('2d'); x.drawImage(img, 0, 0, 32, 32);
+        done(coverColours(x.getImageData(0, 0, 32, 32).data));
+      } catch (e){ done(null); }
+    };
+    img.onerror = () => done(null);
+    img.src = url;
+  });
+  colourCache.set(url, p);
+  return p;
 }
+function findColours(url){ colourOf(url).then(c => { if (music.track && artUrl(music.track.images, 300) === url) applyColours(c); else if (!url) applyColours(null); }); }
 function applyColours(c){
   music.colours = c;
   const r = document.documentElement.style;
@@ -173,10 +181,14 @@ export function setRepeat(mode){
   music.player = Object.assign({}, m, { repeat: mode });
   return act(() => sp().repeat(mode, device()), 900);
 }
-export async function like(){
+/** A light tap felt on phones that can, for the buttons that matter. */
+export function haptic(){ try { if (navigator.vibrate) navigator.vibrate(8); } catch (e){} }
+export async function like(force){
   const t = music.track; if (!t || t.episode) return;
-  const on = !music.liked; music.liked = on;
-  try { await sp().like([t.id], on); say(on ? 'Added to your liked songs' : 'Removed from your liked songs'); }
+  const on = force === true ? true : !music.liked;
+  if (on === music.liked) return;
+  music.liked = on; haptic();
+  try { await sp().like([t.id], on); if (!music.open) say(on ? 'Added to your liked songs' : 'Removed from your liked songs'); }
   catch (e){ music.liked = !on; fail(e); }
 }
 let volTimer = 0;
@@ -212,21 +224,23 @@ export function play(o){
   }, 700);
 }
 export async function addToQueue(t){
-  try { await sp().addToQueue(t.uri, device()); say('Added to Up next: ' + t.name); if (music.pane === 'queue') loadQueue(); }
+  try { await sp().addToQueue(t.uri, device()); haptic(); say('Added to Up next: ' + t.name); if (music.open) loadQueue(); }
   catch (e){ fail(e); }
 }
 export async function loadQueue(){
   try { const q = await sp().queue(); music.queue = ((q && q.queue) || []).map(trackOf).filter(Boolean).slice(0, 30); }
   catch (e){ fail(e, true); }
 }
-export function setPane(p){ music.pane = p; store.set('musicPane', p); if (p === 'queue') loadQueue(); }
+/** The player's own views: the player, the lyrics, or Up next. */
+export function setView(v){ music.view = v; if (v === 'queue') loadQueue(); }
 
 /* ---------- the full player opens over any page; the phone's Back closes it ---------- */
-export function openPlayer(){
+export function openPlayer(view){
+  music.view = view || 'player';
   if (music.open) return;
   music.open = true; music.picker = false;
   try { history.pushState({ player: 1 }, ''); } catch (e){}
-  if (music.pane === 'queue') loadQueue();
+  loadQueue();
   soon(50);
 }
 export function closePlayer(){

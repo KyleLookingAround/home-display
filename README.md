@@ -113,6 +113,8 @@ Everything below works from the published site, in the browser, with no server:
 - **Open-Meteo:** the weather.
 - **National Rail:** live trains, through [Huxley2](https://huxley2.azurewebsites.net) or its mirror, free community services. If one is down, the other is tried.
 - **Where the ISS is:** [wheretheiss.at](https://wheretheiss.at).
+- **Spotify:** the music player. Connect it under Settings, Music; you sign in at Spotify, and the sign-in stays on that device. Playing from here needs Premium ([decision 0012](docs/decisions/0012-music-player.md)).
+- **LRCLIB:** synced lyrics, from [lrclib.net](https://lrclib.net), a free open library.
 
 A few things can't be fetched by a web page:
 - **Metrolink times:** TfGM refuses browser calls.

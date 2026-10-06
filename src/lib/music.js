@@ -67,7 +67,7 @@ export function page(j, key){
   const p = key && j ? j[key] : j;
   if (!p) return { items: [], next: false, total: 0 };
   // saved songs, playlist rows and recently played wrap each song (as track, or item in Spotify's newer answers)
-  const items = (p.items || []).map(x => x && (x.track !== undefined || (x.item !== undefined && x.added_at !== undefined)) ? { added: x.added_at || x.played_at || null, track: x.track || x.item } : x).filter(Boolean);
+  const items = (p.items || []).map(x => x && (x.track !== undefined || (x.item !== undefined && x.added_at !== undefined)) ? { added: x.added_at || x.played_at || null, track: x.track || x.item, context: x.context || null } : x).filter(Boolean);
   return { items: items, next: !!p.next, total: p.total || items.length, cursor: p.cursors ? p.cursors.after : null };
 }
 /** "Playing from" for the context: your liked songs, or the playlist's or album's name once it's known. */

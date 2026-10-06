@@ -4,6 +4,19 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation** (music branch): a music player, on Spotify ([decision 0012](decisions/0012-music-player.md)).
+  - Connect Spotify in Settings. It signs in at Spotify with PKCE, so there's no secret, and the sign-in stays on the phone.
+  - A now-playing strip sits above the tabs on every page, tinted to the cover. Swipe it to skip; tap it for the full player.
+  - The full player:
+    - the cover blurred into a slow nebula behind it;
+    - drag it down to close; swipe the cover to skip; double-tap it to like;
+    - scrub, shuffle and repeat;
+    - where it's playing, with its volume, and Play on to move it to the TV, a Google speaker or the phone;
+    - glances at the lyric being sung (synced lyrics from LRCLIB) and what's up next, each opening its own view.
+  - The Music tab: a greeting and shortcuts, rows (jump back in, your playlists, top artists, albums, played lately), search with a top result, and playlist, album and artist pages lit by their covers.
+  - Now shows what's playing.
+  - The cover's colours glow behind every page.
+  - The household's Spotify Client ID is in `household.json`.
 - **Update**: the redesign is merged into `main` and live, at Kyle's word: the phone pages ([decision 0010](decisions/0010-redesign.md)), the new wall display ([decision 0011](decisions/0011-wall-display.md)) and everything built on the `redesign` branch since 2026-10-05 (the entries marked "(redesign)" below). The `redesign` branch is still published at /preview/ while it exists; it now matches the live site.
 
 ## 2026-10-05

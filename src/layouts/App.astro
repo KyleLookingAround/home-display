@@ -55,7 +55,7 @@ const NAV = [
       <slot />
     </main>
     <MiniPlayer client:load />
-    <footer class="foot">
+    <footer class="foot" hidden={page === 'music'}>
       <p>Prices include VAT. Gas in cubic metres is converted to kWh (volume correction 1.02264, calorific value 39.5 MJ/m³). Smart meter readings arrive a day behind.</p>
       <p>Projections, simulations and savings are estimates to help you decide what to look into, not advice or quotes.</p>
     </footer>
