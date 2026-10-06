@@ -67,34 +67,35 @@
 {/if}
 
 <style>
-  .about{display:grid;gap:22px;align-content:start;padding-bottom:20px}
-  h3{margin:0 0 8px;font:700 13px/1.2 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(233,236,255,.6)}
+  .about{display:grid;gap:var(--s3);align-content:start;padding-bottom:20px}
+  h3{margin:0 0 var(--s2);font:500 12px/1.3 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:var(--s4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  section.artist{background:none;border:0;padding:0;backdrop-filter:none;-webkit-backdrop-filter:none}
   .loading,.none{display:grid;justify-items:center;gap:12px;text-align:center;color:rgba(233,236,255,.65);padding:10vh 16px}
   .loading p,.none p{margin:0;max-width:30ch}
-  .spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--tint,var(--gas));animation:spin .9s linear infinite}
+  .spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--gas);animation:spin .9s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  .badge{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:16px;font:700 15.5px/1.3 var(--f-body);
-    background:linear-gradient(135deg,color-mix(in srgb,var(--tint,var(--gas)) 34%,transparent),color-mix(in srgb,var(--tint,var(--gas)) 10%,transparent));border:1px solid color-mix(in srgb,var(--tint,var(--gas)) 45%,transparent);color:#fff}
-  .badge :global(.ic){color:var(--tint,var(--gas))}
-  .story p{margin:0;font:400 16px/1.6 var(--f-body);color:rgba(233,236,255,.9)}
+  .badge{display:flex;align-items:center;gap:10px;padding:var(--s3) var(--s4);border-radius:var(--radius);font:600 15px/1.3 var(--f-body);background:rgba(79,214,255,.08);border:1px solid rgba(79,214,255,.4);color:var(--ink)}
+  .badge :global(.ic){color:var(--gas);flex:none}
+  .story p{margin:0;font:400 15.5px/1.6 var(--f-body);color:var(--ink)}
   .story p.clamp{display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
   .row-links{display:flex;gap:16px;align-items:center;margin-top:10px}
   .row-links a,.link{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font:600 13.5px var(--f-body);text-decoration:none;background:none;border:0;padding:6px 0;cursor:pointer}
-  .row-links a{color:rgba(233,236,255,.65)}
+  .row-links a{color:var(--gas)}
   dl{margin:0;display:grid;gap:2px}
-  dl div{display:grid;gap:1px;padding:9px 0;border-top:1px solid rgba(255,255,255,.07)}
+  dl div{display:grid;gap:2px;padding:var(--s2) 0;border-top:1px solid var(--line)}
   dl div:first-child{border-top:0}
-  dt{font-size:12.5px;color:rgba(233,236,255,.55)}
-  dd{margin:0;font:600 15.5px/1.35 var(--f-body)}
+  dt{font:500 11px/1.3 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  dd{margin:0;font:600 15px/1.35 var(--f-body)}
   dd a{color:inherit;text-decoration:none} dd a:hover{text-decoration:underline}
-  .gm dd{color:var(--tint,var(--gas))}
-  .acard{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border-radius:14px;background:rgba(255,255,255,.05);text-decoration:none;color:var(--ink)}
-  .acard:hover{background:rgba(255,255,255,.08)}
+  .gm dd{color:var(--gas)}
+  .acard{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:var(--s3);border-radius:var(--radius);background:var(--card);border:1px solid var(--line);text-decoration:none;color:var(--ink)}
+  .acard:hover{border-color:var(--line-hot)}
   .acard > :global(.ic){transform:rotate(180deg);opacity:.6}
-  .ai{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.08)}
+  .ai{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--card-2);border:1px solid var(--line);color:var(--gas)}
   .at{display:grid;min-width:0}
   .at b{font-size:15.5px}
-  .at span{font-size:13px;color:rgba(233,236,255,.6)}
-  .credit{margin:0;font-size:12px;color:rgba(233,236,255,.45)}
+  .at span{font-size:13px;color:var(--muted)}
+  .credit{margin:0;font:12px/1.5 var(--f-mono);color:var(--faint)}
   @media (prefers-reduced-motion:reduce){ .spin{animation:none} }
 </style>

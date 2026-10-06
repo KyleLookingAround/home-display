@@ -287,7 +287,8 @@ test('music: the Music tab searches, plays and queues, and opens albums, playlis
   await until(() => page.locator('.row', { hasText: 'Your playlists' }).locator('.tile', { hasText: 'Friday night' }).count().then(n => n === 1), 'your playlists');
   await until(() => page.locator('.row', { hasText: 'Jump back in' }).locator('.tile').count().then(n => n === 2), 'jump back in: where you played from lately');
   assert.match(await page.locator('.row', { hasText: 'Jump back in' }).textContent(), /Platform 3.*Friday night/s);
-  assert.match(await page.textContent('.hello h2'), /^Good (morning|afternoon|evening), Kyle$|^Up late, Kyle$/);
+  assert.match(await page.textContent('.now-answer .label'), /^(Good (morning|afternoon|evening)|Up late), Kyle · Playing on Kitchen speaker$/);
+  assert.match(await page.textContent('.now-answer .big'), /Harold Street/, 'the page opens with what\'s playing');
   assert.match(await page.locator('.row', { hasText: 'Your top artists' }).textContent(), /Viaduct/);
   await page.waitForTimeout(300);
   await shot(page, 'music-library');
@@ -295,7 +296,7 @@ test('music: the Music tab searches, plays and queues, and opens albums, playlis
   await until(() => page.locator('.tr', { hasText: 'Last Train to Piccadilly' }).count().then(n => n === 1), 'liked songs');
   await page.goto(base + '/music.html#recent');
   await until(() => page.locator('.when', { hasText: 'min ago' }).count().then(n => n >= 1), 'recently played, with when');
-  await page.goto(base + '/music.html'); await page.locator('.hello').waitFor();
+  await page.goto(base + '/music.html'); await page.locator('.sbox').waitFor();
   // search
   await page.fill('input[type=search]', 'harold');
   await until(() => page.locator('.tr', { hasText: 'Bins Out Tonight' }).count().then(n => n === 1), 'search results');
@@ -309,7 +310,7 @@ test('music: the Music tab searches, plays and queues, and opens albums, playlis
   // an artist
   await page.locator('.tile:has(.round)', { hasText: 'The Stockport Satellites' }).click();
   await until(() => page.locator('.dhead h2').textContent().then(t => t === 'The Stockport Satellites').catch(() => false), 'the artist');
-  assert.match(await page.textContent('.detail'), /Popular.*Harold Street.*Albums and singles.*Region G/s);
+  assert.match(await page.textContent('main'), /Popular.*Harold Street.*Albums and singles.*Region G/s);
   // an album from the artist, played from its second song
   await page.locator('.tile', { hasText: 'Region G' }).click();
   await until(() => page.locator('.dhead h2').textContent().then(t => t === 'Region G').catch(() => false), 'the album');
@@ -321,7 +322,7 @@ test('music: the Music tab searches, plays and queues, and opens albums, playlis
   // a playlist, in Spotify's newer shape
   await page.goto(base + '/music.html#playlist/p1');
   await until(() => page.locator('.tr').count().then(n => n === 3), 'the playlist\'s songs');
-  assert.match(await page.textContent('.detail'), /Friday night.*Kyle · 3 songs.*For the end of the week/s);
+  assert.match(await page.textContent('main'), /Friday night.*Kyle\s*3 songs · 10 min.*For the end of the week/s);
   await page.click('.detail .playbig[aria-label="Play Friday night"]');
   await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:playlist:p1'), 'the playlist played');
   // now it's what's playing, its button pauses it
@@ -446,6 +447,31 @@ test('music: an artist\'s story, and the record shelf', async () => {
   await shot(page, 'music-shelf');
   await page.locator('.shelf .playbig').click();
   await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.body && c.body.context_uri === 'spotify:album:al2'), 'played from the shelf');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+test('music: looks like the rest of the app, sharp corners and all', async () => {
+  const sp = spotify();
+  const { page, ctx, errors } = await open('/music.html', { sp });
+  await page.locator('.mini').waitFor();
+  const look = () => page.evaluate(() => {
+    const cs = s => getComputedStyle(document.querySelector(s));
+    return { strip: cs('.mini').borderTopLeftRadius, card: cs('main .card').borderTopLeftRadius, label: cs('main .card .label').fontFamily, answer: cs('.now-answer .big').fontFamily, play: cs('.mini .ib.play').borderTopColor };
+  });
+  const round = await look();
+  assert.equal(round.strip, '14px'); assert.equal(round.card, '14px');
+  assert.match(round.label, /JetBrains Mono/, 'card labels in the app\'s mono');
+  assert.match(round.answer, /Syncopate/, 'the answer in the app\'s display face');
+  await page.evaluate(() => { localStorage.setItem('hse.corners', 'sharp'); });
+  await page.reload(); await page.locator('.mini').waitFor();
+  const sharp = await look();
+  assert.equal(sharp.strip, '4px', 'the strip follows the corners setting'); assert.equal(sharp.card, '4px');
+  await page.locator('.mini').click({ position: { x: 120, y: 20 } });
+  await page.locator('.sheet.open').waitFor();
+  const play = await page.evaluate(() => getComputedStyle(document.querySelector('.sheet .ctl .big')).backgroundColor);
+  assert.equal(play, 'rgb(79, 214, 255)', 'the play button is the app\'s cyan');
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector('.sheet .glance')).borderTopLeftRadius), '4px');
   assert.deepEqual(errors, []);
   await ctx.close();
 });

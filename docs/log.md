@@ -4,6 +4,14 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update** (music branch): the music player brought into the house style, at Kyle's word ("make sure the music app matches the look and feel").
+  - The app's cards, mono labels and corners throughout, sharp ones included.
+  - The Music tab opens with what's playing in Syncopate, as Now opens with the price verdict.
+  - The song's title heads the player in Syncopate.
+  - Cyan for every control; the views as the app's segmented control.
+  - Toasts as cards.
+  - The cover's colour is now only light (the glow and the player's nebula), never a control.
+  - A test checks the corners, the type and the cyan.
 - **Creation** (music branch, stage 2): the stories behind the music, with no new keys.
   - **About this song**: the story (its Wikipedia article), the credits (who wrote it, who sang and played what, who produced and engineered it, where and when it was recorded) and the artist. Credits come from MusicBrainz by the song's ISRC.
   - **The local badge**: "Made in Greater Manchester", or "Recorded at Strawberry Studios, Stockport", when MusicBrainz says so.

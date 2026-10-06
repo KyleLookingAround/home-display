@@ -79,6 +79,7 @@ html.tinted .app::before{opacity:1}
 .status.err i,.status.offline i{background:var(--bad)}
 .icon-btn{display:inline-grid;place-items:center;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card);cursor:pointer;flex:none;color:var(--ink)}
 .icon-btn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn svg.ic[fill="currentColor"]{fill:currentColor;stroke:none}   /* solid icons (play, pause, skip) stay solid */
 .icon-btn.spin svg{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes pulse{50%{opacity:.35}}

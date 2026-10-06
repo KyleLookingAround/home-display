@@ -26,14 +26,14 @@
 
 <style>
   .tt{position:relative;width:min(100%,360px,40vh);aspect-ratio:1;user-select:none}
-  .plinth{position:absolute;left:-4%;top:-4%;right:-4%;bottom:-4%;border-radius:18px;background:linear-gradient(145deg,#1b1e2c,#0c0e17);box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06)}
+  .plinth{position:absolute;left:-4%;top:-4%;right:-4%;bottom:-4%;border-radius:var(--radius);border:1px solid var(--line);background:linear-gradient(145deg,#141831,#080a18);box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.06)}
   .platter{position:absolute;left:4%;top:4%;width:84%;aspect-ratio:1;border-radius:50%;background:#0b0b0f;box-shadow:0 8px 24px rgba(0,0,0,.7)}
   .record{position:absolute;left:2%;top:2%;right:2%;bottom:2%;border-radius:50%;display:grid;place-items:center;
     background:repeating-radial-gradient(circle at 50% 50%,#121217 0 1.2px,#1b1b22 1.2px 2.6px);animation:turn 1.8s linear infinite;animation-play-state:paused}
   .playing .record{animation-play-state:running}
   @keyframes turn{to{transform:rotate(360deg)}}
   .label{width:36%;aspect-ratio:1;border-radius:50%;object-fit:cover;box-shadow:0 0 0 3px #0e0e13}
-  .label.blank{background:var(--tint,var(--gas))}
+  .label.blank{background:var(--gas)}
   .hole{position:absolute;width:3.2%;aspect-ratio:1;border-radius:50%;background:#05060c;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
   .sheen{position:absolute;left:2%;top:2%;right:2%;bottom:2%;border-radius:50%;pointer-events:none;
     background:conic-gradient(from 210deg,transparent 0 8%,rgba(255,255,255,.10) 12%,transparent 18% 58%,rgba(255,255,255,.07) 62%,transparent 68%);mix-blend-mode:screen}

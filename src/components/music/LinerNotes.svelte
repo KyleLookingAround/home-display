@@ -41,22 +41,22 @@
 
 <style>
   .notes{display:grid;gap:10px}
-  .strip{display:grid;grid-auto-flow:column;grid-auto-columns:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:12px}
+  .strip{display:grid;grid-auto-flow:column;grid-auto-columns:100%;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:var(--radius)}
   .strip::-webkit-scrollbar{display:none}
   figure{margin:0;scroll-snap-align:center;display:grid;gap:8px;justify-items:center}
   figure a{display:block;width:100%}
-  figure img{width:100%;height:auto;max-height:56vh;object-fit:contain;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.55);display:block}
-  figcaption{font:600 13px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:rgba(233,236,255,.65)}
+  figure img{width:100%;height:auto;max-height:56vh;object-fit:contain;border-radius:var(--radius-sm);box-shadow:0 18px 50px rgba(0,0,0,.55);display:block}
+  figcaption{font:500 12px var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
   .pager{display:flex;justify-content:center;align-items:center;gap:14px}
-  .ib{appearance:none;border:0;background:rgba(255,255,255,.07);color:var(--ink);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
+  .ib{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);width:44px;height:44px;border-radius:50%;display:grid;place-items:center;cursor:pointer}
   .ib:disabled{opacity:.3;cursor:default}
   .fwd :global(.ic){transform:rotate(180deg)}
-  .count{font-size:13px;color:rgba(233,236,255,.7)}
-  .credit{margin:0;font-size:12px;color:rgba(233,236,255,.45);text-align:center}
+  .count{font-size:13px;color:var(--muted)}
+  .credit{margin:0;font:12px/1.5 var(--f-mono);color:var(--faint);text-align:center}
   .loading,.none{display:grid;justify-items:center;gap:12px;text-align:center;color:rgba(233,236,255,.65);padding:8vh 16px}
-  .none img{width:160px;border-radius:8px;opacity:.85}
+  .none img{width:160px;border-radius:var(--radius-sm);opacity:.85}
   .loading p,.none p{margin:0;max-width:30ch}
-  .spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--tint,var(--gas));animation:spin .9s linear infinite}
+  .spin{width:28px;height:28px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:var(--gas);animation:spin .9s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){ .spin{animation:none} }
 </style>

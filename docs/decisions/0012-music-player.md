@@ -14,8 +14,13 @@
   - Signing in goes to Spotify and back to Settings, which trades the code for tokens with the PKCE verifier. The tokens stay on that device (`hse.spotify`); each page refreshes them when they run out.
   - The TV will get them sealed with the PIN, as it gets the Octopus account ([0011](0011-wall-display.md)).
 - **The phone reads Spotify's player every few seconds while a page is open** (sooner while playing, and just after a song ends) and works out the position in between. Commands show at once and are checked a moment later. Nothing is polled while the page is hidden.
-- **The design: the album is the room you're in.** The player shouldn't look like a copy of Spotify's; it should feel like this app.
-  - **The cover sets the light.** Its colours, read from its pixels, tint the strip, the player and a glow behind every page. The full player's backdrop is the cover itself, blurred into a slow-drifting nebula over the starfield.
+- **The design: the album is the room you're in, and the room is this app.** The player shouldn't look like a copy of Spotify's; Kyle asked that it match the look and feel of the rest of the app.
+  - **The house style throughout:**
+    - the app's cards, with their glass, hairline border and radius (following the corners setting);
+    - mono uppercase labels;
+    - Syncopate for the one big answer: what's playing opens the Music tab, as the price verdict opens Now, and the song's title heads the player;
+    - JetBrains Mono for figures, and cyan for everything you press (play buttons, sliders, toggles, links, the views' segmented control).
+  - **The cover sets the light, and only the light.** Its colours, read from its pixels, glow faintly behind every page and around the strip, and the full player's backdrop is the cover blurred into a slow-drifting nebula over a starfield. Controls never take the cover's colour, so the player always reads as part of the house.
   - **Touch first, and forgiving.**
     - Swipe the strip or the cover to skip.
     - Drag the player down to put it away.
