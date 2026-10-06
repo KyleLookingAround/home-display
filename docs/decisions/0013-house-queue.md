@@ -1,6 +1,6 @@
 # 0013: A house queue the TV keeps, and parties guests join with a code
 
-**Status:** accepted, October 2026, built on the `music` branch (stage 4 of [0012](0012-music-player.md)).
+**Status:** accepted, October 2026, built on the `music` branch and merged into `main` on 06/10/2026 (stage 4 of [0012](0012-music-player.md)).
 
 **Context.** Kyle picked three things for stage 4: a house queue everyone can reorder, take songs out of and vote on; a party queue guests join by scanning a code on the TV; and "who's listening", with each person's own Spotify. Spotify's Web API lets other apps add to its queue, but not reorder it, remove from it, or read who added what. There is no home server ([0004](0004-no-home-server.md)), and the site is locked with a PIN ([0003](0003-lock.md)) that guests don't have.
 

@@ -1,6 +1,6 @@
 # 0012: A music player of our own, on Spotify
 
-**Status:** accepted, October 2026, built on the `music` branch (previewed at `/preview/`).
+**Status:** accepted, October 2026, built on the `music` branch and merged into `main` on 06/10/2026.
 
 **Context.** Kyle listens on the TV's own app, Google speakers and Bluetooth from his phone, and wanted a music player in the dashboard: a now-playing strip on every page that opens a full player, "like what Spotify has", with 25 features he picked from a proposal (in [ROADMAP.md](../../ROADMAP.md), section 4). He asked for the UI and UX to be incredible, given how much it will hold. There is no home server ([0004](0004-no-home-server.md)).
 

@@ -4,6 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update**: the music player is merged into `main` and live, at Kyle's word: everything built on the `music` branch today (the entries marked "(music branch)" below, decisions [0012](decisions/0012-music-player.md), [0013](decisions/0013-house-queue.md) and [0014](decisions/0014-finding-music.md)). The `music` branch is still published at /preview/ while it exists; it now matches the live site.
 - **Update** (music branch): the full design pass over the player, phone, laptop and TV.
   - On a laptop, pages now use the full width (they shrank to fit what was on them, so the Music tab sat in a 700-pixel column). Your listening puts the clock and the calendar side by side, and the weather radio's covers are cover-sized.
   - In the player, the lyrics and Up next glances share the row equally, so the next song's name shows; and the views' tabs now have a solid backdrop, so the words don't show through them as the page scrolls.

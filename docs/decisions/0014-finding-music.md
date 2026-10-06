@@ -1,6 +1,6 @@
 # 0014: Finding music without Spotify's recommendations
 
-**Status:** accepted, October 2026, built on the `music` branch (stage 5 of [0012](0012-music-player.md)).
+**Status:** accepted, October 2026, built on the `music` branch and merged into `main` on 06/10/2026 (stage 5 of [0012](0012-music-player.md)).
 
 **Context.** Kyle picked five things for the last stage: more like this (Last.fm, ListenBrainz), a heads-up for new releases, gigs (Ticketmaster), a weather radio, and his listening (top artists and songs, a listening clock and a heat map). Spotify stopped giving new apps its recommendations, related artists and audio features in November 2024, and only ever shares your last 50 plays. There is no home server ([0004](0004-no-home-server.md)), and the repository is public.
 
