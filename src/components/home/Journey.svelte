@@ -7,12 +7,13 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
-  import { jr, watchJourney } from '../../state/journey.svelte.js';
+  import { jr, watchJourney, shareHome } from '../../state/journey.svelte.js';
+  import { tv, watchTv } from '../../state/tv.svelte.js';
   import { journeyView, journeyLines, trainText, weatherThen } from '../../lib/geo.js';
   import { HOME, hhmm } from '../../lib/format.js';
   import MapView from '../charts/MapView.svelte';
   let { compact = false } = $props();
-  onMount(() => { const a = watchHouse({ trains: true }); const b = watchJourney(); return () => { if (a) a(); b(); }; });
+  onMount(() => { const a = watchHouse({ trains: true }); const b = watchJourney(); watchTv(); return () => { if (a) a(); b(); }; });
 
   const leg = $derived(app.trains && app.trains.leg);
   const d = $derived(jr.train);
@@ -28,13 +29,19 @@
 {#if show}
   <section class="card journey">
     <div class="card-head"><h2 class="label">{j ? j.title : 'Your journey'}</h2>{#if pos && pos.late >= 1}<span class="small warn">{pos.late} min late</span>{:else if pos}<span class="small cheap">On time</span>{/if}</div>
-    <MapView places={j ? j.places : []} route={j ? j.route : []} walks={j ? j.walks : []} fit={j ? j.fit : []} height={compact ? 200 : 260} label="Map of the journey: {d.dest} train{pos ? ', ' + trainText(pos) : ''}" />
+    <MapView places={j ? j.places.concat(app.here && app.now - app.here.at < 5 * 60e3 + 60e3 ? [{ lat: app.here.lat, lon: app.here.lon, kind: 'you' }] : []) : []} route={j ? j.route : []} walks={j ? j.walks : []} fit={j ? j.fit : []} height={compact ? 200 : 260} label="Map of the journey: {d.dest} train{pos ? ', ' + trainText(pos) : ''}" />
     <p class="lead"><b class="mono">{hhmm(d.sched)}</b> to {d.dest}{d.platform ? ', platform ' + d.platform : ''}</p>
     {#if pos}<p class="now">{trainText(pos)}</p>
     {:else if jr.err}<p class="note">Its live position didn't load. Trying again.</p>
     {:else}<p class="note">Finding where it is…</p>{/if}
     {#each lines as l}<p class="sub">{l}</p>{/each}
     {#if town}<p class="sub" class:wet={town.rain >= 60}>{town.text}</p>{/if}
+    {#if leg.home && tv.code}
+      <div class="share">
+        {#if jr.sharing}<span class="small">{jr.shareNote || 'Telling the TV…'}</span><button class="btn small" type="button" onclick={() => shareHome(false)}>Stop telling the TV</button>
+        {:else}<button class="btn small primary" type="button" onclick={() => shareHome(true)}>Show the TV I'm on my way</button>{/if}
+      </div>
+    {/if}
   </section>
 {/if}
 
@@ -44,4 +51,5 @@
   .journey .sub{margin:4px 0 0;color:var(--muted)}
   .journey .wet{color:var(--gas)}
   .warn{color:var(--warn)}
+  .share{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2) var(--s3);margin-top:var(--s3)}
 </style>

@@ -8,8 +8,10 @@
   import { where, useLocation, rememberOffice, forgetOffice, watchWhere } from '../../state/where.svelte.js';
   import { houseSettings, saveHouse } from '../../state/house.js';
   import { distKm } from '../../lib/geo.js';
-  let msg = $state('');
-  onMount(() => { houseSettings(); return watchWhere(); });
+  import { store } from '../../lib/browser.js';
+  let msg = $state(''), auto = $state(false);
+  onMount(() => { houseSettings(); auto = store.get('autoShare') === '1'; return watchWhere(); });
+  const setAuto = on => { auto = on; store.set('autoShare', on ? '1' : ''); };
   const fresh = $derived(!!(app.here && app.now - app.here.at < 5 * 60e3 + 60e3));
   async function here(){
     const r = await rememberOffice();
@@ -25,6 +27,8 @@
   <label class="sw"><input type="checkbox" checked={where.on} onchange={e => useLocation(e.currentTarget.checked)}><span>Use this phone's location</span></label>
   <p class="note">The walk to the train becomes the walk from where you are, and the phone notices when you're at work, so the day counts as an office day. It's only asked for while the app is open, and never leaves this phone, except sealed to your TV if you share your way home.</p>
   {#if where.denied}<p class="note warn">Your browser has blocked location for this site. Allow it in the browser's settings for the site, then turn this on again.</p>{/if}
+  <label class="sw"><input type="checkbox" checked={auto} onchange={e => setAuto(e.currentTarget.checked)}><span>Tell the TV when I'm on my train home</span></label>
+  <p class="note">Once your train home leaves, the paired TV shows you're on your way and when you'll be in, followed from the train's live times. With location on, it shows where you are too. Sealed with the site PIN. You can also tap "Show the TV I'm on my way" under your journey.</p>
   {#if where.on}
     <div class="work">
       {#if where.office}

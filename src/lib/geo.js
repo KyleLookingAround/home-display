@@ -241,3 +241,33 @@ export function legFromHere(leg, here, index, now){
   const km = distKm(here, index[leg.from]);
   return km > 3 ? leg : Object.assign({}, leg, { walk: walkMins(km), walkHere: true });
 }
+
+/* ---------- the way home, told to the TV ---------- */
+const ID_RE = /^[\w=-]{4,40}$/, CRS_RE = /^[A-Z]{3}$/;
+/**
+ * A trip home as the phone tells the TV (sealed): who, the train they're on (its id, time and destination), where
+ * they get on and off, the walk after, when it gets in, and where the phone is if it knows. Null if it's not well
+ * formed, or over: three hours on, or a quarter of an hour after they'd be home.
+ */
+export function readTrip(t, now){
+  if (!t || typeof t !== 'object' || !CRS_RE.test(t.from) || !CRS_RE.test(t.to) || !(+t.sched > 0) || !(+t.at > 0)) return null;
+  if (!(t.sid && ID_RE.test(t.sid)) && !(t.rid && /^\d{6,20}$/.test(t.rid))) return null;
+  const out = { name: String(t.name || '').slice(0, 40), sid: t.sid && ID_RE.test(t.sid) ? t.sid : null, rid: t.rid && /^\d{6,20}$/.test(t.rid) ? t.rid : null,
+    sched: +t.sched, dest: String(t.dest || '').slice(0, 80), from: t.from, to: t.to, walk: Math.max(0, Math.min(90, Math.round(+t.walk || 0))), arr: +t.arr || 0, at: +t.at };
+  const h = t.here;
+  if (h && isFinite(h.lat) && isFinite(h.lon) && Math.abs(h.lat) <= 90 && Math.abs(h.lon) <= 180) out.here = { lat: +h.lat, lon: +h.lon, at: +h.at || out.at };
+  const home = out.arr ? out.arr + out.walk * 60e3 : 0;
+  if (now - out.at > 3 * 3600e3 || (home && now > home + 15 * 60e3)) return null;
+  return out;
+}
+/** When they'll be home: the train's arrival where they get off (live, or as the phone last said), then the walk. */
+export function tripHome(trip, pos){
+  const off = pos ? dueAt(pos, trip.to) : null, t = off ? off.t : trip.arr;
+  return t ? t + trip.walk * 60e3 : 0;
+}
+/** The heads-up: "Kyle's on the way home", "On the 17:50 · between Levenshulme and Heaton Chapel · home about 18:05". */
+export function tripHead(trip, pos){
+  const home = tripHome(trip, pos), where = pos ? trainText(pos).replace(/^./, c => c.toLowerCase()) : '';
+  return { kind: 'train', tone: 'good', title: trip.name ? trip.name + '\u2019s on the way home' : 'On the way home',
+    sub: 'On the ' + hhmm(trip.sched) + (where ? ' · ' + where : '') + (home ? ' · home about ' + hhmm(home) : '') };
+}

@@ -895,6 +895,42 @@ test('location: the walk from where you are, work remembered, and an office day 
   await ctx.close();
 });
 
+test('the way home: the phone tells the TV, sealed, and the TV follows the train', async () => {
+  const LOCK = 'a1b2c3-hashed-pin', evening = new Date('2026-10-05T17:30:00+01:00'), set = { ...COMMUTE, tramStop: '' };
+  const tv = await open('/display.html#today', { at: evening, settings: set });
+  let toTv = [];
+  await relay(tv.page, () => toTv);
+  await tv.page.addInitScript(s => { try { localStorage.setItem('staticrypt_passphrase', s); } catch (e) {} }, LOCK);
+  await tv.page.reload(); await tv.page.waitForTimeout(800);
+  const code = await tv.page.evaluate(() => localStorage.getItem('hse.remote'));
+  const phone = await open('/home.html', { width: 390, height: 844, at: evening, settings: set, withHelper: false });
+  const phoneSent = await relay(phone.page, () => []);
+  await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); } catch (e) {} }, [LOCK, code]);
+  await phone.page.reload(); await ready(phone.page);
+  const card = phone.page.locator('.card.journey');
+  await card.getByRole('button', { name: "Show the TV I'm on my way" }).click({ timeout: 15000 });
+  await phone.page.waitForFunction(() => /The TV shows you're on your way/.test(document.querySelector('.journey').textContent), null, { timeout: 15000 });
+  const sealed = phoneSent.filter(s => s.msg.cmd === 'account').pop();
+  assert.ok(sealed); assert.doesNotMatch(JSON.stringify(sealed.msg), /Crewe|MAN|SPT/, 'the relay sees only the sealed box');
+  toTv = [sealed.msg];
+  await tv.page.reload();
+  await tv.page.waitForFunction(() => /On the way home/.test(document.getElementById('dHeads').textContent), null, { timeout: 15000 });
+  assert.match(await tv.page.textContent('#dHeads'), /On the way home\s*On the 17:50[^]*home about 18:03/);
+  await tv.page.evaluate(() => { location.hash = 'travel'; });
+  await tv.page.waitForFunction(() => !document.getElementById('tJourneyCard').hidden && /^On the way home · 17:50 to Crewe/.test(document.getElementById('tJourneyTitle').textContent), null, { timeout: 15000 });
+  assert.match(await tv.page.textContent('#tJourney'), /home about 18:03/);
+  await shot(tv.page, 'tv-travel-trip');
+  // stopping clears it on the TV
+  await card.getByRole('button', { name: 'Stop telling the TV' }).click();
+  for (let i = 0; i < 30 && phoneSent.filter(s => s.msg.cmd === 'account').length < 2; i++) await phone.page.waitForTimeout(100);
+  toTv = [phoneSent.filter(s => s.msg.cmd === 'account').pop().msg];
+  await tv.page.reload();
+  await tv.page.waitForTimeout(1500);
+  assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.trip')), null);
+  assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
+  await tv.ctx.close(); await phone.ctx.close();
+});
+
 test('dashboard: Home shows the trains as the station sign does, and taps through its views', async () => {
   const { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, settings: { ...SETTINGS, trainWalk: 25 }, withHelper: false });
   const sign = page.locator('.dmx');

@@ -4,6 +4,10 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Creation**: maps, stage 3: your way home on the TV.
+  - On the way home, "Show the TV I'm on my way" under your journey tells the paired TV which train you're on, sealed with the site PIN; or it happens by itself once your train home leaves (Settings, Location: "Tell the TV when I'm on my train home").
+  - The TV follows that train from its live times, on its own: a heads-up on Today ("On the way home · On the 17:50 · home about 18:03", with your name if your Spotify is on the phone) and the map on Travel, with where you are when location is on.
+  - It ends by itself a quarter of an hour after you'd be home (or three hours on), or when you tap Stop (`readTrip`, `tripHome`, `tripHead` in geo.js; `shareHome` in state/journey.svelte.js; `D.trip` on the TV, kept in `hse.trip` there).
 - **Creation**: maps, stage 2: the phone's location, when you turn it on (Settings, Location; `state/where.svelte.js`).
   - The walk to the train is the walk from where you are, when you're within 3 km of the station ("With a 6 minute walk from where you are"; `legFromHere`), so "Leave in…" stays true wherever you are.
   - "I'm at work: remember this place" keeps work's place on the phone (`hse.office`) and works out the walk from the station you get off at, which goes to the TV with your office days.

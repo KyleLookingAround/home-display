@@ -111,6 +111,7 @@ function mapHtml(j, w, h){
     const q = pt(p);
     if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
     else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
+    else if (p.kind === 'you') svg += `<circle class="you-ring" cx="${q.x}" cy="${q.y}" r="22"/><circle class="you" cx="${q.x}" cy="${q.y}" r="11"/>`;
     else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
   });
   j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false; svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });

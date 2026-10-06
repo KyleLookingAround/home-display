@@ -58,13 +58,16 @@ export function commuteToTv(wait = 1200){
   if (!tv.code || !app.house) return Promise.resolve('');
   const secret = lockSecret();
   if (!secret || !canSeal()) return Promise.resolve('To change the TV too, unlock the site on both with the same PIN, with Remember ticked.');
-  const s = app.house, details = { plan: s.plan || {}, week: { days: s.workDays || [], start: s.workStart, end: s.workEnd, walk: s.workWalk } };
-  return new Promise(done => {
-    tvTimer = setTimeout(async () => {
-      try { done(await tvSend('account', { box: await sealDetails(tv.code, secret, details) }) ? 'Sent to the TV.' : 'The TV didn\'t get it. Change a day again to retry.'); }
-      catch (e){ done('This browser couldn\'t seal it for the TV.'); }
-    }, wait);
-  });
+  const s = app.house;
+  return new Promise(done => { tvTimer = setTimeout(() => sealToTv({ plan: s.plan || {}, week: { days: s.workDays || [], start: s.workStart, end: s.workEnd, walk: s.workWalk } }).then(done), wait); });
+}
+/** Seals details with the site's PIN and sends them to the paired TV. Resolves to what to tell you. */
+export async function sealToTv(details){
+  const secret = lockSecret();
+  if (!tv.code) return '';
+  if (!secret || !canSeal()) return 'To tell the TV, unlock the site on both with the same PIN, with Remember ticked.';
+  try { return await tvSend('account', { box: await sealDetails(tv.code, secret, details) }) ? 'Sent to the TV.' : 'The TV didn\'t get it. Try again.'; }
+  catch (e){ return 'This browser couldn\'t seal it for the TV.'; }
 }
 
 async function cached(key, age, run, set, setErr, force){

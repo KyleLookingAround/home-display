@@ -30,7 +30,7 @@ const SRC = {
   trains:  { label: 'Trains',  every: () => legTurned() ? 0 : shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => { const leg = legNow(); return loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg: leg })); } },
   // your journey (src/lib/geo.js): the stations once a day, the train that matters every 45 seconds while it shows
   stations: { label: 'Stations', every: () => 24*60*MIN, need: () => !!D.set.trainFrom && /^https?:$/.test(location.protocol), run: loadStations },
-  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
+  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' || (D.trip && shown() === 'today') ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
   town:    { label: 'Town weather', every: () => 30*MIN, need: () => !!townStation(), run: () => loadPlaceWeather(townStation()) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
@@ -63,26 +63,40 @@ D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
 const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
 function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
 /* ---------- your journey: the train that matters, followed once it has left, until it gets you there ---------- */
-function journeyPick(now){ D.jPick = pickTrain(SRC.trains.data, D.jPick, now); return D.jPick; }
+// someone on their way home, as their phone told this screen (sealed; readTrip): their train is followed instead
+D.trip = readTrip(store.getJ('trip', null), Date.now());
+function tripNow(now){ if (D.trip && !readTrip(D.trip, now)){ D.trip = null; store.del('trip'); } return D.trip; }
+function journeyPick(now){
+  const t = tripNow(now);
+  D.jPick = t ? { sid: t.sid, rid: t.rid, sched: t.sched, dest: t.dest, leg: 'trip' } : pickTrain(SRC.trains.data, D.jPick && D.jPick.leg !== 'trip' ? D.jPick : null, now);
+  return D.jPick;
+}
 function journeyTurned(){ const d = SRC.service.data, p = D.jPick; return !!p && (!d || (d.d.sid || d.d.rid) !== (p.sid || p.rid) || d.d.sched !== p.sched); }
 function loadJourney(){ const d = journeyPick(Date.now()); return loadService(d).then(j => ({ d: d, stops: parseService(j, Date.now()) })); }
 function townStation(){ const T = SRC.trains.data, leg = T && T.leg, idx = SRC.stations.data; const c = leg ? (leg.home ? leg.from : leg.work ? leg.to : '') : ''; return c && idx ? idx[c] : null; }
 /** Beside the station sign when there are no trams: the map, where the train is, and when you're there. */
 function renderJourney(now){
-  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data;
+  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data, trip = tripNow(now);
   const d = S && D.jPick && (S.d.sid || S.d.rid) === (D.jPick.sid || D.jPick.rid) ? S.d : null;
-  const on = !D.set.tramStop && !!(T && T.leg && idx && d);
+  const leg = trip ? { from: trip.from, to: trip.to, walk: 0, after: trip.walk, home: true } : T && T.leg;
+  const on = !D.set.tramStop && !!(leg && idx && d);
   card.hidden = !on; $('#tTrains').parentNode.classList.toggle('solo', !D.set.tramStop && !on);
   if (!on) return;
-  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, T.leg, idx, HOME), box = $('#tJourney');
-  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = T.leg.end && (T.leg.work || now < T.leg.end) ? weatherThen(SRC.town.data, T.leg.end, 'In town') : null;
+  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, leg, idx, HOME), box = $('#tJourney');
+  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = !trip && leg.end && (leg.work || now < leg.end) ? weatherThen(SRC.town.data, leg.end, 'In town') : null;
+  if (trip){
+    j.title = trip.name ? trip.name + '\u2019s way home' : 'On the way home';
+    const home = tripHome(trip, pos); j.there = home ? 'home about ' + hhmm(home) : '';
+    if (trip.here && now - trip.here.at < 10*MIN){ j.places.push({ lat: trip.here.lat, lon: trip.here.lon, kind: 'you' }); j.fit.push(trip.here); }
+  }
   $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
   // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
-  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length].join('|');
+  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length, j.places.length].join('|');
   if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
   if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
   box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
-  setHtml(box.querySelector('.jl'), journeyLines(j, pos).concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
+  const lines = trip ? [(j.off ? j.off.text : 'On the ' + hhmm(trip.sched)) + (j.there ? ' · ' + j.there : '')] : journeyLines(j, pos);
+  setHtml(box.querySelector('.jl'), lines.concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
 }
 function due(s, now){
   if (!s.need() || s.busy) return false;
@@ -226,7 +240,8 @@ function renderToday(){
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
   const walk = trainWalkOf(SRC.trains.data, s);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: walk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now).slice(0, 3));
+  const trip = tripNow(now), tripPos = trip && SRC.service.data && SRC.stations.data && (SRC.service.data.d.sid || SRC.service.data.d.rid) === (trip.sid || trip.rid) ? trainAt(SRC.service.data.stops, now, SRC.stations.data) : null;
+  $('#dHeads').innerHTML = headsHtml((trip ? [tripHead(trip, tripPos)] : []).concat(headsUp({ trains: SRC.trains.data, walk: walk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now)).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
   const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: walk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
@@ -405,6 +420,14 @@ async function takeDetails(box){
   const d = secret && canSeal() ? await openDetails(D.remote, secret, box) : null;
   if (!d){ toast('Your phone sent something this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
   const got = [], changes = {};
+  if ('trip' in d){
+    const was = D.trip; D.trip = d.trip || null;
+    if (D.trip) store.setJ('trip', D.trip); else store.del('trip');
+    SRC.service.last = 0; render();
+    if (D.trip && (!was || was.sched !== D.trip.sched)) toast((D.trip.name ? D.trip.name + ' is on the way' : 'On the way') + ' home, on the ' + hhmm(D.trip.sched) + '.', 6000);
+    tellRemote(D.trip ? 'Showing the way home' : 'Home');
+    if (Object.keys(d).length === 1) return;
+  }
   if (d.account){
     const a = d.account;
     store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);

@@ -9,6 +9,7 @@
 // was unlocked with "Remember this screen". The relay, and anyone without the PIN, sees only the sealed box.
 import { MODES, cleanPlan } from './household.js';
 import { readWire } from './queue.js';
+import { readTrip } from './geo.js';
 
 export const RELAY = 'https://ntfy.sh';
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // no 0/O or 1/I/L, for reading off a TV
@@ -99,7 +100,7 @@ function boxKey(code, secret){
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
  * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp },
- * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [1, 3, 5], start: '08:00', end: '16:00' } }.
+ * trip: { name, sid, rid, sched, dest, from, to, walk, arr, at, here } or false, plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [1, 3, 5], start: '08:00', end: '16:00' } }.
  */
 export async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -122,6 +123,8 @@ export async function openDetails(code, secret, box){
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
   // your office days as planned on the phone (the days that differ from your usual week); {} clears them
   if (d.plan && typeof d.plan === 'object' && !Array.isArray(d.plan)) out.plan = cleanPlan(d.plan, Date.now());
+  // on the way home: the train, and where the phone is (readTrip); false when it's over
+  if ('trip' in d) out.trip = d.trip ? readTrip(d.trip, Date.now()) || false : false;
   // and your usual week at work: the days, and when you start and finish
   const w = d.week;
   if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))

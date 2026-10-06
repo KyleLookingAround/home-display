@@ -64,7 +64,7 @@ Kyle has given standing permission to develop, test and push to `main` without c
     - `music/Radio.svelte`, `NewReleases`, `Gigs`, `Listening` (`music.html#listening`), `MoreLike` (the player's "More like this") and `FansAlso` (on artist pages): stage 5's finding music.
     - `party/Party.svelte` (`pages/party.astro`, `layouts/Plain.astro`): the guests' page, outside the lock.
     - `screen/Screen.svelte`: a live picture of the wall display (`display.html#<view>&embed=1` in a scaled frame), pairing with a screen's code, and buttons that change what it shows. `screen/TvMusic.svelte`: Spotify on the TV (signing it in, sealed; the sleep timer; favourites for the number keys).
-    - `home/Journey.svelte` (with `charts/MapView.svelte` and `state/journey.svelte.js`): your train on a map, moving, on Home and Now; on the TV it's `mapHtml` in `board.js`, beside the sign on Travel.
+    - `home/Journey.svelte` (with `charts/MapView.svelte` and `state/journey.svelte.js`): your train on a map, moving, on Home and Now, and "Show the TV I'm on my way" (`shareHome`: the train, sealed; the TV follows it and shows it on Today and Travel, `D.trip`); on the TV the map is `mapHtml` in `board.js`, beside the sign on Travel.
     - `home/Upgrade.svelte`: the shape every upgrade shares: a year's saving, a rough cost, the payback, and the simulator folded under "Work it out".
     - `charts/`: `Strip` (prices over time, cheapest hours, carbon band, markers), `Radar` (the rain radar, looping), `Bars` (ghost of the period before, change marks), `HeatMap`, `ClockFace`, `Dial`, `Sparkline`, `Scatter`. Tap, point or arrow keys to read them.
   - `state/`:

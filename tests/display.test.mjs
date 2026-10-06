@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'geo', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere readTrip tripHome tripHead workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -484,6 +484,20 @@ test('location: at a place, and the walk to the train from where you are', () =>
   assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 30 }, { lat: 53.4790, lon: -2.2445 }), true, '100 m');
   assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 30 }, { lat: 53.4831, lon: -2.2445 }), false, '550 m');
   assert.equal(A.atPlace({ lat: 53.4781, lon: -2.2445, acc: 450 }, { lat: 53.4815, lon: -2.2445 }), true, 'within a rough fix');
+});
+
+test('the way home, as the phone tells the TV', () => {
+  const t = h => at('2026-10-05T' + h + ':00'), now = t('17:52');
+  const trip = { name: 'Kyle', sid: 'S20abc', sched: t('17:50'), dest: 'Crewe', from: 'MAN', to: 'SPT', walk: 5, arr: t('17:58'), at: t('17:51'), here: { lat: 53.47, lon: -2.22, at: t('17:51') }, extra: 'x' };
+  const r = plain(A.readTrip(trip, now));
+  assert.deepEqual(r, { name: 'Kyle', sid: 'S20abc', rid: null, sched: t('17:50'), dest: 'Crewe', from: 'MAN', to: 'SPT', walk: 5, arr: t('17:58'), at: t('17:51'), here: { lat: 53.47, lon: -2.22, at: t('17:51') } });
+  assert.equal(A.readTrip(Object.assign({}, trip, { from: 'man' }), now), null);
+  assert.equal(A.readTrip(Object.assign({}, trip, { sid: 'bad id!', rid: null }), now), null);
+  assert.equal(A.readTrip(trip, t('18:19')), null, 'over a quarter of an hour after they\'d be home');
+  assert.equal(A.readTrip(Object.assign({}, trip, { arr: 0 }), t('20:52')), null, 'or three hours on');
+  assert.equal(A.tripHome(r, null), t('18:03'));
+  assert.deepEqual(plain(A.tripHead(r, null)), { kind: 'train', tone: 'good', title: 'Kyle’s on the way home', sub: 'On the 17:50 · home about 18:03' });
+  assert.equal(A.tripHead(Object.assign({}, r, { name: '' }), null).title, 'On the way home');
 });
 
 test('the station sign words a train the same on the phone and the TV', () => {

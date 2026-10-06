@@ -182,6 +182,8 @@ body.lite .dmx{text-shadow:none}
 .jmap .stn.big{stroke-width:4;fill:#1a1408}
 .jmap .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .jmap .train{fill:var(--elec);stroke:#04050d;stroke-width:3}
+.jmap .you{fill:var(--gas);stroke:#04050d;stroke-width:3}
+.jmap .you-ring{fill:rgba(79,214,255,.2)}
 .jmap .train-ring{fill:rgba(255,181,71,.22);animation:jpulse 1.6s ease-out infinite;transform-origin:center;transform-box:fill-box}
 body.lite .jmap .train-ring{animation:none}
 @keyframes jpulse{from{transform:scale(.6);opacity:1}to{transform:scale(1.6);opacity:0}}
@@ -2463,6 +2465,36 @@ function legFromHere(leg, here, index, now){
   const km = distKm(here, index[leg.from]);
   return km > 3 ? leg : Object.assign({}, leg, { walk: walkMins(km), walkHere: true });
 }
+
+/* ---------- the way home, told to the TV ---------- */
+const ID_RE = /^[\w=-]{4,40}$/, CRS_RE = /^[A-Z]{3}$/;
+/**
+ * A trip home as the phone tells the TV (sealed): who, the train they're on (its id, time and destination), where
+ * they get on and off, the walk after, when it gets in, and where the phone is if it knows. Null if it's not well
+ * formed, or over: three hours on, or a quarter of an hour after they'd be home.
+ */
+function readTrip(t, now){
+  if (!t || typeof t !== 'object' || !CRS_RE.test(t.from) || !CRS_RE.test(t.to) || !(+t.sched > 0) || !(+t.at > 0)) return null;
+  if (!(t.sid && ID_RE.test(t.sid)) && !(t.rid && /^\d{6,20}$/.test(t.rid))) return null;
+  const out = { name: String(t.name || '').slice(0, 40), sid: t.sid && ID_RE.test(t.sid) ? t.sid : null, rid: t.rid && /^\d{6,20}$/.test(t.rid) ? t.rid : null,
+    sched: +t.sched, dest: String(t.dest || '').slice(0, 80), from: t.from, to: t.to, walk: Math.max(0, Math.min(90, Math.round(+t.walk || 0))), arr: +t.arr || 0, at: +t.at };
+  const h = t.here;
+  if (h && isFinite(h.lat) && isFinite(h.lon) && Math.abs(h.lat) <= 90 && Math.abs(h.lon) <= 180) out.here = { lat: +h.lat, lon: +h.lon, at: +h.at || out.at };
+  const home = out.arr ? out.arr + out.walk * 60e3 : 0;
+  if (now - out.at > 3 * 3600e3 || (home && now > home + 15 * 60e3)) return null;
+  return out;
+}
+/** When they'll be home: the train's arrival where they get off (live, or as the phone last said), then the walk. */
+function tripHome(trip, pos){
+  const off = pos ? dueAt(pos, trip.to) : null, t = off ? off.t : trip.arr;
+  return t ? t + trip.walk * 60e3 : 0;
+}
+/** The heads-up: "Kyle's on the way home", "On the 17:50 · between Levenshulme and Heaton Chapel · home about 18:05". */
+function tripHead(trip, pos){
+  const home = tripHome(trip, pos), where = pos ? trainText(pos).replace(/^./, c => c.toLowerCase()) : '';
+  return { kind: 'train', tone: 'good', title: trip.name ? trip.name + '\u2019s on the way home' : 'On the way home',
+    sub: 'On the ' + hhmm(trip.sched) + (where ? ' · ' + where : '') + (home ? ' · home about ' + hhmm(home) : '') };
+}
 /* The phone as a remote for a screen, through ntfy.sh: a free relay that needs no account and allows browser calls. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
@@ -2562,7 +2594,7 @@ function boxKey(code, secret){
 /**
  * Seals what the phone sends a screen, for the screen with this code: any of { account: { account, key, gasUnit, pay },
  * wifi: { ssid, password, security, hidden }, dates: [{ name, date, kind }], ical, spotify: { id, name, product, client, refresh, access, exp },
- * plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [1, 3, 5], start: '08:00', end: '16:00' } }.
+ * trip: { name, sid, rid, sched, dest, from, to, walk, arr, at, here } or false, plan: { 'YYYY-MM-DD': { in, start, end } }, week: { days: [1, 3, 5], start: '08:00', end: '16:00' } }.
  */
 async function sealDetails(code, secret, details){
   const iv = crypto.getRandomValues(new Uint8Array(12)), k = await boxKey(code, secret);
@@ -2585,6 +2617,8 @@ async function openDetails(code, secret, box){
   if (typeof d.ical === 'string' && /^(https|webcal):\/\//i.test(d.ical)) out.ical = d.ical.slice(0, 500);
   // your office days as planned on the phone (the days that differ from your usual week); {} clears them
   if (d.plan && typeof d.plan === 'object' && !Array.isArray(d.plan)) out.plan = cleanPlan(d.plan, Date.now());
+  // on the way home: the train, and where the phone is (readTrip); false when it's over
+  if ('trip' in d) out.trip = d.trip ? readTrip(d.trip, Date.now()) || false : false;
   // and your usual week at work: the days, and when you start and finish
   const w = d.week;
   if (w && Array.isArray(w.days) && /^\d\d:\d\d$/.test(w.start) && /^\d\d:\d\d$/.test(w.end))
@@ -5365,6 +5399,7 @@ function mapHtml(j, w, h){
     const q = pt(p);
     if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
     else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
+    else if (p.kind === 'you') svg += `<circle class="you-ring" cx="${q.x}" cy="${q.y}" r="22"/><circle class="you" cx="${q.x}" cy="${q.y}" r="11"/>`;
     else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
   });
   j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false; svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
@@ -5811,7 +5846,7 @@ const SRC = {
   trains:  { label: 'Trains',  every: () => legTurned() ? 0 : shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => { const leg = legNow(); return loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg: leg })); } },
   // your journey (src/lib/geo.js): the stations once a day, the train that matters every 45 seconds while it shows
   stations: { label: 'Stations', every: () => 24*60*MIN, need: () => !!D.set.trainFrom && /^https?:$/.test(location.protocol), run: loadStations },
-  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
+  service: { label: 'Your train', every: () => journeyTurned() ? 0 : (shown() === 'travel' || (D.trip && shown() === 'today') ? 45e3 : 5*MIN), need: () => !!SRC.stations.data && !!journeyPick(Date.now()), run: loadJourney },
   town:    { label: 'Town weather', every: () => 30*MIN, need: () => !!townStation(), run: () => loadPlaceWeather(townStation()) },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
@@ -5844,26 +5879,40 @@ D.plan = cleanPlan(store.getJ('plan', {}), Date.now());
 const legNow = () => commuteLeg(Object.assign({}, D.set, { plan: D.plan }), Date.now(), SRC.holidays.data);
 function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && JSON.stringify(d.leg) !== JSON.stringify(l); }
 /* ---------- your journey: the train that matters, followed once it has left, until it gets you there ---------- */
-function journeyPick(now){ D.jPick = pickTrain(SRC.trains.data, D.jPick, now); return D.jPick; }
+// someone on their way home, as their phone told this screen (sealed; readTrip): their train is followed instead
+D.trip = readTrip(store.getJ('trip', null), Date.now());
+function tripNow(now){ if (D.trip && !readTrip(D.trip, now)){ D.trip = null; store.del('trip'); } return D.trip; }
+function journeyPick(now){
+  const t = tripNow(now);
+  D.jPick = t ? { sid: t.sid, rid: t.rid, sched: t.sched, dest: t.dest, leg: 'trip' } : pickTrain(SRC.trains.data, D.jPick && D.jPick.leg !== 'trip' ? D.jPick : null, now);
+  return D.jPick;
+}
 function journeyTurned(){ const d = SRC.service.data, p = D.jPick; return !!p && (!d || (d.d.sid || d.d.rid) !== (p.sid || p.rid) || d.d.sched !== p.sched); }
 function loadJourney(){ const d = journeyPick(Date.now()); return loadService(d).then(j => ({ d: d, stops: parseService(j, Date.now()) })); }
 function townStation(){ const T = SRC.trains.data, leg = T && T.leg, idx = SRC.stations.data; const c = leg ? (leg.home ? leg.from : leg.work ? leg.to : '') : ''; return c && idx ? idx[c] : null; }
 /** Beside the station sign when there are no trams: the map, where the train is, and when you're there. */
 function renderJourney(now){
-  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data;
+  const card = $('#tJourneyCard'), T = SRC.trains.data, S = SRC.service.data, idx = SRC.stations.data, trip = tripNow(now);
   const d = S && D.jPick && (S.d.sid || S.d.rid) === (D.jPick.sid || D.jPick.rid) ? S.d : null;
-  const on = !D.set.tramStop && !!(T && T.leg && idx && d);
+  const leg = trip ? { from: trip.from, to: trip.to, walk: 0, after: trip.walk, home: true } : T && T.leg;
+  const on = !D.set.tramStop && !!(leg && idx && d);
   card.hidden = !on; $('#tTrains').parentNode.classList.toggle('solo', !D.set.tramStop && !on);
   if (!on) return;
-  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, T.leg, idx, HOME), box = $('#tJourney');
-  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = T.leg.end && (T.leg.work || now < T.leg.end) ? weatherThen(SRC.town.data, T.leg.end, 'In town') : null;
+  const pos = trainAt(S.stops, now, idx), j = journeyView(pos, leg, idx, HOME), box = $('#tJourney');
+  const w = Math.max(400, Math.round(box.clientWidth || 800)), town = !trip && leg.end && (leg.work || now < leg.end) ? weatherThen(SRC.town.data, leg.end, 'In town') : null;
+  if (trip){
+    j.title = trip.name ? trip.name + '\u2019s way home' : 'On the way home';
+    const home = tripHome(trip, pos); j.there = home ? 'home about ' + hhmm(home) : '';
+    if (trip.here && now - trip.here.at < 10*MIN){ j.places.push({ lat: trip.here.lat, lon: trip.here.lon, kind: 'you' }); j.fit.push(trip.here); }
+  }
   $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
   // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
-  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length].join('|');
+  const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length, j.places.length].join('|');
   if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
   if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
   box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
-  setHtml(box.querySelector('.jl'), journeyLines(j, pos).concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
+  const lines = trip ? [(j.off ? j.off.text : 'On the ' + hhmm(trip.sched)) + (j.there ? ' · ' + j.there : '')] : journeyLines(j, pos);
+  setHtml(box.querySelector('.jl'), lines.concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
 }
 function due(s, now){
   if (!s.need() || s.busy) return false;
@@ -6007,7 +6056,8 @@ function renderToday(){
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
   const walk = trainWalkOf(SRC.trains.data, s);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: walk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now).slice(0, 3));
+  const trip = tripNow(now), tripPos = trip && SRC.service.data && SRC.stations.data && (SRC.service.data.d.sid || SRC.service.data.d.rid) === (trip.sid || trip.rid) ? trainAt(SRC.service.data.stops, now, SRC.stations.data) : null;
+  $('#dHeads').innerHTML = headsHtml((trip ? [tripHead(trip, tripPos)] : []).concat(headsUp({ trains: SRC.trains.data, walk: walk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now)).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
   const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: walk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
@@ -6186,6 +6236,14 @@ async function takeDetails(box){
   const d = secret && canSeal() ? await openDetails(D.remote, secret, box) : null;
   if (!d){ toast('Your phone sent something this screen couldn\'t open. Unlock both with the same PIN, with Remember ticked.', 8000); tellRemote('Couldn\'t open it: unlock both with the same PIN'); return; }
   const got = [], changes = {};
+  if ('trip' in d){
+    const was = D.trip; D.trip = d.trip || null;
+    if (D.trip) store.setJ('trip', D.trip); else store.del('trip');
+    SRC.service.last = 0; render();
+    if (D.trip && (!was || was.sched !== D.trip.sched)) toast((D.trip.name ? D.trip.name + ' is on the way' : 'On the way') + ' home, on the ' + hhmm(D.trip.sched) + '.', 6000);
+    tellRemote(D.trip ? 'Showing the way home' : 'Home');
+    if (Object.keys(d).length === 1) return;
+  }
   if (d.account){
     const a = d.account;
     store.set('account', a.account); store.set('key', a.key); store.set('gasUnit', a.gasUnit); store.set('pay', a.pay);
