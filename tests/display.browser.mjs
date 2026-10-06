@@ -631,6 +631,51 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   await tv.ctx.close(); await phone.ctx.close();
 });
 
+test('dashboard: full screen on a phone, kept from page to page', async () => {
+  const { page, ctx, errors } = await open('/index.html', { width: 390, height: 844, settings: null, withHelper: false, clock: false });
+  await ready(page);
+  const full = () => page.evaluate(() => !!document.fullscreenElement);
+  const btn = page.locator('header .fs');
+  assert.equal(await btn.getAttribute('aria-label'), 'Full screen', 'a button in the header');
+  const box = await btn.boundingBox(), head = await page.locator('header.head').boundingBox();
+  assert.ok(box.width >= 44 && box.x + box.width <= head.x + head.width + 1, 'big enough to tap, and on the screen');
+  await shot(page, 'phone-header');
+  await btn.click();
+  await page.waitForFunction(() => !!document.fullscreenElement);
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '1', 'remembered');
+  assert.equal(await btn.getAttribute('aria-label'), 'Leave full screen');
+  // a new page leaves full screen, as browsers do; the first tap there goes back
+  await page.click('.nav a[href="./money.html"]'); await page.waitForURL(/money\.html/); await ready(page);
+  assert.equal(await full(), false);
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '1', 'changing page doesn\'t forget it');
+  await page.click('main h2 >> nth=0');
+  await page.waitForFunction(() => !!document.fullscreenElement);
+  await page.locator('header .fs').click();
+  await page.waitForFunction(() => !document.fullscreenElement);
+  assert.equal(await page.evaluate(() => localStorage.getItem('hse.fullscreen')), '0', 'leaving with the button forgets it');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // an iPhone's Safari can't: the button explains Add to Home Screen
+  const ip = await open('/index.html', { width: 390, height: 844, settings: null, withHelper: false, clock: false });
+  await ip.page.addInitScript(() => {
+    Object.defineProperty(Document.prototype, 'fullscreenEnabled', { get: () => false });
+    Object.defineProperty(Document.prototype, 'webkitFullscreenEnabled', { get: () => false });
+    Object.defineProperty(Navigator.prototype, 'userAgent', { get: () => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1' });
+  });
+  await ip.page.reload(); await ready(ip.page);
+  await ip.page.locator('header .fs').click();
+  assert.match(await ip.page.textContent('.fs-help'), /Add to Home Screen/);
+  await shot(ip.page, 'phone-fullscreen-iphone');
+  await ip.page.click('.fs-help >> text=Got it');
+  assert.equal(await ip.page.locator('.fs-help').count(), 0);
+  // opened from the Home Screen, there's nothing to hide
+  await ip.page.addInitScript(() => { Object.defineProperty(Navigator.prototype, 'standalone', { get: () => true }); });
+  await ip.page.reload(); await ready(ip.page);
+  assert.equal(await ip.page.locator('header .fs').count(), 0);
+  assert.deepEqual(ip.errors, []);
+  await ip.ctx.close();
+});
+
 test('dashboard: the pages open with no signal, once seen', async () => {
   const { page, ctx, errors } = await open('/index.html', { width: 390, height: 844, settings: null, withHelper: false, clock: false, sw: true });
   await page.evaluate(() => navigator.serviceWorker.ready);
