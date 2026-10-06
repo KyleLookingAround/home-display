@@ -35,7 +35,7 @@ export function rainSoon(slots, now){
   return nowWet ? { raining: true, stops: null, text: 'Raining for the next few hours' } : null;
 }
 
-/* ---------- the rain radar (RainViewer frames over CARTO's dark map, © OpenStreetMap contributors © CARTO) ---------- */
+/* ---------- the rain radar (RainViewer frames over Esri's dark grey map) ---------- */
 export async function loadRadar(){
   const j = await request('https://api.rainviewer.com/public/weather-maps.json');
   const past = (j && j.radar && j.radar.past) || [], ahead = (j && j.radar && j.radar.nowcast) || [];
@@ -48,7 +48,12 @@ export function tileOf(lat, lon, z){
   return { x: Math.floor(x), y: Math.floor(y), fx: x - Math.floor(x), fy: y - Math.floor(y) };
 }
 export const RADAR_ZOOM = 7;
-export const baseTile = (z, x, y) => `https://a.basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
+/**
+ * Esri's World Dark Gray base map, no labels (Esri, HERE, Garmin, © OpenStreetMap contributors). No key, and browsers
+ * may load it; drawn darker on the page to sit in the night sky. CARTO's tiles began asking for a key in October 2026.
+ */
+export const baseTile = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/${z}/${y}/${x}`;
+export const BASE_CREDIT = '© Esri · OpenStreetMap';
 export const radarTile = (host, path, z, x, y) => `${host}${path}/256/${z}/${x}/${y}/2/1_1.png`;
 
 /* ---------- air quality, UV and pollen (Open-Meteo's air quality service, from CAMS) ---------- */

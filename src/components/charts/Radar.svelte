@@ -1,11 +1,11 @@
 <script>
   /*
    * The rain radar around home: RainViewer's last two hours of frames over a dark map, playing on a loop, with home
-   * marked. Tap to pause on a frame. Map © OpenStreetMap contributors © CARTO; radar © RainViewer.
+   * marked. Tap to pause on a frame. Map © Esri, © OpenStreetMap contributors; radar © RainViewer.
    */
   import { onMount } from 'svelte';
   import { HOME, hhmm } from '../../lib/format.js';
-  import { tileOf, RADAR_ZOOM, baseTile, radarTile } from '../../lib/outdoors.js';
+  import { tileOf, RADAR_ZOOM, baseTile, radarTile, BASE_CREDIT } from '../../lib/outdoors.js';
   let { radar = null, size = 300 } = $props();
   const z = RADAR_ZOOM, home = tileOf(HOME.lat, HOME.lon, z);
   const tiles = [];
@@ -28,20 +28,21 @@
 
 <button class="radar" type="button" style="height:{size}px" bind:clientWidth={width} aria-label="Rain radar, {playing ? 'playing; tap to pause' : 'paused; tap to play'}" onclick={toggle}>
   <div class="tiles" style="transform:translate({shift.x}px,{shift.y}px)">
-    {#each tiles as t}<img src={baseTile(z, t.x, t.y)} alt="" style="left:{t.left}px;top:{t.top}px" loading="lazy" decoding="async">{/each}
+    {#each tiles as t}<img class="base" src={baseTile(z, t.x, t.y)} alt="" style="left:{t.left}px;top:{t.top}px" loading="lazy" decoding="async">{/each}
     {#each frames as f, k}
       {#each tiles as t}<img class="rain" class:on={k === shown} src={radarTile(radar.host, f.path, z, t.x, t.y)} alt="" style="left:{t.left}px;top:{t.top}px" loading="lazy" decoding="async">{/each}
     {/each}
   </div>
   <i class="home" aria-hidden="true"></i>
   {#if shown >= 0}<span class="when">{hhmm(frames[shown].t)}{frames[shown].ahead ? ' forecast' : ''}</span>{/if}
-  <span class="credit">© OpenStreetMap · CARTO · RainViewer</span>
+  <span class="credit">{BASE_CREDIT} · RainViewer</span>
 </button>
 
 <style>
   .radar{position:relative;display:block;width:100%;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16;padding:0;cursor:pointer}
   .tiles{position:absolute;left:0;top:0;width:768px;height:768px}
   .tiles img{position:absolute;width:256px;height:256px;max-width:none}
+  .tiles .base{filter:brightness(.6) contrast(1.15)}
   .tiles .rain{opacity:0;transition:opacity .25s}
   .tiles .rain.on{opacity:.85}
   .home{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;background:var(--elec);box-shadow:0 0 0 3px rgba(255,181,71,.3),0 0 12px var(--elec)}

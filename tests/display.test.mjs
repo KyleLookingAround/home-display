@@ -440,7 +440,8 @@ test('maps: distance, walks, stations near a place, and a view that fits', () =>
   assert.ok(a.x >= 20 && a.x <= 340 && b.y >= 20 && b.y <= 220 && b.y < a.y, 'both inside, Piccadilly north of Stockport');
   const tiles = A.viewTiles(v);
   assert.ok(tiles.length >= 2 && tiles.length <= 6 && tiles.every(t => t.left > -256 && t.top > -256 && t.left < 360 && t.top < 240));
-  assert.match(A.mapTile(tiles[0]), /^https:\/\/[a-d]\.basemaps\.cartocdn\.com\/dark_nolabels\/11\/\d+\/\d+\.png$/);
+  assert.match(A.mapTile(tiles[0]), /^https:\/\/server\.arcgisonline\.com\/ArcGIS\/rest\/services\/Canvas\/World_Dark_Gray_Base\/MapServer\/tile\/11\/\d+\/\d+$/);
+  assert.match(A.mapTile({ z: 7, x: 63, y: 41 }), /\/tile\/7\/41\/63$/, 'Esri asks for the row before the column');
 });
 
 test('maps: where a train is, from either board\'s live times', () => {

@@ -187,7 +187,7 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   await page.route(/^https:\/\/www\.gov\.uk\/bank-holidays\.json/, r => r.fulfill({ json: holidays }));
   await page.route(/^https:\/\/environment\.data\.gov\.uk\//, r => r.fulfill({ json: floods }));
   await page.route(/^https:\/\/api\.rainviewer\.com\//, r => r.fulfill({ json: radar }));
-  await page.route(/^https:\/\/(tilecache\.rainviewer\.com|[a-d]\.basemaps\.cartocdn\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  await page.route(/^https:\/\/(tilecache\.rainviewer\.com|server\.arcgisonline\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
   await page.route(/^https:\/\/(national-rail-api\.davwheat\.dev|ntfy\.sh)\//, r => r.fulfill({ status: 500, body: '' }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
   boardAt = at;

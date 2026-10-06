@@ -101,7 +101,7 @@ function signHtml(trains, walk, now){
   return { board: board, platform: plat + '<div class="clock-s" data-clock-s></div>' };
 }
 
-/* ---------- the journey map (src/lib/geo.js): CARTO's dark tiles with the route, stations, home and the train ---------- */
+/* ---------- the journey map (src/lib/geo.js): Esri's dark grey tiles with the route, stations, home and the train ---------- */
 function mapHtml(j, w, h){
   const v = fitView(j.fit.length ? j.fit : j.places, w, h, 60, 9, 15), pt = p => onView(v, p), xy = p => { const q = pt(p); return q.x.toFixed(1) + ',' + q.y.toFixed(1); };
   const tiles = viewTiles(v).map(t => `<img src="${mapTile(t)}" alt="" style="left:${t.left}px;top:${t.top}px">`).join('');

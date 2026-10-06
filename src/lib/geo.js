@@ -1,10 +1,11 @@
 /*
  * Maps and distance: where stations are (public/stations.json), where a train is between them from its live times,
- * how long a walk is, and a map drawn from CARTO's dark tiles with our own lines and labels on top.
+ * how long a walk is, and a map drawn from Esri's dark grey tiles (the rain radar's) with our own lines and labels on top.
  * Plain enough for TV browsers (Chromium 63): no optional chaining or nullish defaults.
  */
 import { HOME, hhmm } from './format.js';
 import { ApiError, request } from './net.js';
+import { baseTile, BASE_CREDIT } from './outdoors.js';
 import { HUXLEY, atClock, boardTime, catchable, commuteTrain } from './household.js';
 
 /* ---------- distance ---------- */
@@ -160,9 +161,9 @@ export function viewTiles(v){
     for (let tx = Math.floor(left / TILE); tx * TILE < left + v.w; tx++) out.push({ z: v.z, x: tx, y: ty, left: Math.round(tx * TILE - left), top: Math.round(ty * TILE - top) });
   return out;
 }
-/** CARTO's dark map without labels (© OpenStreetMap contributors © CARTO); our labels go on top. */
-export const mapTile = t => 'https://' + 'abcd'.charAt(Math.abs(t.x + t.y) % 4) + '.basemaps.cartocdn.com/dark_nolabels/' + t.z + '/' + t.x + '/' + t.y + '.png';
-export const MAP_CREDIT = '© OpenStreetMap · CARTO';
+/** The dark map without labels (baseTile in outdoors.js); our labels go on top. */
+export const mapTile = t => baseTile(t.z, t.x, t.y);
+export const MAP_CREDIT = BASE_CREDIT;
 
 /* ---------- the journey: what goes on the map ---------- */
 /**

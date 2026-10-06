@@ -4,6 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Finding**: the rain radar (and the new journey maps) showed "API KEY REQUIRED" where the map should be: CARTO's base map tiles now ask for a key. The radar itself (RainViewer) still needs none. The map underneath is now Esri's World Dark Gray Base, which needs no key and allows browsers (checked), drawn darker to sit in the night sky (`baseTile` in outdoors.js, used by `mapTile` too). OpenStreetMap's own tile servers block apps like this one, so they weren't an option.
 - **Creation**: maps, stage 4: getting home from anywhere, and your commute in numbers.
   - Get me home (on Home): from wherever you are, the nearest stations within 15 km with trains that call at yours, the walk to each, the first you can make, and when you'd be home; best first, with a map. Near your own station, just the walk (`waysHome`). It asks where you are just that once if location isn't on.
   - Your commute this year: office days, miles by train, walking, steps and the CO₂ next to driving it, all estimates (`commuteStats`). The phone logs each office day once your day has started (`logDay`; `hse.officeLog`, on the phone only), so it counts from today.

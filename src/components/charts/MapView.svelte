@@ -1,7 +1,7 @@
 <script>
   /*
-   * A map: CARTO's dark tiles (no labels) with our own on top: a route as a glowing line, stations, home, you, and a
-   * train that moves. It fits `fit` (or every place) into its box. Map © OpenStreetMap contributors © CARTO.
+   * A map: Esri's dark grey tiles (no labels), darkened, with our own on top: a route as a glowing line, stations, home, you, and a
+   * train that moves. It fits `fit` (or every place) into its box. Map © Esri, © OpenStreetMap contributors.
    */
   import { fitView, onView, viewTiles, mapTile, MAP_CREDIT } from '../../lib/geo.js';
   let { places = [], route = [], walks = [], fit = null, height = 240, label = 'Map', min = 9, max = 15 } = $props();
@@ -44,7 +44,7 @@
 
 <style>
   .map{position:relative;width:100%;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16}
-  img{position:absolute;width:256px;height:256px;max-width:none;filter:saturate(.6) brightness(1.15)}
+  img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.6) contrast(1.15)}
   svg{position:absolute;left:0;top:0}
   .route{fill:none;stroke:var(--elec);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
   .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:10;stroke-linecap:round;stroke-linejoin:round}
