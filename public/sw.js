@@ -4,8 +4,8 @@
  * icons and fonts, whose names change when they do, come from the copy first. Readings and prices aren't touched:
  * the pages keep those in IndexedDB themselves. Lives next to the pages, so /preview/ keeps its own.
  */
-const CACHE = 'hse-pages-v1', MAX = 150;
-const PAGES = ['./', 'index.html', 'money.html', 'usage.html', 'home.html', 'screen.html', 'settings.html', 'household.json', 'manifest.webmanifest', 'icon-192.png'];
+const CACHE = 'hse-pages-v2', MAX = 150;
+const PAGES = ['./', 'index.html', 'money.html', 'usage.html', 'home.html', 'music.html', 'screen.html', 'settings.html', 'household.json', 'manifest.webmanifest', 'icon-192.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(PAGES.map(p => c.add(p).catch(() => null)))).then(() => self.skipWaiting()));

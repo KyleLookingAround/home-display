@@ -41,6 +41,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 /* ---------- the shell: a bottom bar on a phone, a rail on a laptop ---------- */
 .app{position:relative;z-index:1;min-height:100vh}
 .main{max-width:760px;margin:0 auto;padding:calc(env(safe-area-inset-top,0px) + var(--s4)) var(--s4) calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + var(--s6))}
+/* music: room for the now-playing strip, no scrolling behind the open player, and the cover's colour glowing behind the page */
+html.has-mini .main{padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom,0px) + 84px)}
+html.player-open{overflow:hidden}
+.app::before{content:"";position:fixed;left:0;top:0;right:0;height:70vh;pointer-events:none;z-index:-1;opacity:0;transition:opacity 1.2s,background 1.2s;
+  background:radial-gradient(80% 60% at 50% -10%,color-mix(in srgb,var(--tint,transparent) 26%,transparent),transparent 70%)}
+html.tinted .app::before{opacity:1}
+@media (prefers-reduced-motion:reduce){ .app::before{transition:none} }
 .nav{position:fixed;z-index:20;left:0;right:0;bottom:0;display:flex;height:calc(var(--nav-h) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);
   background:rgba(6,8,20,.92);border-top:1px solid var(--line);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .nav .brand,.nav a.item.rail-only{display:none}
@@ -58,6 +65,7 @@ button,input,select,textarea{font:inherit;color:inherit}
   .nav a.item{flex:none;flex-direction:row;justify-content:flex-start;gap:var(--s3);padding:var(--s3);border-radius:var(--radius-sm);font-size:15px}
   .nav a.item[aria-current="page"]{background:rgba(79,214,255,.1)}
   .main{max-width:1100px;padding:var(--s5) var(--s6) var(--s6)}
+  html.has-mini .main{padding-bottom:110px}
 }
 
 /* ---------- the header ---------- */

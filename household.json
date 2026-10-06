@@ -35,5 +35,6 @@
   "trainTo": "",
   "trainWalk": 15,
   "tramStop": "",
-  "tramWalk": 15
+  "tramWalk": 15,
+  "spotifyClientId": "68f6b8e123124e28817824fb1579ee3d"
 }

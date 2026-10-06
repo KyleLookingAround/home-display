@@ -7,11 +7,13 @@ import Ahead from '../components/now/Ahead.svelte';
 import RightNow from '../components/now/RightNow.svelte';
 import ComingUp from '../components/now/ComingUp.svelte';
 import RunIt from '../components/now/RunIt.svelte';
+import MusicNow from '../components/now/MusicNow.svelte';
 ---
 <App page="index" title="Now">
   <Notices client:load example />
   <Verdict client:load />
   <HeadsUp client:load />
+  <MusicNow client:load />
   <div class="cols">
     <div class="page span"><Ahead client:load /></div>
     <RightNow client:load />
