@@ -4,7 +4,8 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
-- **Creation** (music branch, stage 4): the house queue, parties and who's listening ([decision 0013](docs/decisions/0013-house-queue.md)).
+- **Creation**: full screen on a phone. A button in the header of every page hides the browser's bars. Browsers end full screen whenever the page changes, so once it's on, each page goes back to full screen at your first tap; leaving it with the button (or Back) turns that off. iPhones can't do this in Safari, so there the button explains Add to Home Screen, which opens the app with no bars, and the button isn't shown when it's opened from there. The display's own Full screen button says the same on an iPhone.
+- **Creation** (music branch, stage 4): the house queue, parties and who's listening ([decision 0013](decisions/0013-house-queue.md)).
   - **The house queue:** with the TV paired and on Spotify, + on a phone adds to a queue the TV keeps. Up next in the player shows it: drag a song by its handle (or the arrow keys) to move it, the heart to vote it up, the cross to take it out. The TV hands Spotify the top song about 25 seconds before the one playing ends, and skipping plays the house's next.
   - **The TV:** the Music view lists the next three, with who chose them and their votes.
   - **Parties:** "Start a party" (on the phone, or in the TV's settings) shows a code on the TV. Guests scan it to open `party.html`, give a name, search (the TV searches for them) or paste a Spotify link, add up to three songs each and vote. The page isn't behind the PIN and holds nothing private; the party's topic can only add songs and vote. While a party's on, the screensaver, the night clock and the bedtime fade wait.

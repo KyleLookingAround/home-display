@@ -480,7 +480,8 @@ function onKey(e){
 function toggleFullscreen(){
   try {
     if (document.fullscreenElement || document.webkitFullscreenElement) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
-    else { const d = document.documentElement, r = d.requestFullscreen || d.webkitRequestFullscreen; if (r){ const p = r.call(d); if (p && p.catch) p.catch(() => {}); } }
+    else { const d = document.documentElement, r = d.requestFullscreen || d.webkitRequestFullscreen; if (r){ const p = r.call(d); if (p && p.catch) p.catch(() => {}); }
+      else toast('This browser can\'t go full screen. On an iPhone: Share, then Add to Home Screen, and open it from there.', 7000); }
   } catch(e){}
 }
 function syncFs(){ $('#fsBtn').textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; }
