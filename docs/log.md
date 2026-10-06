@@ -4,6 +4,7 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update**: full screen now stays on across every page, so the site feels like an app. Browsers leave full screen whenever a page changes, so the button now opens the site inside the full-screen page (one frame filling the screen) and the tabs change inside it; the page underneath rests, polling nothing. Leaving full screen, by the button or the phone's Back, opens the page you were on as itself. A fresh visit with full screen chosen goes back into it at the first tap.
 - **Creation** (music branch, stage 5): finding music, and your listening ([decision 0014](decisions/0014-finding-music.md)).
   - **More like this** (the player's More): songs people play alongside the one playing, from ListenBrainz (and Last.fm with a key), found on Spotify, with the artists fans also like. Artist pages show "Fans also like" too.
   - **New from your artists:** releases in the last three weeks from the artists you follow and play, on the Music tab; the last three days as a heads-up on Now and on the TV's Today.
