@@ -9,12 +9,16 @@
   import { BIN_COLOURS } from '../../lib/household.js';
   import DateField from '../DateField.svelte';
   let f = $state(null), saved = $state('');
-  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
+  const KEYS = ['bins', 'trainFrom', 'trainTo', 'trainWalk', 'workDays', 'workWalk', 'homeFrom', 'tramStop', 'tramWalk', 'ical', 'wifi', 'dates'];
+  const WEEK = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+  const HOME_TIMES = Array.from({ length: 21 }, (_, i) => String(10 + Math.floor(i / 2)).padStart(2, '0') + (i % 2 ? ':30' : ':00'));
+  const toggleDay = d => { f.workDays = f.workDays.includes(d) ? f.workDays.filter(x => x !== d) : [...f.workDays, d].sort(); };
   const fill = s => {
     const o = {};
     KEYS.forEach(k => { o[k] = k === 'bins' ? s.bins.map(b => ({ name: b.name, what: b.what || '', colour: b.colour || 'grey', date: b.date, every: +b.every || 1 })) : s[k]; });
     o.wifi = s.wifi ? { ...s.wifi } : { ssid: '', password: '', security: 'WPA', hidden: false };
     o.dates = (s.dates || []).map(d => ({ ...d }));
+    o.workDays = [...(s.workDays || [])];
     return o;
   };
   onMount(async () => { f = fill(await houseSettings()); });
@@ -22,7 +26,7 @@
     ev.preventDefault();
     const form = $state.snapshot(f);
     form.trainFrom = String(form.trainFrom || '').trim().toUpperCase(); form.trainTo = String(form.trainTo || '').trim().toUpperCase();
-    form.trainWalk = +form.trainWalk || 0; form.tramWalk = +form.tramWalk || 0; form.ical = String(form.ical || '').trim();
+    form.trainWalk = +form.trainWalk || 0; form.workWalk = Math.max(0, +form.workWalk || 0); form.tramWalk = +form.tramWalk || 0; form.ical = String(form.ical || '').trim();
     form.bins = form.bins.filter(b => b.name && b.date).map(b => ({ ...b, every: Math.max(1, Math.round(+b.every || 1)) }));
     form.wifi = form.wifi && String(form.wifi.ssid || '').trim() ? { ssid: form.wifi.ssid.trim(), password: form.wifi.password || '', security: form.wifi.security || 'WPA', hidden: !!form.wifi.hidden } : null;
     form.dates = form.dates.filter(d => String(d.name || '').trim() && d.date).map(d => ({ name: d.name.trim(), date: d.date, kind: d.kind || 'birthday' }));
@@ -63,6 +67,16 @@
           <div class="field"><label for="hWalk">Walk (minutes)</label><input id="hWalk" type="number" min="0" max="60" bind:value={f.trainWalk}></div>
         </div>
         <p class="note">Three-letter station codes: Stockport is SPT, Manchester Piccadilly MAN.</p>
+        <div class="field"><span class="lbl" id="hDaysL">Days you go in to work</span>
+          <div class="days" role="group" aria-labelledby="hDaysL">
+            {#each WEEK as [d, n]}<label class="day"><input type="checkbox" checked={f.workDays.includes(d)} onchange={() => toggleDay(d)}><span>{n}</span></label>{/each}
+          </div>
+        </div>
+        <div class="inline-fields">
+          <div class="field"><label for="hWorkWalk">Walk to work from there (minutes)</label><input id="hWorkWalk" type="number" min="0" max="60" bind:value={f.workWalk}></div>
+          <div class="field"><label for="hHome">Head home from</label><select id="hHome" bind:value={f.homeFrom}>{#each HOME_TIMES as t}<option>{t}</option>{/each}</select></div>
+        </div>
+        <p class="note">On those days the trains go to work until then, with when you'll be in, and then turn round for the way home. On other days, and bank holidays, you see every train from your station.</p>
         <div class="inline-fields">
           <div class="field"><label for="hTram">Tram stop</label><input id="hTram" bind:value={f.tramStop} placeholder="Needs the home server"></div>
           <div class="field"><label for="hTramWalk">Walk (minutes)</label><input id="hTramWalk" type="number" min="0" max="60" bind:value={f.tramWalk}></div>
@@ -105,6 +119,12 @@
 <style>
   fieldset{border:0;margin:0;padding:0;display:grid;gap:var(--s3)}
   legend{font:600 14px/1.3 var(--f-body);color:var(--ink);margin-bottom:var(--s2);padding:0}
+  .days{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .day{position:relative;display:inline-flex}
+  .day input{position:absolute;opacity:0;width:1px;height:1px}
+  .day span{min-width:48px;text-align:center;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius-sm);font:500 14px/1 var(--f-body);color:var(--muted);cursor:pointer}
+  .day input:checked + span{background:rgba(255,179,71,.14);border-color:var(--elec);color:var(--ink)}
+  .day input:focus-visible + span{outline:2px solid var(--gas);outline-offset:2px}
   .bin{display:grid;gap:var(--s2);padding:var(--s2) var(--s3);border:1px solid var(--line);border-radius:var(--radius-sm)}
   .bin[open]{padding-bottom:var(--s3)}
   .bin > :global(* + *){margin-top:var(--s2)}

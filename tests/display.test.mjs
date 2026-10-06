@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable workDay commuteLeg arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -360,6 +360,45 @@ test('trains you can still make with your walk come first; the rest are only cou
   assert.equal(c.missed, 3, 'the one that has already left isn\'t counted');
   assert.equal(A.leaveBy(c.list[0].sched, 25, now).text, 'Run for it');
   assert.equal(A.catchable(null, 10, now).list.length, 0);
+});
+
+test('the commute: to work in the morning, home in the afternoon, every train on days off', () => {
+  const s = A.displaySettings({ trainFrom: 'SPT', trainTo: 'MAN', trainWalk: 15, workDays: [1, 2, 3, 4, 5], workWalk: 25, homeFrom: '15:00' });
+  const mon = h => at('2026-10-05T' + h + ':00');
+  assert.deepEqual(plain(A.commuteLeg(s, mon('07:40'))), { from: 'SPT', to: 'MAN', walk: 15, after: 25, work: true, home: false });
+  assert.deepEqual(plain(A.commuteLeg(s, mon('15:00'))), { from: 'MAN', to: 'SPT', walk: 25, after: 15, work: false, home: true }, 'turned round from 15:00');
+  assert.deepEqual(plain(A.commuteLeg(s, at('2026-10-10T09:00:00'))), { from: 'SPT', to: '', walk: 15, after: 0, work: false, home: false }, 'Saturday: every train from Stockport');
+  assert.equal(A.commuteLeg(s, at('2026-12-28T09:00:00'), [{ date: '2026-12-28', title: 'Boxing Day' }]).work, false, 'a bank holiday is a day off');
+  assert.equal(A.commuteLeg(A.displaySettings({ trainFrom: 'SPT', trainTo: 'MAN' }), mon('17:00')).to, 'MAN', 'with no work days, the station only picks the trains');
+  assert.equal(A.trainWalkOf({ leg: { walk: 25 } }, s), 25);
+  assert.equal(A.trainWalkOf(null, s), 15);
+  assert.deepEqual(plain(A.displaySettings({ workDays: ['1', 9, 5], workWalk: -3, homeFrom: 'soon' })).workDays, [1, 5]);
+  assert.equal(A.displaySettings({ homeFrom: 'soon' }).homeFrom, '15:00');
+});
+
+test('the commute: when each train gets there, from either board, and when you\'re at work or home', () => {
+  const now = at('2026-10-05T07:50:00');
+  const r = A.parseHuxley({ locationName: 'Stockport', filterLocationName: 'Manchester Piccadilly', trainServices: [
+    { std: '08:03', etd: 'On time', destination: [{ locationName: 'Manchester Piccadilly' }], subsequentCallingPoints: [{ callingPoint: [{ locationName: 'Heaton Chapel', crs: 'HTC', st: '08:07', et: 'On time' }, { locationName: 'Manchester Piccadilly', crs: 'MAN', st: '08:14', et: '08:17' }] }] },
+    { std: '08:09', etd: 'Delayed', destination: [{ locationName: 'Manchester Airport' }], subsequentCallingPoints: [{ callingPoint: [{ locationName: 'Manchester Piccadilly', crs: 'MAN', st: '08:20', et: 'Delayed' }] }] },
+    { std: '2026-10-05T08:12:00', etd: '2026-10-05T08:12:00', destination: [{ locationName: 'Manchester Piccadilly' }], subsequentLocations: [{ locationName: 'Levenshulme', crs: 'LVM', isPass: true, sta: '0001-01-01T00:00:00' }, { locationName: 'Manchester Piccadilly', crs: 'MAN', isPass: false, sta: '2026-10-05T08:22:00', eta: '2026-10-05T08:23:30.5', ata: '0001-01-01T00:00:00' }] } ] }, now, 'MAN');
+  assert.equal(r.toName, 'Manchester Piccadilly');
+  assert.deepEqual(r.list.map(d => d.arr && new Date(d.arr).toTimeString().slice(0, 5)), ['08:17', null, '08:23'], 'expected times, and a delay is not a time');
+  assert.equal(r.list[0].arrSched, at('2026-10-05T08:14:00'));
+  const leg = { from: 'SPT', to: 'MAN', walk: 15, after: 25, work: true, home: false };
+  assert.equal(A.arriveBy(r.list[0], leg).text, 'At work by 08:42');
+  assert.equal(A.arriveBy(r.list[0], { from: 'MAN', to: 'SPT', walk: 25, after: 15, home: true }).text, 'Home by 08:32');
+  assert.equal(A.arriveBy(r.list[0], { from: 'SPT', to: 'MAN', walk: 15, after: 0 }).text, 'Arrives 08:17');
+  assert.equal(A.arriveBy(r.list[1], leg), null);
+  const trains = Object.assign(r, { leg });
+  assert.equal(A.commuteLine(trains, now), 'The 08:03 is at Manchester Piccadilly at 08:17, then a 25 minute walk: at work by 08:42.', 'a run for it, but you can make it');
+  assert.equal(A.commuteLine(trains, at('2026-10-05T07:55:00')), 'The 08:12 is at Manchester Piccadilly at 08:23, then a 25 minute walk: at work by 08:48.', 'the 08:03 is too soon with a 15 minute walk, and the delayed 08:09 has no time yet');
+  assert.equal(A.trainsTitle(trains, {}), 'Trains to work');
+  assert.equal(A.trainsTitle({ station: 'Stockport', toName: 'Manchester Piccadilly', list: [] }, { trainFrom: 'SPT' }), 'Trains from Stockport to Manchester Piccadilly');
+  assert.equal(A.trainsTitle({ station: 'Stockport', list: [] }, { trainFrom: 'SPT' }), 'Trains from Stockport');
+  assert.equal(A.trainsTitle(null, { trainFrom: '' }), 'Trains');
+  const heads = A.headsUp({ trains: trains }, at('2026-10-05T07:40:00'));
+  assert.match(heads[0].sub, /^08:03 to Manchester Piccadilly, expected 08:03\. At work by 08:42$|^08:03 to Manchester Piccadilly\. At work by 08:42$/);
 });
 
 test('the station sign words a train the same on the phone and the TV', () => {

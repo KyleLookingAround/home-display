@@ -77,14 +77,26 @@ const floods = { items: [{ severityLevel: 3, description: 'River Goyt at Marple 
 const gridMix = { data: [{ regionid: 3, shortname: 'North West England', data: [{ from: '2026-10-05T13:00Z', to: '2026-10-05T13:30Z', generationmix: [{ fuel: 'wind', perc: 55.4 }, { fuel: 'nuclear', perc: 27.6 }, { fuel: 'imports', perc: 8.3 }, { fuel: 'gas', perc: 6.5 }, { fuel: 'solar', perc: 2.2 }] }] }] };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
 
-function huxley(){
-  const hm = m => { const d = new Date(+NOW + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
-  const calls = { 'Manchester Piccadilly': ['Heaton Chapel', 'Levenshulme', 'Manchester Piccadilly'], 'London Euston': ['Macclesfield', 'Stoke-on-Trent', 'Milton Keynes Central', 'London Euston'], Buxton: ['Davenport', 'Hazel Grove', 'Disley', 'Buxton'] };
+// A Darwin board, as Huxley2 gives it: Stockport's, or Piccadilly's on the way home (/departures/MAN/…). Each calling
+// point has its code and time, so the commute can say when you'll get there.
+let boardAt = NOW;
+const CRS = { 'Heaton Chapel': 'HTC', Levenshulme: 'LVM', 'Manchester Piccadilly': 'MAN', 'Manchester Airport': 'MIA', Stockport: 'SPT', Davenport: 'DVN', 'Hazel Grove': 'HAZ', Buxton: 'BUX', Macclesfield: 'MAC', Crewe: 'CRE' };
+function huxley(url = ''){
+  const hm = m => { const d = new Date(+boardAt + m * 60e3); return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' }); };
+  const home = /\/departures\/MAN\//i.test(url), to = (/\/to\/([A-Z]{3})\//i.exec(url) || [])[1];
+  const calls = home ? { Buxton: [['Stockport', 9], ['Davenport', 13], ['Hazel Grove', 17], ['Buxton', 45]], Crewe: [['Stockport', 8], ['Macclesfield', 20], ['Crewe', 40]], 'Hazel Grove': [['Levenshulme', 6], ['Heaton Chapel', 9], ['Stockport', 12], ['Hazel Grove', 20]] }
+    : { 'Manchester Piccadilly': [['Heaton Chapel', 4], ['Levenshulme', 7], ['Manchester Piccadilly', 11]], 'London Euston': [['Macclesfield', 12], ['Stoke-on-Trent', 30], ['Milton Keynes Central', 90], ['London Euston', 120]],
+        Buxton: [['Davenport', 4], ['Hazel Grove', 9], ['Disley', 15], ['Buxton', 35]], 'Manchester Airport': [['Manchester Piccadilly', 10], ['Manchester Airport', 30]] };
   const svc = (m, dest, plat, etd, extra) => Object.assign({ std: hm(m), etd: etd || 'On time', platform: plat, operator: 'Northern', isCancelled: false, length: 4, destination: [{ locationName: dest, via: null }],
-    subsequentCallingPoints: [{ callingPoint: (calls[dest] || [dest]).map(n => ({ locationName: n })) }] }, extra || {});
-  return { locationName: 'Stockport', crs: 'SPT', nrccMessages: null, trainServices: [
-    svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', hm(23)), svc(24, 'Buxton', '4'),
-    svc(31, 'Hazel Grove', '2', 'Cancelled', { isCancelled: true }), svc(38, 'Sheffield', '3', 'Delayed'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4') ] };
+    subsequentCallingPoints: [{ callingPoint: (calls[dest] || [[dest, 30]]).map(([n, k]) => ({ locationName: n, crs: CRS[n] || null, st: hm(m + k), et: 'On time' })) }] }, extra || {});
+  const named = { MAN: 'Manchester Piccadilly', SPT: 'Stockport' };
+  if (home) return { locationName: 'Manchester Piccadilly', crs: 'MAN', filterLocationName: to ? named[to] : null, nrccMessages: null, trainServices: [
+    svc(8, 'Buxton', '13'), svc(20, 'Crewe', '5'), svc(34, 'Hazel Grove', '14'), svc(47, 'Buxton', '13') ] };
+  const all = [svc(9, 'Manchester Piccadilly', '1'), svc(17, 'London Euston', '3', hm(23)), svc(24, 'Buxton', '4'),
+    svc(31, 'Hazel Grove', '2', 'Cancelled', { isCancelled: true }), svc(38, 'Sheffield', '3', 'Delayed'), svc(46, 'Manchester Airport', '1'), svc(55, 'Crewe', '4')];
+  // "/to/MAN": only the trains that call there, as Darwin filters them
+  return { locationName: 'Stockport', crs: 'SPT', filterLocationName: to ? named[to] : null, nrccMessages: null,
+    trainServices: to ? all.filter(x => x.subsequentCallingPoints[0].callingPoint.some(c => c.crs === to.toUpperCase())) : all };
 }
 const trams = { value: [
   { Id: 1, StationLocation: 'East Didsbury', Direction: 'Outgoing', Dest0: 'Rochdale Town Centre', Carriages0: 'Double', Status0: 'Due', Wait0: '4', Dest1: 'Shaw and Crompton', Carriages1: 'Single', Wait1: '12', Dest2: 'Rochdale Town Centre', Wait2: '19', MessageBoard: 'Welcome to Metrolink. Engineering works this Sunday: see tfgm.com.' },
@@ -148,7 +160,9 @@ before(async () => {
 after(async () => { await browser.close(); server.close(); });
 
 const SETTINGS = { trainFrom: 'SPT', trainWalk: 12, tramStop: 'East Didsbury', tramWalk: 8, ical: 'https://calendar.google.com/calendar/ical/x%40group.calendar.google.com/private-0/basic.ics',
-  bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Paper and card', colour: 'blue', date: '2026-10-13', every: 2 }, { name: 'Garden waste', colour: 'brown', date: '2026-10-08', every: 2 }] };
+  bins: [{ name: 'General waste', colour: 'black', date: '2026-10-06', every: 2 }, { name: 'Paper and card', colour: 'blue', date: '2026-10-13', every: 2 }, { name: 'Garden waste', colour: 'brown', date: '2026-10-08', every: 2 }],
+  trainTo: '', workDays: [] };                  // every train from Stockport; the commute has tests of its own
+const COMMUTE = { ...SETTINGS, trainTo: 'MAN', trainWalk: 15, workDays: [1, 2, 3, 4, 5], workWalk: 25, homeFrom: '15:00' };
 
 async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false } = {}){
   helper = withHelper;
@@ -168,7 +182,8 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   await page.route(/^https:\/\/(tilecache\.rainviewer\.com|[a-d]\.basemaps\.cartocdn\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
   await page.route(/^https:\/\/(national-rail-api\.davwheat\.dev|ntfy\.sh)\//, r => r.fulfill({ status: 500, body: '' }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
-  await page.route(/^https:\/\/huxley2\.azurewebsites\.net\//, r => r.fulfill({ json: huxley() }));
+  boardAt = at;
+  await page.route(/^https:\/\/huxley2\.azurewebsites\.net\//, r => r.fulfill({ json: huxley(r.request().url()) }));
   if (clock) await page.clock.install({ time: at });
   if (settings) await page.addInitScript(s => { try { localStorage.setItem('hse.display', s); } catch (e) {} }, JSON.stringify(settings));
   if (account) await page.addInitScript(() => { try { localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test'); } catch (e) {} });
@@ -252,7 +267,7 @@ test('display: content on the TV is real data, labelled examples only where noth
   assert.doesNotMatch(await page.textContent('#screen'), /Example/);
   await ctx.close();
   // GitHub Pages, no home server: trains still come straight from the public boards; trams say what they need.
-  const pages = await open('/display.html#travel', { withHelper: false, settings: { tramStop: 'East Didsbury' } });
+  const pages = await open('/display.html#travel', { withHelper: false, settings: { tramStop: 'East Didsbury', trainTo: '', workDays: [] } });
   await pages.page.waitForTimeout(500);
   assert.match(await pages.page.textContent('#tTrains'), /Manchester Piccadilly/);
   assert.match(await pages.page.textContent('#tTrains'), /Delayed/);
@@ -727,6 +742,34 @@ test('dashboard: a page waiting for its styles shows the night sky, not a white 
   assert.ok(before.icon <= 24, `icons stay icon-sized (${before.icon}px)`);
   release();
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.app')).visibility === 'visible');
+  await ctx.close();
+});
+
+test('the commute: trains to work with when you\'ll be in, then the way home on the phone and the TV', async () => {
+  // Monday 14:10: to work. The 14:19 is too soon with a 15 minute walk; the 14:56 is at Piccadilly 15:06, at work 15:31.
+  let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, settings: COMMUTE, withHelper: false });
+  const card = page.locator('.card', { hasText: 'Trains to work' });
+  await card.locator('.dmx').waitFor(); await ready(page);
+  assert.match(await card.locator('.commute').textContent(), /^The 14:56 is at Manchester Piccadilly at 15:06, then a 25 minute walk: at work by 15:31\.$/);
+  assert.doesNotMatch(await card.locator('.dmx').textContent(), /Buxton|Euston/, 'only trains that call at Piccadilly');
+  await card.scrollIntoViewIfNeeded(); await shot(page, 'home-commute');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  // 17:30: the way home, from Piccadilly with the walk from work; on the TV too
+  const evening = new Date('2026-10-05T17:30:00+01:00');
+  ({ page, ctx, errors } = await open('/display.html#travel', { at: evening, settings: COMMUTE }));
+  await page.waitForFunction(() => /Trains home/.test(document.getElementById('tTrainTitle').textContent));
+  assert.match(await page.textContent('#tCommute'), /^The 17:50 is at Stockport at 17:58, then a 15 minute walk: home by 18:13\.$/);
+  assert.match(await page.textContent('#tBoard'), /Crewe/);
+  await shot(page, 'tv-travel-home');
+  await page.evaluate(() => { location.hash = 'today'; }); await page.waitForTimeout(500);
+  await page.evaluate(() => document.body.classList.remove('chrome-on'));
+  assert.equal(await page.textContent('#dTrainsH'), 'Trains home');
+  assert.match(await page.textContent('#dTrains'), /17:50 Crewe[\s\S]*Run for it\s*Home by 18:13/);
+  const l = await layout(page);
+  assert.ok(l.sh <= l.ih, `Today still fits (${l.sh})`); assert.deepEqual(l.small, []);
+  await shot(page, 'tv-today-home');
+  assert.deepEqual(errors, []);
   await ctx.close();
 });
 

@@ -11,7 +11,7 @@ import { findHomeMini, liveReading } from '../lib/octopus.js';
 import { loadBankHolidays, loadNowcast, loadRadar, loadAir, loadFloods } from '../lib/outdoors.js';
 import { loadGridMix } from '../lib/carbon.js';
 import { CI_REGION } from '../lib/format.js';
-import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive } from '../lib/household.js';
+import { mergeSettings, deviceChanges, loadDisplayWeather, loadCouncilBins, loadCalendar, loadTrainsLive, commuteLeg } from '../lib/household.js';
 
 const MIN = 60e3;
 let started = null, shared = null;
@@ -54,7 +54,10 @@ export const loadCouncil = force => cached('council', 3 * 60 * MIN, loadCouncilB
 export async function loadTrains(force){
   const s = await houseSettings();
   if (!s.trainFrom){ app.trains = null; return null; }
-  return cached('trains:' + s.trainFrom + ':' + (s.trainTo || ''), 2 * MIN, () => loadTrainsLive(s.trainFrom, s.trainTo), v => { app.trains = v; }, e => { app.trainsErr = e; }, force);
+  // the commute turns round in the afternoon on a work day: the way home, from where you work
+  const leg = commuteLeg(s, Date.now(), app.holidays);
+  return cached('trains:' + leg.from + ':' + leg.to + ':' + leg.walk + ':' + leg.after, 2 * MIN, () => loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg })),
+    v => { app.trains = v; }, e => { app.trainsErr = e; }, force);
 }
 export async function loadEvents(force){
   const s = await houseSettings();

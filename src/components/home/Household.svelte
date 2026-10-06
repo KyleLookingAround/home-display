@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
-  import { BIN_COLOURS, relDay, weatherText, leaveBy, catchable } from '../../lib/household.js';
+  import { BIN_COLOURS, relDay, weatherText, leaveBy, catchable, trainWalkOf, trainsTitle, commuteLine } from '../../lib/household.js';
   import { rainSoon, aqiLabel, uvLabel, pollenLabel } from '../../lib/outdoors.js';
   import Radar from '../charts/Radar.svelte';
   import DepartureBoard from './DepartureBoard.svelte';
@@ -38,7 +38,8 @@
   const today = $derived(+startOfDay(new Date(app.now)));
   const events = $derived(app.events ? app.events.filter(e => e.end > app.now && e.start < +addDays(new Date(today), 2)) : null);
 
-  const walk = $derived(app.house ? +app.house.trainWalk || 0 : 0);
+  const walk = $derived(app.house ? trainWalkOf(app.trains, app.house) : 0);
+  const commute = $derived(commuteLine(app.trains, app.now));
   // the next trains you can still make with your walk; the ones you can't are only counted
   const caught = $derived(app.trains && app.trains.list ? catchable(app.trains.list, walk, app.now) : null);
   const trains = $derived(caught ? caught.list.slice(0, 4) : null);
@@ -98,9 +99,10 @@
   </section>
 
   <section class="card">
-    <h2 class="label">Trains{app.trains && app.trains.station ? ' from ' + app.trains.station : ''}</h2>
+    <h2 class="label">{app.house ? trainsTitle(app.trains, app.house) : 'Trains'}</h2>
     {#if app.trains && app.trains.list && app.trains.list.length}
       <DepartureBoard trains={app.trains} {walk} />
+      {#if commute}<p class="commute">{commute}</p>{/if}
       <p class="note">Tap the board for the departures and when to leave. With a {walk} minute walk{caught.missed ? `, ${caught.missed} sooner ${caught.missed === 1 ? 'one leaves' : 'ones leave'} too soon to make` : ''}.</p>
     {:else if trains}<p class="note">No trains in the next couple of hours.</p>
     {:else if app.trainsErr}<p class="note">Departures didn't load: {errorText(app.trainsErr)[0]}</p>
@@ -128,6 +130,7 @@
 </div>
 
 <style>
+  .commute{margin:var(--s2) 0 0;font-weight:500}
   .wx-now{display:flex;align-items:center;gap:var(--s3)}
   .wx-i{font-size:34px;line-height:1}
   .wx-now .figure{font:500 40px/1 var(--f-mono)}

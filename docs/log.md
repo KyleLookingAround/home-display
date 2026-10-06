@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-06
 
+- **Update**: the trains know the commute: Stockport to Manchester Piccadilly, then a walk to work.
+  - Settings, Household has the days you go in, the walk from the station to work, and when you head home. household.json now has Piccadilly (MAN), Monday to Friday, a 25 minute walk and home from 15:00 (`workDays`, `workWalk`, `homeFrom`).
+  - On a work day the trains are the ones that call at Piccadilly, each with when you'll be at work ("At work by 08:49": the arrival at Piccadilly from Darwin's calling points, plus the walk). From 15:00 they turn round: trains home from Piccadilly, leaving the office in time to catch them, and when you'll be home. Days off and bank holidays show every train from Stockport, as before (`commuteLeg`, `arriveBy`, `commuteLine` in household.js).
+  - It shows on the phone's Home card and the leave-now heads-up, and on the TV's Today and Travel.
+  - Found on the way: saving the TV's settings sheet forgot guest Wi-Fi and family dates sent from a phone, because the sheet only knew its own fields. It now keeps what it doesn't show; its setup link still leaves the Wi-Fi password and dates out.
 - **Finding**: the first time you went between pages, a huge black lightning bolt flashed up while the page loaded. It was the Now tab's icon, drawn at full width on a white page because the page showed before its stylesheet arrived (most often on the locked site, which writes each page in after unlocking). Pages now start on the night sky with nothing drawn, appear once their styles are in (or after three seconds if they never come), and every icon carries its own size. A test holds the stylesheet back and checks.
 - **Update**: the music player is merged into `main` and live, at Kyle's word: everything built on the `music` branch today (the entries marked "(music branch)" below, decisions [0012](decisions/0012-music-player.md), [0013](decisions/0013-house-queue.md) and [0014](decisions/0014-finding-music.md)). The `music` branch is still published at /preview/ while it exists; it now matches the live site.
 - **Update** (music branch): the full design pass over the player, phone, laptop and TV.

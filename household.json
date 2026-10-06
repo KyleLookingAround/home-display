@@ -32,8 +32,11 @@
     }
   ],
   "trainFrom": "SPT",
-  "trainTo": "",
+  "trainTo": "MAN",
   "trainWalk": 15,
+  "workDays": [1, 2, 3, 4, 5],
+  "workWalk": 25,
+  "homeFrom": "15:00",
   "tramStop": "",
   "tramWalk": 15,
   "spotifyClientId": "4ee18df2817b461d9e6fb53740703f89"

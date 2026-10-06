@@ -1,7 +1,7 @@
 /* The household's data: settings shared by every screen, modes, bins, weather, the calendar, trains and trams. */
 // Shared ES module. The display's build (build.py) also concatenates it for TV browsers, removing the
 // import lines and export keywords, so keep imports on one line each and the syntax Chromium 63 can parse.
-import { addDays, hhmm, HOME, keyDate, nz, shortDate, startOfDay } from './format.js';
+import { addDays, dayKey, hhmm, HOME, keyDate, nz, shortDate, startOfDay } from './format.js';
 import { ApiError, NET, request } from './net.js';
 import { rainSoon } from './outdoors.js';
 import { standingAt, unitPriceAt } from './octopus.js';
@@ -51,6 +51,7 @@ export const DISPLAY_DEFAULTS = {
   mode: 'screensaver', rotate: 0, saver: 10, detail: 'auto', night: true, nightFrom: '23:00', nightTo: '06:30', reloadAt: '03:30',
   bins: [], ical: '', wifi: null, dates: [],
   trainFrom: 'SPT', trainTo: '', trainWalk: 15, tramStop: '', tramWalk: 15,
+  workDays: [], workWalk: 0, homeFrom: '15:00',   // the commute: days you travel to trainTo, the walk from there, and when you head home
   musicNight: true          // fade the music out as the night window starts (the TV does it)
 };
 export function displaySettings(saved){
@@ -58,6 +59,9 @@ export function displaySettings(saved){
   s.bins = Array.isArray(s.bins) ? s.bins.filter(b => b && b.name && /^\d{4}-\d\d-\d\d$/.test(b.date)) : [];
   if (MODE_ALIASES[s.mode]) s.mode = MODE_ALIASES[s.mode];
   s.dates = Array.isArray(s.dates) ? s.dates.filter(d => d && d.name && /^\d{4}-\d\d-\d\d$/.test(d.date)) : [];
+  s.workDays = Array.isArray(s.workDays) ? s.workDays.map(Number).filter(d => d >= 0 && d <= 6) : [];
+  s.workWalk = Math.max(0, +s.workWalk || 0);
+  if (!/^\d\d?:\d\d$/.test(s.homeFrom || '')) s.homeFrom = DISPLAY_DEFAULTS.homeFrom;
   s.wifi = s.wifi && s.wifi.ssid ? { ssid: String(s.wifi.ssid), password: String(s.wifi.password || ''), security: s.wifi.security === 'WEP' || s.wifi.security === 'nopass' ? s.wifi.security : 'WPA', hidden: !!s.wifi.hidden } : null;
   return s;
 }
@@ -356,6 +360,53 @@ export function catchable(list, walkMin, now){
   });
   return { list: out, missed };
 }
+/* ---------- the commute: there in the morning, back in the afternoon ---------- */
+/** Is this a day you go in: one of your work days, and not a bank holiday? */
+export function workDay(s, now, holidays){
+  const d = new Date(now), key = dayKey(now);
+  if ((s.workDays || []).indexOf(d.getDay()) < 0) return false;
+  return !(holidays || []).some(h => (typeof h === 'string' ? h : h.date) === key);
+}
+/**
+ * Which way the trains run now. With work days set, `trainTo` is where you work: on a work day the trains go there
+ * (with `workWalk` at the far end) until `homeFrom`, then turn round, from there back to your station, walking
+ * `workWalk` to it; on other days it's every train from your station. With no work days, `trainTo` only picks the
+ * trains that call there. `walk` is the walk to the train, `after` the walk once off it.
+ */
+export function commuteLeg(s, now, holidays){
+  const to = String(s.trainTo || ''), commuting = !!to && (s.workDays || []).length > 0, work = commuting && workDay(s, now, holidays);
+  const leg = { from: s.trainFrom, to: commuting && !work ? '' : to, walk: +s.trainWalk || 0, after: 0, work: false, home: false };
+  if (!work) return leg;
+  const p = String(s.homeFrom || '15:00').split(':'), d = new Date(now);
+  if (d.getHours() * 60 + d.getMinutes() >= (+p[0] || 0) * 60 + (+p[1] || 0))
+    return { from: to, to: s.trainFrom, walk: +s.workWalk || 0, after: +s.trainWalk || 0, work: false, home: true };
+  return Object.assign(leg, { after: +s.workWalk || 0, work: true });
+}
+/** The walk to the train for the trains on show: the commute's when they came with one, else your station's. */
+export const trainWalkOf = (trains, s) => trains && trains.leg ? trains.leg.walk : +(s && s.trainWalk) || 0;
+/** Where a train gets you: "At work by 08:49", "Home by 18:31", or "Arrives 08:24" off a work day. Null if not known. */
+export function arriveBy(d, leg){
+  if (!d || !leg || d.cancelled || !d.arr) return null;
+  if (leg.work || leg.home){ const t = d.arr + (leg.after || 0) * 60e3; return { t: t, text: (leg.home ? 'Home by ' : 'At work by ') + hhmm(t) }; }
+  return { t: d.arr, text: 'Arrives ' + hhmm(d.arr) };
+}
+/** The trains card's title: "Trains to work", "Trains home", or "Trains from Stockport" (to Manchester Piccadilly). */
+export function trainsTitle(trains, s){
+  const leg = trains && trains.leg, from = (trains && trains.station) || (leg ? leg.from : s.trainFrom), to = (trains && trains.toName) || (leg ? leg.to : s.trainTo);
+  if (!from) return 'Trains';
+  if (leg && (leg.work || leg.home)) return leg.home ? 'Trains home' : 'Trains to work';
+  return 'Trains from ' + from + (to ? ' to ' + to : '');
+}
+/** A line under the board: "The 08:03 is at Manchester Piccadilly 08:24, then a 25 minute walk: at work by 08:49." */
+export function commuteLine(trains, now){
+  const leg = trains && trains.leg;
+  if (!leg || !leg.to) return '';
+  const d = catchable((trains.list || []).filter(x => !x.cancelled && x.arr), leg.walk, now).list[0], a = arriveBy(d, leg);
+  if (!a) return '';
+  const at = trains.toName || leg.to;
+  if (!leg.work && !leg.home) return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + '.';
+  return 'The ' + hhmm(d.sched) + ' is at ' + at + ' at ' + hhmm(d.arr) + (leg.after ? ', then a ' + leg.after + ' minute walk' : '') + ': ' + a.text.charAt(0).toLowerCase() + a.text.slice(1) + '.';
+}
 /* ---------- the station sign: its words, the same on the phone and the TV ---------- */
 export const ordinal = n => n + (n % 10 === 1 && n % 100 !== 11 ? 'st' : n % 10 === 2 && n % 100 !== 12 ? 'nd' : n % 10 === 3 && n % 100 !== 13 ? 'rd' : 'th');
 /** A train as the platform sign has it: "On time", "Exp 14:33", "Delayed" or "Cancelled". */
@@ -434,12 +485,13 @@ export function countdownText(c){
  */
 export function headsUp(o, now){
   const out = [], hour = new Date(now).getHours();
-  const trains = o.trains && o.trains.list ? o.trains.list : [], walk = +o.walk || 0;
+  const trains = o.trains && o.trains.list ? o.trains.list : [], walk = o.trains && o.trains.leg ? o.trains.leg.walk : +o.walk || 0;
   for (let i = 0; i < trains.length; i++){
     const tr = trains[i]; if (tr.cancelled) continue;
     const l = leaveBy(tr.exp || tr.sched, walk, now);
     if (l.mins < 0) continue;
-    if (l.mins <= 20) out.push({ kind: 'train', tone: l.cls, title: l.text, sub: hhmm(tr.sched) + ' to ' + tr.dest + (tr.exp && tr.exp !== tr.sched ? ', expected ' + hhmm(tr.exp) : '') + (tr.platform ? ', platform ' + tr.platform : '') });
+    const leg = o.trains.leg, a = leg && (leg.work || leg.home) ? arriveBy(tr, leg) : null;
+    if (l.mins <= 20) out.push({ kind: 'train', tone: l.cls, title: l.text, sub: hhmm(tr.sched) + ' to ' + tr.dest + (tr.exp && tr.exp !== tr.sched ? ', expected ' + hhmm(tr.exp) : '') + (tr.platform ? ', platform ' + tr.platform : '') + (a ? '. ' + a.text : '') });
     break;
   }
   const bins = o.bins || [];
@@ -505,7 +557,23 @@ export function boardTime(hhmm, now, ref){
   return t;
 }
 export const stripTags = s => String(s || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
-export function parseHuxley(j, now = Date.now()){
+const noTime = t => !t || /^0001-/.test(String(t));
+/** When a service gets to `to` (a station code), from the public board's calling points or the staff board's: { arr, arrSched }. */
+function arrivalAt(s, to, sched, now){
+  if (!to) return null;
+  const want = String(to).toUpperCase(), cp = s.subsequentCallingPoints && s.subsequentCallingPoints[0] && s.subsequentCallingPoints[0].callingPoint;
+  const at = (cp || []).filter(c => c && String(c.crs || '').toUpperCase() === want)[0];
+  if (at){
+    const st = boardTime(at.st, now, sched); if (st == null) return null;
+    const et = String(at.et || '').trim();
+    return { arrSched: st, arr: et === 'On time' || !et ? st : boardTime(et, now, st) };   // "Delayed": not known
+  }
+  const l = (s.subsequentLocations || []).filter(x => x && String(x.crs || '').toUpperCase() === want && !x.isPass)[0];
+  if (!l || noTime(l.sta)) return null;
+  const sta = boardTime(l.sta, now, sched);
+  return sta == null ? null : { arrSched: sta, arr: !noTime(l.ata) ? boardTime(l.ata, now, sta) : !noTime(l.eta) ? boardTime(l.eta, now, sta) : sta };
+}
+export function parseHuxley(j, now = Date.now(), to){
   const list = ((j && j.trainServices) || []).map(s => {
     const sched = boardTime(s.std, now); if (sched == null) return null;
     const etd = String(s.etd || '').trim(), cancelled = !!s.isCancelled || /cancel/i.test(etd);
@@ -514,11 +582,13 @@ export function parseHuxley(j, now = Date.now()){
     const calls = [], cp = s.subsequentCallingPoints && s.subsequentCallingPoints[0] && s.subsequentCallingPoints[0].callingPoint;
     if (cp) cp.forEach(c => { if (c && c.locationName) calls.push(c.locationName); });
     else (s.subsequentLocations || []).forEach(l => { if (l && l.crs && !l.isPass && !l.isOperational && l.locationName) calls.push(l.locationName); });
-    return { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
+    const out = { sched, exp, dest: (s.destination || []).map(x => x.locationName + (x.via ? ' ' + x.via : '')).join(' & ') || 'Unknown',
              platform: s.platform || null, cancelled, delayed: !cancelled && exp == null, operator: s.operator || '', reason: stripTags(s.cancelReason || s.delayReason || ''),
-             calls, coaches: +s.length > 0 ? +s.length : null };
+             calls, coaches: +s.length > 0 ? +s.length : null, arr: null, arrSched: null };
+    const a = arrivalAt(s, to, sched, now); if (a){ out.arr = a.arr; out.arrSched = a.arrSched; }
+    return out;
   }).filter(Boolean).sort((a, b) => (a.exp || a.sched) - (b.exp || b.sched));
-  return { station: (j && j.locationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
+  return { station: (j && j.locationName) || null, toName: (j && j.filterLocationName) || null, list, messages: ((j && j.nrccMessages) || []).map(m => stripTags(m.value || m.Value || m)).filter(Boolean) };
 }
 export async function loadTrainsLive(from, to){
   const path = `/${encodeURIComponent(from)}${to ? '/to/' + encodeURIComponent(to) : ''}/20?expand=true`;   // about an hour at Stockport, with where each train calls
@@ -529,7 +599,7 @@ export async function loadTrainsLive(from, to){
       const j = await Promise.race([request(TRAIN_BOARDS[k] + path, { headers: { Accept: 'application/json' } }),
         new Promise((_, no) => setTimeout(() => no(new ApiError('NETWORK')), 10000))]);
       trainBoard = k;
-      return parseHuxley(j);
+      return parseHuxley(j, Date.now(), to);
     } catch(e){ err = e; }
   }
   if (NET.proxy && NET.keys.rtt) return loadTrains(from, to);

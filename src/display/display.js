@@ -26,7 +26,8 @@ const SRC = {
   iss:     { label: 'ISS', every: () => shown() === 'screensaver' ? MIN : 10*MIN, need: () => true, run: loadISS },
   cal:     { label: 'Calendar', every: () => 15*MIN, need: () => !!D.set.ical, run: () => loadCalendar(D.set.ical) },
   // Huxley2 is a free community service: ask once a minute only while departures are on screen.
-  trains:  { label: 'Trains',  every: () => shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => loadTrainsLive(D.set.trainFrom, D.set.trainTo) },
+  // the commute turns round in the afternoon on a work day (commuteLeg): when it does, the trains are due at once
+  trains:  { label: 'Trains',  every: () => legTurned() ? 0 : shown() === 'travel' ? MIN : shown() === 'screensaver' ? 3*MIN : 10*MIN, need: () => !!D.set.trainFrom, run: () => { const leg = legNow(); return loadTrainsLive(leg.from, leg.to).then(r => Object.assign(r, { leg: leg })); } },
   trams:   { label: 'Trams',   every: () => shown() === 'travel' ? MIN : 5*MIN, need: () => NET.proxy && !!D.set.tramStop, run: () => loadTrams(D.set.tramStop) },
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
   nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
@@ -53,6 +54,8 @@ async function pollMini(){
   if (fresh) r.todayAt = Date.now(); else { r.today = prev.today; r.rows = prev.rows; r.todayAt = prev.todayAt; }
   return r;
 }
+const legNow = () => commuteLeg(D.set, Date.now(), SRC.holidays.data);
+function legTurned(){ const d = SRC.trains.data, l = legNow(); return !!d && !!d.leg && (d.leg.from !== l.from || d.leg.to !== l.to); }
 function due(s, now){
   if (!s.need() || s.busy) return false;
   const wait = s.err ? Math.min(s.every(), 30e3 * Math.pow(2, Math.min(5, s.fails - 1))) : s.every();
@@ -193,22 +196,23 @@ function renderToday(){
   $('#dVerdict').innerHTML = verdictHtml(now);
   $('#dWx').innerHTML = weatherHtml(now);
   const bins = collections(now);
-  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: s.trainWalk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now).slice(0, 3));
+  const walk = trainWalkOf(SRC.trains.data, s);
+  $('#dHeads').innerHTML = headsHtml(headsUp({ trains: SRC.trains.data, walk: walk, bins, weather: W, nowcast: SRC.nowcast.data, floods: SRC.floods.data, countdowns: cds, music: musicHeads(SRC.releases.data, null, now) }, now).slice(0, 3));
   // the next twelve hours, as on the phone's Now page
-  const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: s.trainWalk }, now);
+  const v = voyageFor({ agile: SRC.agile.data, weather: W, events: SRC.cal.data, trains: SRC.trains.data, walk: walk }, now);
   const markers = v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })).concat(v.train ? [{ t: v.train.sched, kind: 'train', label: v.train.dest }] : []);
   $('#dCheap').textContent = v.dock ? `Cheapest ${hhmm(v.dock.from)}–${hhmm(v.dock.to)} · ${pence(v.dock.avg)}` : '';
   if (v.range) stripFor($('#dStrip'), { from: now - 30*MIN, to: v.to, rates: SRC.agile.data, cheap: v.dock, rain: rainBands(now, v.to), markers, now, aria: 'Agile prices for the next 12 hours' });
   else $('#dStrip').innerHTML = `<p class="empty">${SRC.agile.err ? 'No prices from Octopus yet, trying again' : 'Waiting for Agile prices'}</p>`;
   // trains
   const T = SRC.trains.data;
-  $('#dTrainsH').textContent = T && T.station ? `Trains from ${T.station}` : 'Trains';
+  $('#dTrainsH').textContent = trainsTitle(T, s);
   let tr = '';
   if (!s.trainFrom) tr = '<p class="empty">Choose a station on your phone: Settings, then Household.</p>';
   else if (T){
-    const caught = catchable(T.list, s.trainWalk, now), rows = caught.list.slice(0, 3);
-    tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, s.trainWalk, now), late = d.exp && d.exp - d.sched >= 60e3;
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${s.trainWalk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
+    const caught = catchable(T.list, walk, now), rows = caught.list.slice(0, 3);
+    tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, walk, now), late = d.exp && d.exp - d.sched >= 60e3, a = arriveBy(d, T.leg);
+      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -255,14 +259,14 @@ function renderTravel(){
   else if (T.data) list = T.data.list;
   else if (T.err) html = `<p class="empty">No departures signal: ${esc(errorText(T.err)[0])} Trying again shortly.</p>`;
   else html = '<p class="empty">Checking departures…</p>';
-  const stn = T.data && T.data.station ? T.data.station : s.trainFrom;
-  $('#tTrainTitle').textContent = `Trains from ${stn}${s.trainTo ? ' calling at ' + s.trainTo : ''}`;
+  $('#tTrainTitle').textContent = trainsTitle(T.data, s);
   const box = $('#tTrains');
   if (list){
     // the station's sign: the board, dimmed where it's too late to make it, and the platform sign for the next you can
-    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div>';
-    const sign = signHtml(T.data, s.trainWalk, now);
+    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div><p class="note" id="tCommute"></p>';
+    const sign = signHtml(T.data, trainWalkOf(T.data, s), now);
     setHtml($('#tBoard'), sign.board); setHtml($('#tPlat'), sign.platform);
+    $('#tCommute').textContent = commuteLine(T.data, now);
     tickSign(now);
   } else box.innerHTML = html;
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
@@ -310,7 +314,7 @@ function cockpitInfo(now){
   const issRaw = /iss/.test(String(D.preview.show || '')) ? { latitude: HOME.lat + 2, longitude: HOME.lon, altitude: 421, velocity: 27580 } : SRC.iss.data;
   const iss = issPass(issRaw, HOME);
   const x = { agile: ag, carbon: SRC.carbon.data, live: L, cost: L ? todayCost(L.rows, T && T.eSets, now) : null, weather: W, bins,
-              events: SRC.cal.data, trains: SRC.trains.data, walk: D.set.trainWalk, iss, sky, label: 'Harold Street · region ' + region() };
+              events: SRC.cal.data, trains: SRC.trains.data, walk: trainWalkOf(SRC.trains.data, D.set), iss, sky, label: 'Harold Street · region ' + region() };
   const voyage = voyageFor(x, now), show = String(D.preview.show || ''), wet = D.preview.wx;
   // Previews: wet weather is a front we're in; show=front, mytrain and dock bring the rest into view, with real data only
   if (/^(rain|drizzle|snow|thunder)$/.test(wet || '')) voyage.fronts = [{ from: now - 3600e3, to: now + 2.5*3600e3, kind: wet === 'drizzle' ? 'rain' : wet }];
@@ -529,8 +533,9 @@ function fillSheet(){
 function readSheet(){
   const v = id => $('#' + id).value.trim();
   const bins = [0, 1, 2, 3].map(i => ({ name: v('bN' + i), colour: v('bC' + i), date: parseUkDate(v('bD' + i)), every: +v('bE' + i) || 2 })).filter(b => b.name && b.date);
-  return displaySettings({ mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', musicNight: v('fMusicNight') !== '0', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
-    bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') });
+  // on top of what this screen already holds, so what the sheet doesn't show (the commute, guest Wi-Fi, dates) stays
+  return displaySettings(Object.assign({}, D.set, { mode: v('fMode'), rotate: +v('fRotate'), saver: +v('fSaver'), detail: v('fDetail'), night: v('fNight') === '1', musicNight: v('fMusicNight') !== '0', nightFrom: v('fNightFrom'), nightTo: v('fNightTo'), reloadAt: v('fReload'),
+    bins, ical: v('fIcal'), trainFrom: v('fTrainFrom').toUpperCase(), trainTo: v('fTrainTo').toUpperCase(), trainWalk: +v('fTrainWalk'), tramStop: v('fTramStop'), tramWalk: +v('fTramWalk') }));
 }
 function openSheet(){ hideChrome(); fillSheet(); $('#sheet').hidden = false; $('#fMode').focus(); }
 function closeSheet(){ $('#sheet').hidden = true; D.lastInput = Date.now(); $('#setBtn').blur(); }
@@ -538,7 +543,7 @@ function applySettings(s, regionCode){
   const old = D.set; D.set = s; store.setJ('display', deviceChanges(s, D.household));
   if (regionCode && regionCode !== region()){ store.set('region', regionCode); SRC.agile.last = 0; SRC.carbon.last = 0; SRC.agile.data = null; SRC.carbon.data = null; }
   if (old.ical !== s.ical){ SRC.cal.data = null; SRC.cal.err = null; SRC.cal.last = 0; }
-  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
+  if (old.trainFrom !== s.trainFrom || old.trainTo !== s.trainTo || old.trainWalk !== s.trainWalk || old.workWalk !== s.workWalk || old.homeFrom !== s.homeFrom || String(old.workDays) !== String(s.workDays)){ SRC.trains.data = null; SRC.trains.err = null; SRC.trains.last = 0; }
   if (old.tramStop !== s.tramStop){ SRC.trams.data = null; SRC.trams.err = null; SRC.trams.last = 0; }
   D.rotateAt = Date.now() + s.rotate * MIN;
   D.reloadAt = nextReload(Date.now(), s.reloadAt, Math.random()*10);
@@ -547,7 +552,10 @@ function applySettings(s, regionCode){
 /* Setup links carry settings from one device to another: display.html#setup=<base64 JSON>. */
 const b64 = { enc: s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
               dec: s => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))) };
-function setupLink(s, withRegion){ return location.href.split('#')[0] + '#setup=' + b64.enc(JSON.stringify(Object.assign({}, s, { region: withRegion }))); }
+function setupLink(s, withRegion){
+  const o = Object.assign({}, s, { region: withRegion }); delete o.wifi; delete o.dates;   // the guest password and family dates travel sealed, not in a link
+  return location.href.split('#')[0] + '#setup=' + b64.enc(JSON.stringify(o));
+}
 function importSetup(hash){
   const m = /^#setup=([A-Za-z0-9_-]+)$/.exec(hash || '');
   if (!m) return false;

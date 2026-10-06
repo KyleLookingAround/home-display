@@ -5,11 +5,12 @@
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
   import { voyageFor } from '../../lib/voyage.js';
+  import { trainWalkOf } from '../../lib/household.js';
   import { cheapestWindow } from '../../lib/analysis.js';
   import { hhmm, pence, startOfDay, addDays } from '../../lib/format.js';
   import Strip from '../charts/Strip.svelte';
   onMount(() => watchHouse({ bins: false, events: true }));
-  const v = $derived(voyageFor({ agile: app.agileToday && app.agileToday.unit, carbon: app.carbonFc, weather: app.weather, events: app.events, trains: app.trains, walk: app.house ? app.house.trainWalk : 0 }, app.now));
+  const v = $derived(voyageFor({ agile: app.agileToday && app.agileToday.unit, carbon: app.carbonFc, weather: app.weather, events: app.events, trains: app.trains, walk: app.house ? trainWalkOf(app.trains, app.house) : 0 }, app.now));
   const markers = $derived([
     ...v.waypoints.map(w => ({ t: w.t, kind: 'event', label: w.title })),
     ...(v.train ? [{ t: v.train.sched, kind: 'train', label: `${hhmm(v.train.sched)} to ${v.train.dest}` }] : [])

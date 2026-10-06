@@ -3,11 +3,11 @@
   import { onMount } from 'svelte';
   import { app } from '../../state/app.svelte.js';
   import { watchHouse } from '../../state/house.js';
-  import { headsUp, BIN_COLOURS } from '../../lib/household.js';
+  import { headsUp, BIN_COLOURS, trainWalkOf } from '../../lib/household.js';
   import { musicHeads } from '../../lib/discover.js';
   import { disc } from '../../state/discover.svelte.js';
   onMount(() => watchHouse());
-  const items = $derived(headsUp({ trains: app.trains, walk: app.house ? app.house.trainWalk : 0, bins: app.collections || [], weather: app.weather, nowcast: app.nowcast, floods: app.floods, countdowns: app.countdowns || [], music: musicHeads(disc.releases, disc.gigs, app.now) }, app.now));
+  const items = $derived(headsUp({ trains: app.trains, walk: app.house ? trainWalkOf(app.trains, app.house) : 0, bins: app.collections || [], weather: app.weather, nowcast: app.nowcast, floods: app.floods, countdowns: app.countdowns || [], music: musicHeads(disc.releases, disc.gigs, app.now) }, app.now));
   const ICON = {
     train: '<rect x="6" y="3" width="12" height="13" rx="3"/><path d="M6 10h12M9 20l-2 2M15 20l2 2M9 16v4M15 16v4"/>',
     bins: '<path d="M4 6h16M9 6V4h6v2M6 6l1 15h10l1-15"/>',
