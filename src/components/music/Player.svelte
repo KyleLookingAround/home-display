@@ -8,7 +8,7 @@
    * shows a glance of each; tapping one opens it, with a small player kept at the top.
    */
   import { tick } from 'svelte';
-  import { music, toggle, next, previous, seek, setShuffle, setRepeat, like, loadDevices, transfer, volume, setView, closePlayer, haptic } from '../../state/music.svelte.js';
+  import { music, toggle, next, previous, seek, setShuffle, setRepeat, like, closePicker, volume, setView, closePlayer, haptic } from '../../state/music.svelte.js';
   import { artUrl, fmtDur, lyricAt, nextRepeat, deviceKind } from '../../lib/music.js';
   import Icon from './Icon.svelte';
   import Turntable from './Turntable.svelte';
@@ -36,7 +36,7 @@
   });
   const onKey = e => {
     if (!music.open) return;
-    if (e.key === 'Escape'){ if (music.over) music.over = ''; else if (music.picker) music.picker = false; else if (music.view !== 'player') setView('player'); else closePlayer(); }
+    if (e.key === 'Escape'){ if (music.over) music.over = ''; else if (music.picker) closePicker(); else if (music.view !== 'player') setView('player'); else closePlayer(); }
   };
 
   /* ---------- touch: drag the player down to close it; swipe the cover to skip; double-tap it to like ---------- */
@@ -63,12 +63,6 @@
     dy = 0; dx = 0;
   }
 
-  /* ---------- Play on ---------- */
-  let devTimer = 0;
-  $effect(() => {
-    if (music.picker){ loadDevices(); devTimer = setInterval(loadDevices, 8000); }
-    return () => clearInterval(devTimer);
-  });
   const vol = $derived(m && m.device && m.device.canVolume && m.device.volume != null ? m.device.volume : null);
   const kind = $derived(m && m.device ? deviceKind(m.device.type) : 'speaker');
 
@@ -93,7 +87,7 @@
 <svelte:window onkeydown={onKey} onpointermove={moveP} onpointerup={up} onpointercancel={() => { active = false; dy = 0; dx = 0; }} />
 
 <div class="scrim" class:open={music.open} onclick={closePlayer} aria-hidden="true"></div>
-<div class="sheet" class:open={music.open} class:picking={music.picker} class:dragging={dy > 0} role="dialog" aria-modal="true" aria-label="Player" aria-hidden={!music.open} inert={!music.open}
+<div class="sheet" class:open={music.open} class:dragging={dy > 0} role="dialog" aria-modal="true" aria-label="Player" aria-hidden={!music.open} inert={!music.open}
      style={dy ? `transform:translateY(${dy}px)` : ''} onpointerdown={down}>
   {#if t}
     <div class="sky" aria-hidden="true">
@@ -224,19 +218,6 @@
     {/if}
   {/if}
 
-  {#if music.picker}
-    <div class="picker" role="dialog" aria-label="Play on">
-      <div class="ph-head"><span class="label">Play on</span><button class="ib" type="button" aria-label="Close" onclick={() => { music.picker = false; }}><Icon name="down" /></button></div>
-      {#each music.devices as d (d.id)}
-        <button type="button" class="d" class:on={d.active} onclick={() => d.active ? (music.picker = false) : transfer(d)}>
-          <span class="dicon"><Icon name={d.kind} size={22} /></span>
-          <span class="dn"><b>{d.name}</b><span>{d.active ? 'Playing here' : d.kind === 'tv' ? 'TV' : d.kind === 'phone' ? 'Phone' : d.kind === 'speaker' ? 'Speaker' : d.kind === 'computer' ? 'Computer' : 'Spotify device'}</span></span>
-          {#if d.active}<span class="eq" aria-hidden="true" class:paused={!m || !m.playing}><i></i><i></i><i></i></span>{/if}
-        </button>
-      {:else}<p class="note">Nothing's awake. Open Spotify on the TV, a speaker or your phone and it'll appear here.</p>{/each}
-      <p class="note">Google speakers sometimes only appear after they've been played to once from the Spotify app.</p>
-    </div>
-  {/if}
   <Sheets />
   {#if music.err && music.open}<p class="err" role="alert"><b>{music.err.title}</b> {music.err.body}</p>{/if}
 </div>
@@ -390,17 +371,6 @@
   .idle{display:grid;justify-items:center;gap:10px;text-align:center;margin:auto;color:var(--muted)}
   .idle .it{font:700 20px var(--f-body);color:var(--ink);margin:0}
 
-  .sheet.picking > :not(.picker){opacity:.2;pointer-events:none;transition:opacity .2s}
-  .picker{position:sticky;bottom:0;margin-top:auto;z-index:2;background:#0a0d20;border:1px solid var(--line-hot);border-radius:var(--radius);padding:10px 12px 14px;display:grid;gap:2px;
-    box-shadow:0 -16px 50px rgba(0,0,0,.6);animation:rise .25s cubic-bezier(.2,.85,.25,1)}
-  @keyframes rise{from{transform:translateY(30px);opacity:0}}
-  @media (prefers-reduced-motion:reduce){ .picker{animation:none} }
-  .ph-head{display:flex;justify-content:space-between;align-items:center;padding-left:8px}
-  .d{appearance:none;border:0;background:transparent;color:var(--ink);display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;padding:8px;border-radius:var(--radius-sm);cursor:pointer;min-height:58px;font:inherit}
-  .d:hover{background:var(--sel)}
-  .dicon{width:40px;height:40px;border-radius:var(--radius-sm);display:grid;place-items:center;background:var(--card-2);border:1px solid var(--line)}
-  .d.on{color:var(--gas)}
-  .d.on .dicon{background:rgba(79,214,255,.14)}
   .dn{display:grid;min-width:0}
   .dn b{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dn span{font-size:12.5px;color:var(--muted)}

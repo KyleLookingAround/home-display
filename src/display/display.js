@@ -493,16 +493,33 @@ function startRemote(){
   });
   D.sentState = ''; tellRemote();
 }
-/** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
+/**
+ * Tells a listening phone what's on screen, when that changes, and whether an account is connected here. Changes a
+ * moment apart go as one message, since the relay allows a household about 250 a day; one the relay refuses is
+ * sent again later. What takes over by itself (the screensaver, the night clock) isn't news on its own.
+ */
 function tellRemote(note){
   if (!D.remote || D.embed) return;
   const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
+  const key = D.mode + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
   if (key === D.sentState && !note) return;
   D.sentState = key;
+  if (note) D.tellNote = note;
+  clearTimeout(D.tellTimer);
+  D.tellTimer = setTimeout(tellNow, 400);
+}
+function tellNow(){
+  const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '', note = D.tellNote || '';
+  D.tellNote = '';
   // with the house queue (the first few), the party's code, and whose Spotify the TV has (src/display/tvqueue.js)
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '',
-    queue: queueWire(HQ.q, 8), more: Math.max(0, HQ.q.length - 8), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } });
+  const msg = wireFit(HQ.q, 8, wire => ({ from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note,
+    queue: wire, more: Math.max(0, HQ.q.length - wire.length), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } }));
+  sendRemote(D.remote, msg).then(ok => {
+    clearTimeout(D.tellRetry);
+    if (ok){ D.tellWait = 0; return; }
+    D.sentState = ''; D.tellWait = Math.min((D.tellWait || 10e3) * 2, 5 * 60e3);
+    D.tellRetry = setTimeout(() => tellRemote(note), D.tellWait);
+  });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -732,6 +749,8 @@ function importSetup(hash){
 function wire(){
   $('#picker').innerHTML = MODES.map(m => `<button class="btn" type="button" role="tab" data-mode="${m.id}" aria-selected="false"><span class="k">${m.key}</span>${m.label}</button>`).join('');
   $('#picker').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-mode]'); if (b){ setMode(b.getAttribute('data-mode')); showChrome(); } });
+  // the first tap or click anywhere also lets this screen's Spotify player make a sound (tmWebWake), as a key does
+  document.addEventListener('click', tmWebWake, true); document.addEventListener('touchstart', tmWebWake, true);
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
   $('#wifiBtn').addEventListener('click', () => showWifi());

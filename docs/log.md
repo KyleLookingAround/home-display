@@ -4,6 +4,27 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-07
 
+- **Update**: choosing where music plays. With nothing playing anywhere, picking a song on the phone now asks "Where to play?" first, from any page, then plays there and remembers it on that phone, asking again only when that speaker or screen isn't awake. The TV's own Spotify app is marked as taking over the screen. "Play on" is now a sheet of its own (`DevicePicker.svelte`), the same from the full player.
+- **Finding**: the music player, its skips, party mode and the phone as a remote, after an audit of each.
+  - **Skips:** one press is one skip. The next song shows at once, a read of Spotify from before the press can't put the old song back, and Previous straight after a skip goes back a song rather than restarting the new one. On the TV a held key no longer skips again and again.
+  - **The house queue** could jam for 20 minutes when the song it had just handed to Spotify was skipped before the TV saw it play. That song is now dropped once something else plays. A skip reads Spotify first, and goes to whatever is playing.
+  - **Skipping from a phone** goes through the TV only when the TV is playing as that person; otherwise it skips your own music. If the relay doesn't take it, the phone says so.
+  - **The relay:**
+    - The TV sends fewer messages (one for a burst of changes, none for a song handed over), and sends again if the relay refused.
+    - Queue messages are kept under the relay's 4 KB.
+    - Phones and guests say hello once they can hear the answer, and again until the TV replies.
+    - A stream the relay closes is opened again.
+  - **Party:**
+    - A guest's quick second search is run a moment later instead of being dropped.
+    - A song that couldn't be added can be tried again, and votes no longer flicker.
+    - The queue starts again when the last song has ended, but not after someone paused it, until a new song is added.
+    - Adding the song that's playing now says so.
+    - Ending a party sends nothing afterwards, and the nightly fresh start keeps the view it was on.
+  - **The TV's own player:**
+    - A tap or click lets it make sound, as a key on the remote does, and it says when it's waiting for one.
+    - Listening as someone else restarts it as that person.
+    - Commands find it by its new id after it restarts.
+    - A sleep timer that runs out while nothing is playing is cleared, rather than stopping the next song someone plays.
 - **Creation**: a Weather view on the wall display, key 7 ([decision 0017](decisions/0017-weather-view.md)).
   - The answer first: "Raining now" (and when it stops), "Rain from 15:00" or "Dry for the day", and what to wear ("Jacket weather, and take a brolly").
   - Now and how warm it feels, and the sun (sunset or sunrise, and the hours of daylight).

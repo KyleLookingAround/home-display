@@ -291,15 +291,20 @@ test('music: the strip on every page, and the full player', async () => {
   // double-tap the cover to like the song (already liked: stays liked); then Play on
   // Play on: move it to the TV
   await sheet.locator('.dev').click();
-  await sheet.locator('.picker .d', { hasText: 'Living room TV' }).waitFor();
+  await page.locator('.picker .d', { hasText: 'Living room TV' }).waitFor();
   await page.waitForTimeout(300);
   await shot(page, 'music-play-on');
-  await sheet.locator('.picker .d', { hasText: 'Living room TV' }).click();
+  await page.locator('.picker .d', { hasText: 'Living room TV' }).click();
   await until(() => calls(sp, 'PUT', '/me/player').some(c => c.body.device_ids[0] === 'tv'), 'moved to the TV');
   await until(() => sheet.locator('.dev').textContent().then(t => /Living room TV/.test(t)), 'the player says the TV');
-  // next song
+  // next song: shown at once, and a second press straight after doesn't skip again
+  const nexts = calls(sp, 'POST', '/me/player/next').length;
   await sheet.locator('button[aria-label="Next"]').click();
-  await until(() => sheet.locator('.name').textContent().then(t => t === 'Negative Pricing'), 'the next song', 5000);
+  await sheet.locator('button[aria-label="Next"]').click();
+  await until(() => sheet.locator('.name').textContent().then(t => t === 'Negative Pricing'), 'the next song', 1000);
+  await page.waitForTimeout(800);
+  assert.equal(calls(sp, 'POST', '/me/player/next').length, nexts + 1, 'one press, one skip');
+  assert.equal(await sheet.locator('.name').textContent(), 'Negative Pricing', 'and it stays');
   // the phone's Back closes the player
   await page.goBack();
   await until(() => page.locator('.sheet.open').count().then(n => n === 0), 'closed by Back');
@@ -374,15 +379,32 @@ test('music: an expired sign-in is refreshed, and what goes wrong is said plainl
   o = await open('/index.html', { sp });
   await o.page.locator('.mini').waitFor();
   await o.ctx.close();
-  // nothing playing anywhere: playing from Music starts on a device Spotify knows
+  // nothing playing anywhere and nowhere chosen yet: picking a song asks where to play first, then plays there
   sp = spotify({ nothing: true, noDevice: true });
   o = await open('/music.html', { sp });
   assert.equal(await o.page.locator('.mini').count(), 0, 'no strip with nothing playing');
   await o.page.fill('input[type=search]', 'harold');
   await until(() => o.page.locator('.tr', { hasText: 'Harold Street' }).count().then(n => n === 1), 'results');
   await o.page.locator('.tr', { hasText: 'Harold Street' }).locator('.go').click();
+  await o.page.locator('.picker', { hasText: 'Where to play?' }).waitFor();
+  assert.equal(calls(sp, 'PUT', '/me/player/play').length, 0, 'nothing plays until you choose');
+  assert.match(await o.page.locator('.picker .d', { hasText: 'Living room TV' }).textContent(), /takes over the screen/, 'the TV\'s own app is marked');
+  await o.page.waitForTimeout(500);
+  await shot(o.page, 'music-where-to-play');
+  await o.page.locator('.picker .d', { hasText: 'Kitchen speaker' }).click();
   await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.query.device_id === 'kitchen'), 'started on the kitchen speaker');
+  assert.equal(await o.page.locator('.picker').count(), 0, 'the picker closes');
   await until(() => o.page.locator('.mini').count().then(n => n === 1), 'the strip appears');
+  assert.deepEqual(await o.page.evaluate(() => JSON.parse(localStorage.getItem('hse.musicDevice'))), { id: 'kitchen', name: 'Kitchen speaker' }, 'remembered on this phone');
+  await o.ctx.close();
+  // chosen before: it plays there without asking
+  sp = spotify({ nothing: true, noDevice: true });
+  o = await open('/music.html', { sp, keep: { 'hse.musicDevice': JSON.stringify({ id: 'old-id', name: 'Kitchen speaker' }) } });   // found by name when its id has changed
+  await o.page.fill('input[type=search]', 'harold');
+  await until(() => o.page.locator('.tr', { hasText: 'Harold Street' }).count().then(n => n === 1), 'results');
+  await o.page.locator('.tr', { hasText: 'Harold Street' }).locator('.go').click();
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.query.device_id === 'kitchen'), 'played on the speaker chosen before');
+  assert.equal(await o.page.locator('.picker').count(), 0, 'without asking');
   await o.ctx.close();
   // not Premium: the player says so
   sp = spotify({ premium: false });

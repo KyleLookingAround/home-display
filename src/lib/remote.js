@@ -74,16 +74,32 @@ export function sendTopic(topic, msg){
   try { return fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
   catch(e){ return Promise.resolve(false); }
 }
-/** Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function. */
-export function listenTopic(topic, read, onMsg){
+/**
+ * Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function.
+ * `onOpen` runs each time the stream opens, so a page can say hello once it can hear the answer. The relay keeps
+ * nothing for a stream that wasn't open, so messages sent while it's down are lost: hence saying hello again.
+ */
+export function listenTopic(topic, read, onMsg, onOpen){
   if (typeof EventSource === 'undefined') return () => {};
-  const es = new EventSource(RELAY + '/' + topic + '/sse');
-  es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
-  return () => { try { es.close(); } catch(e){} };
+  let es = null, stopped = false, wait = 2000, timer = 0;
+  const open = () => {
+    if (stopped) return;
+    es = new EventSource(RELAY + '/' + topic + '/sse');
+    es.onopen = () => { wait = 2000; if (onOpen) onOpen(); };
+    es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
+    // the browser reconnects by itself after a dropped connection, but gives up after an error answer (a 429 once
+    // the relay's daily allowance is used up): then open it again, waiting longer each time
+    es.onerror = () => {
+      if (stopped || es.readyState !== 2) return;
+      clearTimeout(timer); timer = setTimeout(open, wait); wait = Math.min(wait * 2, 5 * 60e3);
+    };
+  };
+  open();
+  return () => { stopped = true; clearTimeout(timer); try { es.close(); } catch(e){} };
 }
 export const sendRemote = (code, msg) => sendTopic(remoteTopic(code), msg);
 /** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
-export const listenRemote = (code, onMsg) => listenTopic(remoteTopic(code), readRemote, onMsg);
+export const listenRemote = (code, onMsg, onOpen) => listenTopic(remoteTopic(code), readRemote, onMsg, onOpen);
 
 /* ---------- the account, sealed with the site's PIN ---------- */
 /** What the lock keeps on a device unlocked with "Remember this screen": the PIN, hashed. Null when there's no lock. */

@@ -82,22 +82,40 @@ export function queueStep(q, m, now){
   let played = null;
   const out = q.filter(x => {
     if (uri && x.uri === uri && (x.fed || x === q[qFirstFree(q)])){ played = x; return false; }
+    // handed over, then skipped past before the TV saw it play: something else is playing, and not the song that was
+    // on when it was handed over (`over`), so it's gone from Spotify's queue too
+    if (x.fed && uri && uri !== (x.over || '') && now - x.fed > 3000) return false;
     return !(x.fed && now - x.fed > FED_FORGET);
   });
   let feed = null;
   const i = qFirstFree(out);
   if (m && m.playing && m.track && m.track.dur && i === 0 && out.length){
     const left = m.track.dur - progressAt(m, now);
-    if (left < FEED_AHEAD){ out[0] = Object.assign({}, out[0], { fed: now }); feed = out[0]; }
+    if (left < FEED_AHEAD){ out[0] = Object.assign({}, out[0], { fed: now, over: uri }); feed = out[0]; }
   }
   return { q: out, feed: feed, played: played };
 }
-/** Marks a song as handed over now (for a skip), or not (when Spotify refused it). */
-export function queueFed(q, id, now){ return q.map(x => x.id === id ? Object.assign({}, x, { fed: now || 0 }) : x); }
+/** Marks a song as handed over now, over the song playing (`over`; for a skip), or not (when Spotify refused it). */
+export function queueFed(q, id, now, over){ return q.map(x => x.id === id ? Object.assign({}, x, { fed: now || 0, over: now ? over || '' : '' }) : x); }
 
 /* ---------- through the relay: short keys, and only what's needed ---------- */
-export function queueWire(q, max){
-  return q.slice(0, max || WIRE_MAX).map(x => ({ i: x.id, u: x.uri, n: x.name, a: x.artist, m: x.img, d: x.dur, b: x.by.name, g: x.by.id, v: x.votes.slice(-20), f: x.fed ? 1 : 0 }));
+export function queueWire(q, max, voters){
+  return q.slice(0, max || WIRE_MAX).map(x => ({ i: x.id, u: x.uri, n: x.name, a: x.artist, m: x.img, d: x.dur, b: x.by.name, g: x.by.id, v: x.votes.slice(-(voters || 20)), f: x.fed ? 1 : 0 }));
+}
+/** The relay turns a message over 4,096 bytes into a file, which pages can't read: this leaves room. */
+export const RELAY_MAX = 3800;
+export const bytesOf = s => unescape(encodeURIComponent(s)).length;
+/**
+ * A message holding the queue's wire form (`wrap(wire)` makes it), made smaller until it fits the relay: fewer of
+ * each song's voters first, then fewer songs.
+ */
+export function wireFit(q, max, wrap){
+  let n = max || WIRE_MAX, v = 20;
+  for (;;){
+    const msg = wrap(queueWire(q, n, v));
+    if (bytesOf(JSON.stringify(msg)) <= RELAY_MAX || (v <= 2 && n <= 1)) return msg;
+    if (v > 2) v = Math.max(2, Math.floor(v / 2)); else n--;
+  }
 }
 const qStr = (v, n) => String(v == null ? '' : v).slice(0, n);
 export function readWire(arr){

@@ -6,7 +6,7 @@
  */
 import { store } from '../lib/browser.js';
 import { spotify, spotifyStore, saveSpotifyStore, activeAccount, forgetAccount, spotifyErrorText } from '../lib/spotify.js';
-import { playerModel, progressAt, playOn, bestDevice, keepDevice, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
+import { playerModel, progressAt, playOn, keepDevice, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
 import { songStory, linerNotes } from '../lib/musicdata.js';
 import { cacheGet, cacheSet } from './cache.js';
 import { tv, tvQueue, tvSend } from './tv.svelte.js';
@@ -27,6 +27,7 @@ class Music {
   ctxName = $state('');             // the playlist or album it's playing from
   open = $state(false);             // the full player is showing
   picker = $state(false);           // "Play on" is showing
+  pending = $state.raw(null);       // what to play once a device is chosen: { o } (play's options), or null
   view = $state('player');          // what the full player shows: player | lyrics | queue | about | notes
   over = $state('');                // a sheet over the player: '' | more | share
   vinyl = $state(store.get('musicVinyl') === '1');   // the cover as a record on a turntable
@@ -42,18 +43,23 @@ class Music {
   get track(){ return this.player ? this.player.track : null; }
   get progress(){ return progressAt(this.player, this.now); }
   get canControl(){ return !this.acc || this.acc.product !== 'free'; }
-  /** What plays next: the top of the TV's house queue when that's in use, or Spotify's own queue. */
+  /** What plays next: the top of the TV's house queue when that's in use (and the TV plays as you), or Spotify's own queue. */
   get nextUp(){
-    if (tv.house && tv.queue.length){ const x = tv.queue[0]; return { name: x.name, artist: x.artist, uri: x.uri, images: x.img ? [{ url: coverUrl(x.img), width: 300 }] : [], by: x.by.name, house: true }; }
+    if (houseMine() && tv.queue.length){ const x = tv.queue[0]; return { name: x.name, artist: x.artist, uri: x.uri, images: x.img ? [{ url: coverUrl(x.img), width: 300 }] : [], by: x.by.name, house: true }; }
     return this.queue && this.queue.length ? this.queue[0] : null;
   }
 }
 export const music = new Music();
+/** The TV's house queue is what plays next for you: the TV is paired, has Spotify, and plays as the person listening here. */
+export const houseMine = () => !!(tv.house && music.acc && tv.state.listening === music.acc.id);
 
 /** The Web API, as the account playing. */
 export const sp = () => spotify(music.acc, music.acc.client);
 
 let started = false, pollTimer = 0, tickTimer = 0, toastTimer = 0, lastTrack = '', lastCtx = '';
+// reads of Spotify's player that started before the last command, or before a newer read, are out of date; and just
+// after a skip, a read still showing the song skipped from is Spotify not having moved on yet
+let pollSeq = 0, cmdAt = 0, readAt = 0, skipAt = 0, skipFrom = '', skipUntil = 0;
 
 /** Starts the player for this page, once: reads who's signed in, then Spotify's player while the page is visible. */
 export function watchMusic(){
@@ -91,11 +97,15 @@ export function signOut(){
 export async function poll(){
   clearTimeout(pollTimer);
   if (!music.acc || document.hidden) return;
+  const seq = ++pollSeq, asked = Date.now();
   try {
     const m = playerModel(await sp().player(), Date.now());
+    if (seq !== pollSeq || asked < cmdAt) return;
+    if (skipFrom && m && m.track && m.track.id === skipFrom && Date.now() < skipUntil){ pollTimer = setTimeout(poll, 700); return; }
+    skipFrom = ''; readAt = Date.now();
     setPlayer(m);
     music.err = null;
-  } catch (e){ fail(e, true); }
+  } catch (e){ if (seq !== pollSeq) return; fail(e, true); }
   music.checked = true;
   const m = music.player;
   let next = m && m.playing ? 5 * SEC : 15 * SEC;
@@ -167,16 +177,18 @@ function applyColours(c){
 
 /* ---------- what you can do ---------- */
 function fail(e, quiet){
+  if (e && e.code === 'RELAY'){ say('The TV didn\'t get that. Try again.'); return; }
   const [title, body] = spotifyErrorText(e);
   if (e && e.code === 'AUTH'){ music.err = { title, body, code: e.code }; return; }
-  if (e && e.code === 'NO_DEVICE'){ music.picker = true; music.open = music.open || false; loadDevices(); say('Choose where to play.'); return; }
+  if (e && e.code === 'NO_DEVICE'){ music.picker = true; loadDevices(); return; }
   if (!quiet){ music.err = { title, body, code: e && e.code }; say(title); }
 }
 export function say(text){ music.toast = text; clearTimeout(toastTimer); toastTimer = setTimeout(() => { music.toast = ''; }, 3200); }
 const device = () => music.player && music.player.device ? music.player.device.id : null;
 async function act(fn, after){
+  cmdAt = Date.now();
   try { await fn(); music.err = null; soon(after); }
-  catch (e){ fail(e); soon(800); }
+  catch (e){ skipFrom = ''; fail(e); soon(800); }
 }
 /** Play or pause, shown at once. */
 export function toggle(){
@@ -186,15 +198,32 @@ export function toggle(){
   music.player = Object.assign({}, m, { playing, progress: progressAt(m, Date.now()), at: Date.now() });
   return act(() => playing ? sp().play({ device: device() }) : sp().pause(device()));
 }
-/** Skips; with songs waiting in the house queue, the TV skips to the next of them (src/display/tvqueue.js). */
+/**
+ * Skips, once per press: the next song shows at once, and the player is read again until Spotify has moved on. With
+ * the TV's house queue in use for you, the TV skips to the next of its songs (src/display/tvqueue.js).
+ */
 export function next(){
-  if (tv.house && tv.queue.length && !tv.queue[0].fed) return act(() => tvSend('skip'), 1500);
-  return act(() => sp().next(device()), 500);
+  const now = Date.now(), m = music.player, up = music.nextUp;
+  if (now - skipAt < 1500) return;
+  skipAt = now;
+  if (m && m.track){
+    skipFrom = m.track.id; skipUntil = now + 4000;
+    // shown, not taken as the song playing: its lyrics, colours and the rest load once Spotify says it is
+    if (up){ const id = up.id || String(up.uri || '').split(':').pop(); music.player = Object.assign({}, m, { track: Object.assign({ artists: [{ name: up.artist || '' }], album: { name: '' }, images: [], dur: 0 }, up, { id }), progress: 0, at: now, playing: true }); music.now = now; }
+  }
+  if (houseMine() && tv.queue.length) return act(async () => {
+    if (!(await tvSend('skip'))){ const e = new Error('The relay didn\'t take that'); e.code = 'RELAY'; throw e; }
+  }, 1200);
+  return act(() => sp().next(null), 500);
 }
+/** Back to the start of the song; or, in its first seconds or just after a skip, the song before. */
 export function previous(){
-  const m = music.player;
-  if (m && progressAt(m, Date.now()) > 4000) return seek(0);
-  return act(() => sp().previous(device()), 500);
+  const now = Date.now(), m = music.player;
+  if (now - skipAt < 1500) return;
+  const settled = !skipFrom && (now - skipAt > 8000 || readAt > skipAt);
+  skipAt = now;
+  if (settled && m && progressAt(m, now) > 4000) return seek(0);
+  return act(() => sp().previous(null), 500);
 }
 export function seek(ms){
   const m = music.player;
@@ -234,27 +263,56 @@ export async function loadDevices(){
   try { music.devices = playOn(await sp().devices(), music.player && music.player.device); }
   catch (e){ fail(e, true); }
 }
-export function transfer(d){
-  music.picker = false;
+/* ---------- where to play: chosen once, then remembered on this phone (hse.musicDevice) ---------- */
+const CHOSEN = 'musicDevice';
+/** The device chosen before, if it's awake: by its id, or its name (the wall display's player gets a new id each start). */
+export function chosenDevice(ds){
+  const c = store.getJ(CHOSEN, null);
+  return c ? (ds || []).find(d => d.id === c.id) || (ds || []).find(d => d.name === c.name) || null : null;
+}
+const remember = d => store.setJ(CHOSEN, { id: d.id, name: d.name });
+function showOn(d){
   const m = music.player;
   if (m) music.player = Object.assign({}, m, { device: { id: d.id, name: d.name, type: d.type, volume: d.volume, canVolume: d.canVolume } });
+}
+/** Asks where to play, then plays what was picked there (chooseDevice). */
+function ask(o, ds){
+  music.pending = o ? { o } : null;
+  if (ds) music.devices = ds;
+  music.picker = true;
+  loadDevices();
+}
+export function closePicker(){ music.picker = false; music.pending = null; }
+/** From "Play on": plays what's waiting there, or moves what's playing there; and remembers it. */
+export function chooseDevice(d){
+  remember(d);
+  const p = music.pending;
+  music.pending = null; music.picker = false;
+  if (!p) return transfer(d);
+  showOn(d); say('Playing on ' + d.name);
+  return act(() => sp().play(Object.assign({}, p.o, { device: d.id })), 900);
+}
+export function transfer(d){
+  music.picker = false;
+  remember(d); showOn(d);
   say('Playing on ' + d.name);
   return act(() => sp().transfer(d.id, true), 1200);
 }
 /**
  * Plays a list of songs (uris), from one of them; or an album or playlist (context), from a song in it. On the
- * device that's on now; but never the TV's own Spotify app unless it's already playing, since starting it takes the
- * screen over from the wall display: then the display's own player, a speaker or this phone (bestDevice), or ask.
+ * device that's on now (but not the TV's own Spotify app sitting idle, since starting it takes the screen over from
+ * the wall display); otherwise on the device chosen before, if it's awake; otherwise it asks first.
  */
 export function play(o){
   return act(async () => {
     let id = keepDevice(music.player) ? device() : null;
     if (!id){
-      const ds = playOn(await sp().devices(), music.player && music.player.device), best = bestDevice(ds);
-      if (!best){ music.devices = ds; music.picker = true; say(ds.length ? 'Choose where to play.' : 'Open Spotify on a speaker or this phone, then try again.'); return; }
-      id = best.id;
+      const ds = playOn(await sp().devices(), music.player && music.player.device), c = chosenDevice(ds);
+      if (!c){ ask(o, ds); return; }
+      id = c.id;
     }
-    await sp().play(Object.assign({}, o, { device: id }));
+    try { await sp().play(Object.assign({}, o, { device: id })); }
+    catch (e){ if (e && e.code === 'NO_DEVICE'){ ask(o); return; } throw e; }
   }, 700);
 }
 export async function addToQueue(t){

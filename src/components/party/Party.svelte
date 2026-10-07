@@ -30,14 +30,39 @@
     if (!code) return;
     const stop = listenTopic(topic(), readParty, r => {
       if (r.from !== 'screen') return;
-      if (r.party){ party = r.party; heard = Date.now(); quiet = false; votes = {}; }
+      if (r.party){ party = r.party; heard = Date.now(); quiet = false; settleVotes(r.party); }
       else if (r.results && me && r.to === me.id && r.rid === rid){ results = r.results; searching = false; }
-      else if (r.reply && me && r.to === me.id){ say(r.reply, r.ok); pending = ''; }
-    });
-    setTimeout(() => { if (me) send('hello'); else sendTopic(topic(), { from: 'guest', cmd: 'hello', who: { id: 'look' + shortId(null, 6), name: 'A guest' } }); }, 700);
-    const t = setTimeout(() => { if (!heard) quiet = true; }, 7000);
-    return () => { stop(); clearTimeout(t); };
+      else if (r.reply && me && r.to === me.id){
+        say(r.reply, r.ok);
+        if (!r.ok && pending) added = added.filter(u => u !== pending);   // not added: it can be tried again
+        pending = '';
+      }
+    }, hello);
+    const t = setTimeout(() => { if (!heard) quiet = true; }, 12000);
+    return () => { stop(); clearTimeout(t); clearTimeout(helloTimer); };
   });
+  /* the relay keeps nothing for a page that wasn't listening: say hello once the stream is open, and again until the TV answers */
+  let helloTimer = 0, helloAt = 0;
+  function hello(){
+    if (Date.now() - helloAt < 15000) return;
+    clearTimeout(helloTimer);
+    const asked = Date.now();
+    let tries = 0;
+    const ask = () => {
+      if (heard > asked || tries++ >= 5) return;
+      helloAt = Date.now();
+      if (me) send('hello'); else sendTopic(topic(), { from: 'guest', cmd: 'hello', who: { id: 'look' + shortId(null, 6), name: 'A guest' } });
+      helloTimer = setTimeout(ask, 4000);
+    };
+    ask();
+  }
+  /* a vote shows at once, and stays shown until the TV's queue agrees (or a few seconds pass) */
+  const voteAt = {};
+  function settleVotes(p){
+    const view = guestView(p.queue, me && me.id), keep = {};
+    for (const id in votes){ const x = view.find(y => y.id === id); if (x && x.voted !== votes[id] && Date.now() - (voteAt[id] || 0) < 6000) keep[id] = votes[id]; }
+    votes = keep;
+  }
 
   function join(e){
     e.preventDefault();
@@ -54,15 +79,17 @@
     const s = q.trim();
     if (!s || pasted){ results = null; searching = false; return; }
     searching = true;
-    sTimer = setTimeout(() => { rid = shortId(null, 8); send('search', { q: s, rid }); setTimeout(() => { if (searching) searching = false; }, 8000); }, 450);
+    sTimer = setTimeout(() => { rid = shortId(null, 8); send('search', { q: s, rid }); const asked = rid; setTimeout(() => { if (searching && rid === asked) searching = false; }, 8000); }, 600);
   }
   function add(uri){
     if (pending) return;
     pending = uri; added = added.concat([uri]);
-    send('add', { uri }).then(ok => { if (!ok){ pending = ''; say('That didn\'t reach the TV. Try again.', false); } });
-    setTimeout(() => { if (pending === uri) pending = ''; }, 8000);
+    const undo = () => { added = added.filter(u => u !== uri); pending = ''; };
+    send('add', { uri }).then(ok => { if (!ok){ undo(); say('That didn\'t reach the TV. Try again.', false); } });
+    setTimeout(() => { if (pending === uri){ undo(); say('The TV didn\'t answer. Try again.', false); } }, 10000);
   }
   function vote(x){
+    voteAt[x.id] = Date.now();
     votes = Object.assign({}, votes, { [x.id]: !(x.id in votes ? votes[x.id] : x.voted) });
     send('vote', { id: x.id });
   }

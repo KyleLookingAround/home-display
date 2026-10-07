@@ -74,7 +74,12 @@
     note = ok ? '' : 'The relay didn\'t take that. Try again.';
   }
   let picked = $state('');
-  async function listenAs(p){ picked = p.id; await tvSend('listen', { id: p.id }); }
+  async function listenAs(p){
+    picked = p.id;
+    const ok = await tvSend('listen', { id: p.id });
+    if (!ok){ picked = ''; note = 'The relay didn\'t take that. Try again.'; return; }
+    setTimeout(() => { if (picked === p.id) picked = ''; }, 10000);   // the TV didn't answer: let it be tried again
+  }
   $effect(() => { if (tv && tv.listening === picked) picked = ''; });
   const initials = n => String(n || '?').split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
   const sleeping = $derived(tv && tv.sleepSong ? 'Stops at the end of this song' : tv && tv.sleepAt > Date.now() ? `Fades out at ${hhmm(tv.sleepAt)}` : '');

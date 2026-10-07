@@ -42,9 +42,21 @@ export function watchTv(){
     tv.state = r.state; tv.heard = Date.now();
     try { sessionStorage.setItem(KEEP, JSON.stringify({ code: tv.code, state: r.state })); } catch (e){}
     hooks.forEach(f => f(r.state));
-  });
-  // give the stream a moment to open, then ask
-  setTimeout(() => tvSend('hello'), 800);
+  }, hello);
+}
+/** Asks the TV what it shows once the stream is open (or open again), and again every few seconds until it answers. */
+let helloTimer = 0, helloAt = 0;
+function hello(){
+  if (Date.now() - helloAt < 15000) return;          // the stream opening again moments after the last hello
+  clearTimeout(helloTimer);
+  const asked = Date.now();
+  let tries = 0;
+  const ask = () => {
+    if (!tv.code || tv.heard > asked || tries++ >= 4) return;
+    helloAt = Date.now(); tvSend('hello');
+    helloTimer = setTimeout(ask, 5000);
+  };
+  ask();
 }
 /** Calls back with each answer from the TV; returns a function that stops. */
 export function onTv(f){ hooks.add(f); return () => hooks.delete(f); }
@@ -54,6 +66,7 @@ export function pairTv(code){
   watchTv();
 }
 export function unpairTv(){
+  clearTimeout(helloTimer);
   if (stop){ stop(); stop = null; }
   store.del('remoteTV'); tv.code = null; tv.state = null; tv.heard = 0;
   try { sessionStorage.removeItem(KEEP); } catch (e){}

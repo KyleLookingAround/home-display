@@ -10,6 +10,7 @@
   import { artUrl, deviceKind } from '../../lib/music.js';
   import Icon from './Icon.svelte';
   import Player from './Player.svelte';
+  import DevicePicker from './DevicePicker.svelte';
   import { watchTv } from '../../state/tv.svelte.js';
   import { peek, freshen } from '../../state/discover.svelte.js';
 
@@ -55,7 +56,7 @@
   </div>
 {/if}
 {#if music.toast}<div class="toast" role="status">{music.toast}</div>{/if}
-{#if music.connected}<Player />{/if}
+{#if music.connected}<Player /><DevicePicker />{/if}
 
 <style>
   /* the app's card, floating above the tabs: dark glass, a hairline border, cyan for what you press, the cover's colour only as a faint glow */

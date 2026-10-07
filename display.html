@@ -2787,16 +2787,32 @@ function sendTopic(topic, msg){
   try { return fetch(RELAY + '/' + topic, { method: 'POST', body: JSON.stringify(msg) }).then(r => r.ok, () => false); }
   catch(e){ return Promise.resolve(false); }
 }
-/** Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function. */
-function listenTopic(topic, read, onMsg){
+/**
+ * Listens on a relay topic, reading each message with `read` (readRemote, readParty); returns a stop function.
+ * `onOpen` runs each time the stream opens, so a page can say hello once it can hear the answer. The relay keeps
+ * nothing for a stream that wasn't open, so messages sent while it's down are lost: hence saying hello again.
+ */
+function listenTopic(topic, read, onMsg, onOpen){
   if (typeof EventSource === 'undefined') return () => {};
-  const es = new EventSource(RELAY + '/' + topic + '/sse');
-  es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
-  return () => { try { es.close(); } catch(e){} };
+  let es = null, stopped = false, wait = 2000, timer = 0;
+  const open = () => {
+    if (stopped) return;
+    es = new EventSource(RELAY + '/' + topic + '/sse');
+    es.onopen = () => { wait = 2000; if (onOpen) onOpen(); };
+    es.onmessage = e => { const r = read(e.data); if (r) onMsg(r); };
+    // the browser reconnects by itself after a dropped connection, but gives up after an error answer (a 429 once
+    // the relay's daily allowance is used up): then open it again, waiting longer each time
+    es.onerror = () => {
+      if (stopped || es.readyState !== 2) return;
+      clearTimeout(timer); timer = setTimeout(open, wait); wait = Math.min(wait * 2, 5 * 60e3);
+    };
+  };
+  open();
+  return () => { stopped = true; clearTimeout(timer); try { es.close(); } catch(e){} };
 }
 const sendRemote = (code, msg) => sendTopic(remoteTopic(code), msg);
 /** Listens on a code's topic; calls back with each request or answer. Returns a stop function. */
-const listenRemote = (code, onMsg) => listenTopic(remoteTopic(code), readRemote, onMsg);
+const listenRemote = (code, onMsg, onOpen) => listenTopic(remoteTopic(code), readRemote, onMsg, onOpen);
 
 /* ---------- the account, sealed with the site's PIN ---------- */
 /** What the lock keeps on a device unlocked with "Remember this screen": the PIN, hashed. Null when there's no lock. */
@@ -3695,22 +3711,40 @@ function queueStep(q, m, now){
   let played = null;
   const out = q.filter(x => {
     if (uri && x.uri === uri && (x.fed || x === q[qFirstFree(q)])){ played = x; return false; }
+    // handed over, then skipped past before the TV saw it play: something else is playing, and not the song that was
+    // on when it was handed over (`over`), so it's gone from Spotify's queue too
+    if (x.fed && uri && uri !== (x.over || '') && now - x.fed > 3000) return false;
     return !(x.fed && now - x.fed > FED_FORGET);
   });
   let feed = null;
   const i = qFirstFree(out);
   if (m && m.playing && m.track && m.track.dur && i === 0 && out.length){
     const left = m.track.dur - progressAt(m, now);
-    if (left < FEED_AHEAD){ out[0] = Object.assign({}, out[0], { fed: now }); feed = out[0]; }
+    if (left < FEED_AHEAD){ out[0] = Object.assign({}, out[0], { fed: now, over: uri }); feed = out[0]; }
   }
   return { q: out, feed: feed, played: played };
 }
-/** Marks a song as handed over now (for a skip), or not (when Spotify refused it). */
-function queueFed(q, id, now){ return q.map(x => x.id === id ? Object.assign({}, x, { fed: now || 0 }) : x); }
+/** Marks a song as handed over now, over the song playing (`over`; for a skip), or not (when Spotify refused it). */
+function queueFed(q, id, now, over){ return q.map(x => x.id === id ? Object.assign({}, x, { fed: now || 0, over: now ? over || '' : '' }) : x); }
 
 /* ---------- through the relay: short keys, and only what's needed ---------- */
-function queueWire(q, max){
-  return q.slice(0, max || WIRE_MAX).map(x => ({ i: x.id, u: x.uri, n: x.name, a: x.artist, m: x.img, d: x.dur, b: x.by.name, g: x.by.id, v: x.votes.slice(-20), f: x.fed ? 1 : 0 }));
+function queueWire(q, max, voters){
+  return q.slice(0, max || WIRE_MAX).map(x => ({ i: x.id, u: x.uri, n: x.name, a: x.artist, m: x.img, d: x.dur, b: x.by.name, g: x.by.id, v: x.votes.slice(-(voters || 20)), f: x.fed ? 1 : 0 }));
+}
+/** The relay turns a message over 4,096 bytes into a file, which pages can't read: this leaves room. */
+const RELAY_MAX = 3800;
+const bytesOf = s => unescape(encodeURIComponent(s)).length;
+/**
+ * A message holding the queue's wire form (`wrap(wire)` makes it), made smaller until it fits the relay: fewer of
+ * each song's voters first, then fewer songs.
+ */
+function wireFit(q, max, wrap){
+  let n = max || WIRE_MAX, v = 20;
+  for (;;){
+    const msg = wrap(queueWire(q, n, v));
+    if (bytesOf(JSON.stringify(msg)) <= RELAY_MAX || (v <= 2 && n <= 1)) return msg;
+    if (v > 2) v = Math.max(2, Math.floor(v / 2)); else n--;
+  }
 }
 const qStr = (v, n) => String(v == null ? '' : v).slice(0, n);
 function readWire(arr){
@@ -5762,7 +5796,10 @@ async function pollSpotify(){
   const sp = tmSp();
   if (!sp) return null;
   tmWebStart();                             // this screen as a player of its own, once
+  const acc = TM.acc, asked = Date.now();
   const m = playerModel(await sp.player(), Date.now());
+  // an answer that left before a command, or for someone else (listening as another person since), is out of date
+  if (TM.acc !== acc || asked < TM.cmdAt) return SRC.music.data;
   const id = m && m.track ? m.track.id : '';
   if (id !== TM.lastTrack){
     TM.lastTrack = id; TM.lyrics = null; TM.lyricsFor = ''; TM.story = null; TM.storyFor = ''; TM.notes = null; TM.notesFor = ''; TM.notePage = 0; TM.shownLine = -2;
@@ -5778,12 +5815,20 @@ async function pollSpotify(){
 function tmSoon(ms){ const s = SRC.music; s.last = Date.now() - s.every() + (ms || 700); }
 async function tmAct(fn, after){
   const sp = tmSp(); if (!sp) return;
+  TM.cmdAt = Date.now();
   try { await fn(sp); SRC.music.err = null; }
-  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
+  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); tellRemote(t[0]); }
   tmSoon(after);
 }
-/** Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own player. */
-const tmDevice = () => { const m = tmModel(); return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null); };
+/**
+ * Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own
+ * player. This screen's player gets a new id each time it starts, so it's always asked for by the id it has now.
+ */
+const tmDevice = () => {
+  const m = tmModel();
+  if (m && m.device && m.device.name === SCREEN_PLAYER && WEB.id) return WEB.id;
+  return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null);
+};
 
 /* ---------- this screen as a Spotify player of its own (Spotify's Web Playback SDK) ---------- */
 // So music plays here, through the TV's speakers, and Spotify's own app never takes the screen over. It needs
@@ -5804,6 +5849,8 @@ function tmWebStart(){
       p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
       p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
       p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      // the browser won't let it make a sound until someone presses something on this screen
+      p.addListener('autoplay_failed', function(){ WEB.woke = false; toast('Press OK on the remote to let the TV play sound.', 8000); tellRemote('Press OK on the TV remote to let it play sound'); });
       p.connect();
       WEB.player = p;
     } catch(e){ cant('This TV\'s browser can\'t play Spotify itself'); }
@@ -5813,8 +5860,15 @@ function tmWebStart(){
   s.onerror = function(){ WEB.loading = false; cant('Spotify\'s player didn\'t load'); };
   document.head.appendChild(s);
 }
-/** Browsers only let a page make sound after someone presses something: the first key on the remote does it. */
+/** Browsers only let a page make sound after someone presses something: the first key, tap or click does it. */
 function tmWebWake(){ if (WEB.player && !WEB.woke && WEB.player.activateElement){ WEB.woke = true; try { WEB.player.activateElement(); } catch(e){} } }
+/** Starts this screen's player again, as whoever's listening now (a new sign-in, or listening as someone else). */
+function tmWebRestart(){
+  if (!WEB.player) return;
+  try { WEB.player.disconnect(); } catch(e){}
+  WEB.player = null; WEB.id = ''; WEB.err = ''; WEB.woke = false;
+  if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady();
+}
 /** Where music plays, for the foot of the Music view. */
 const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
@@ -5822,8 +5876,21 @@ function tmToggle(){
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
   return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
 }
-const tmNext = () => tmAct(sp => hqSkip(sp, tmDevice()), 600);
-const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
+/** One skip at a time: a held key, or a second press before Spotify has moved on, doesn't skip again. */
+function tmNext(){
+  const now = Date.now();
+  if (now - (TM.skipAt || 0) < 1500) return;
+  TM.skipAt = now;
+  return tmAct(sp => hqSkip(sp), 600);
+}
+/** Back to the start of the song, or (in its first seconds, or just after a skip) the song before. */
+function tmPrev(){
+  const now = Date.now();
+  if (now - (TM.skipAt || 0) < 1500) return;
+  const fresh = now - (TM.skipAt || 0) > 8000 || SRC.music.at > (TM.skipAt || 0);   // the song shown is the one playing
+  TM.skipAt = now;
+  return tmAct(sp => fresh && progressAt(tmModel(), now) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(null), 600);
+}
 /** A favourite from the number keys: a playlist or album, from the top. */
 function tmFavourite(i){
   const f = tmFavs()[i];
@@ -5903,7 +5970,11 @@ function tmTick(now){
   if (!TM.acc) return;
   if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
   const m = tmModel();
-  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading) tmFade(60);
+  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading){
+    // nothing playing when the time comes: the timer is done, rather than waiting to stop the next song someone plays
+    if (!(m && m.playing)){ if (now >= TM.sleepAt){ TM.sleepAt = 0; render(); tellRemote('Sleep timer off'); } }
+    else tmFade(60);
+  }
   if (TM.sleepSong && m && m.track){
     if (m.track.id !== TM.sleepSong){ TM.sleepSong = ''; tmAct(sp => sp.pause(tmDevice())); }
     else if (m.track.dur - progressAt(m, now) < 9000 && !TM.fading) tmFade(8);
@@ -5994,9 +6065,10 @@ function tmNotesHtml(){
  */
 function tmKey(e){
   if (!TM.acc) return false;
+  if (e.repeat && tmTrack() && /^(Arrow|Enter)/.test(e.key)) return true;
   if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
   if (e.key === '0'){ tmRadio(); return true; }
-  if (!tmTrack() && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
+  if (hqIdle(tmModel(), Date.now()) && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
   if (!tmTrack()) return false;
   if (e.key === 'Enter'){ tmToggle(); return true; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
@@ -6013,6 +6085,7 @@ const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaPlay: 'toggle', MediaPause: 
 function tmMediaKey(e){
   const a = MEDIA_KEYS[e.key] || MEDIA_KEYS[e.keyCode];
   if (!a || !TM.acc) return false;
+  if (e.repeat) return true;
   if (a === 'toggle') tmToggle(); else if (a === 'next') tmNext(); else tmPrev();
   return true;
 }
@@ -6028,7 +6101,7 @@ function tmTake(acc){
   rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
   // a new sign-in may bring the permission to play here: start this screen's player again with it
-  if (WEB.player){ try { WEB.player.disconnect(); } catch(e){} WEB.player = null; WEB.id = ''; WEB.err = ''; if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady(); }
+  tmWebRestart();
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
 }
 /* ===================== display: the house queue, parties and who's listening (src/lib/queue.js) ===================== */
@@ -6038,16 +6111,18 @@ function tmTake(acc){
 const HQ = { q: hqLoad(), party: cleanCode(store.get('party')) || '', partyAt: +store.get('partyAt') || 0, stopParty: null, guests: {},
   sendTimer: 0, partySent: '', nowSent: '' };
 const HQ_WHY = { DUP: 'That song is already in the queue.', FULL: 'The queue is full for now.', LIMIT: 'You have ' + GUEST_MAX + ' songs waiting. Once one plays, add another.',
-  LOOKUP: 'Spotify couldn\'t find that song.', NOSPOTIFY: 'Spotify isn\'t on the TV yet.', CLOSED: 'The party is over.' };
+  LOOKUP: 'Spotify couldn\'t find that song.', NOW: 'That song is playing now.', NOSPOTIFY: 'Spotify isn\'t on the TV yet.', CLOSED: 'The party is over.' };
 
 function hqLoad(){
   const q = store.getJ('houseQueue', []);
   return Array.isArray(q) ? q.filter(x => x && x.id && x.uri && x.by && Array.isArray(x.votes)) : [];
 }
-/** Keeps the queue, redraws, and tells the phones and the party. */
-function hqSet(q, note){
+/** Keeps the queue, redraws, and tells the phones and the party (unless `quiet`: nothing anyone sees has changed). */
+function hqSet(q, note, quiet){
   HQ.q = q; store.setJ('houseQueue', q);
-  render(); D.sentState = ''; tellRemote(note); hqPartyTell();
+  render();
+  if (quiet) return;
+  D.sentState = ''; tellRemote(note); hqPartyTell();
 }
 /** Adds a song by its uri, looked up with the TV's own Spotify so its name and cover are Spotify's. */
 async function hqAdd(uri, by, guest){
@@ -6059,6 +6134,8 @@ async function hqAdd(uri, by, guest){
   if (!t) return { err: 'LOOKUP' };
   const r = queueAdd(HQ.q, queueItem(t, by, Date.now()), { guest: guest });
   if (r.err) return r;
+  // the song playing now would be dropped as played the moment it was added
+  if (tmTrack() && tmTrack().uri === uri) return { err: 'NOW' };
   hqSet(r.q, (by.name || 'Someone') + ' added ' + t.name);
   toast('♪ ' + (by.name || 'Someone') + ' added ' + t.name + ' · ' + t.artist, 4000);
   return { item: r.q[r.q.length - 1] };
@@ -6070,48 +6147,67 @@ function hqCommand(r){
   else if (r.op === 'remove') hqSet(queueRemove(HQ.q, r.id));
   else if (r.op === 'vote') hqSet(queueVote(HQ.q, r.id, r.who.id));
 }
+/** Nothing is playing: no song at all, or one that has played to its end. */
+function hqIdle(m, now){ return !(m && m.track) || (!m.playing && m.track.dur && progressAt(m, now) >= m.track.dur - 3000); }
 /** Every second: hand Spotify the next song as this one ends, and drop songs that have started. */
 function hqTick(now){
   if (HQ.party && now - HQ.partyAt > 12 * 3600e3) hqParty(false);
   const m = tmModel();
   const id = m && m.track ? m.track.id + (m.playing ? '>' : '|') : '';
   if (id !== HQ.nowSent){ HQ.nowSent = id; hqPartyTell(); }
-  // at a party, a song added while nothing at all is playing starts the music (never a paused song, though)
-  if (HQ.party && SRC.music.at && !(m && m.track) && HQ.q.some(x => !x.fed) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStart(); return; }
+  // someone paused: the party doesn't start the music again by itself until a song is added after that
+  if (m && m.track && !m.playing && !hqIdle(m, now)) HQ.pausedAt = now;
+  // at a party, a song added while nothing is playing (or the last song has ended) starts the music
+  if (HQ.party && SRC.music.at && hqIdle(m, now) && HQ.q.some(x => !x.fed && x.at > (HQ.pausedAt || 0)) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStart(); return; }
   if (!HQ.q.length || !m) return;
   const r = queueStep(HQ.q, m, now);
   if (!r.feed && !r.played && r.q.length === HQ.q.length) return;
-  hqSet(r.q);
+  // handing a song over changes nothing anyone sees, so phones and guests aren't sent it (the relay's allowance)
+  hqSet(r.q, '', !!r.feed && !r.played && r.q.length === HQ.q.length);
   const sp = tmSp();
-  if (r.feed && sp) sp.addToQueue(r.feed.uri, tmDevice()).catch(() => hqSet(queueFed(HQ.q, r.feed.id, 0)));
+  // to whatever is playing: no device named, so a song moved elsewhere in the meantime still gets it
+  if (r.feed && sp) sp.addToQueue(r.feed.uri, null).catch(() => hqSet(queueFed(HQ.q, r.feed.id, 0)));
 }
 /** Plays the house queue from the top, when nothing is playing: on the device last used, or the first awake. */
 function hqStart(){
   const top = HQ.q.filter(x => !x.fed)[0];
   if (!top) return;
-  hqSet(queueFed(HQ.q, top.id, Date.now()));
+  hqSet(queueFed(HQ.q, top.id, Date.now(), ''));
   tmAct(sp => sp.play({ device: tmDevice(), uris: [top.uri] }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
     return sp.devices().then(ds => { const d = bestDevice(playOn(ds, null)); if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
   }).catch(e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; }), 900);
 }
-/** Skipping with songs waiting in the house queue plays the next of them, not what Spotify would have played. */
-function hqSkip(sp, dev){
-  const top = HQ.q.length && !HQ.q[0].fed ? HQ.q[0] : null;
-  if (!top) return sp.next(dev);
-  hqSet(queueFed(HQ.q, top.id, Date.now()));
-  return sp.addToQueue(top.uri, dev).then(() => sp.next(dev), e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; });
+/**
+ * Skipping with songs waiting in the house queue plays the next of them, not what Spotify would have played. It
+ * reads Spotify first, so a song already handed over and now playing is skipped past rather than counted twice;
+ * and it goes to whatever is playing, wherever that is.
+ */
+async function hqSkip(sp){
+  let m = null;
+  try { m = playerModel(await sp.player(), Date.now()); SRC.music.data = m; SRC.music.at = Date.now(); } catch(e){}
+  const uri = m && m.track ? m.track.uri : '';
+  if (uri && HQ.q.some(x => x.fed && x.uri === uri)) hqSet(HQ.q.filter(x => !(x.fed && x.uri === uri)));
+  const top = HQ.q.filter(x => !x.fed)[0];
+  // a song already handed over plays next anyway
+  if (!top || HQ.q.some(x => x.fed)) return sp.next(null);
+  hqSet(queueFed(HQ.q, top.id, Date.now(), uri), '', true);
+  try { await sp.addToQueue(top.uri, null); }
+  catch(e){ hqSet(queueFed(HQ.q, top.id, 0), '', true); throw e; }
+  return sp.next(null);
 }
 
 /* ---------- parties: guests scan a code and add songs, on a topic of their own ---------- */
-function hqParty(on){
+function hqParty(on, resumed){
   if (HQ.stopParty){ HQ.stopParty(); HQ.stopParty = null; }
   if (on){
     if (!tmSp()){ toast('Spotify isn\'t on this screen yet: on your phone, Screen, then Connect Spotify on the TV.', 6000); return; }
     if (!HQ.party){ HQ.party = newRemoteCode(); HQ.partyAt = Date.now(); store.set('party', HQ.party); store.set('partyAt', String(HQ.partyAt)); toast('The party\'s on. Guests scan the code to add songs.', 5000); }
     HQ.stopParty = listenTopic(partyTopic(HQ.party), readParty, hqGuest);
-    if (D.mode !== 'music') setMode('music');
+    // after the nightly fresh start, the party carries on in whatever view the screen was showing
+    if (D.mode !== 'music' && !resumed) setMode('music');
   } else if (HQ.party){
+    clearTimeout(HQ.sendTimer); clearTimeout(HQ.retryTimer);
     sendTopic(partyTopic(HQ.party), { from: 'screen', party: { open: false, at: Date.now() } });
     HQ.party = ''; HQ.guests = {}; HQ.partySent = ''; store.del('party'); store.del('partyAt');
     toast('The party\'s over. The house queue stays.', 4000);
@@ -6119,37 +6215,52 @@ function hqParty(on){
   D.sentState = ''; tellRemote(on ? 'Party on' : 'Party over'); render();
   if (on) hqPartyTell(true);
 }
-/** A guest's request. Each guest gets a search a second, a few hundred requests a party, and songs only up to the limit (queueAdd). */
+/**
+ * A guest's request. Each guest gets a search a second (one asked sooner waits its turn rather than being lost), a
+ * few hundred requests a party, and songs only up to the limit (queueAdd).
+ */
 function hqGuest(r){
   if (r.from !== 'guest' || !HQ.party) return;
-  const now = Date.now(), g = HQ.guests[r.who.id] || (HQ.guests[r.who.id] = { t: 0, n: 0 });
-  if (g.n > 400 || (r.cmd === 'search' && now - g.t < 1000)) return;
-  g.n++; if (r.cmd === 'search') g.t = now;
+  const now = Date.now(), g = HQ.guests[r.who.id] || (HQ.guests[r.who.id] = { t: 0, n: 0, later: 0 });
+  if (g.n > 400) return;
+  g.n++;
   if (r.cmd === 'hello') hqPartyTell(true);
-  else if (r.cmd === 'search') hqSearch(r);
+  else if (r.cmd === 'search'){
+    clearTimeout(g.later);
+    const wait = 1000 - (now - g.t);
+    if (wait > 0){ g.later = setTimeout(() => { g.t = Date.now(); hqSearch(r); }, wait); return; }
+    g.t = now; hqSearch(r);
+  }
   else if (r.cmd === 'add') hqAdd(r.uri, r.who, true).then(x => hqReply(r.who.id, x.err ? HQ_WHY[x.err] : 'Added ' + x.item.name + '. It\'s number ' + (HQ.q.map(y => y.id).indexOf(x.item.id) + 1) + ' in the queue.', !x.err));
   else if (r.cmd === 'vote') hqSet(queueVote(HQ.q, r.id, r.who.id));
 }
-function hqReply(to, text, ok){ sendTopic(partyTopic(HQ.party), { from: 'screen', to: to, reply: text, ok: !!ok }); }
+function hqReply(to, text, ok){ if (HQ.party) sendTopic(partyTopic(HQ.party), { from: 'screen', to: to, reply: text, ok: !!ok }); }
 function hqSearch(r){
   const sp = tmSp(); if (!sp) return;
   sp.search(r.q, ['track'], 8).then(j => {
+    if (!HQ.party) return;
     const list = ((j && j.tracks && j.tracks.items) || []).filter(Boolean).map(trackOf).filter(t => t && t.playable !== false);
     sendTopic(partyTopic(HQ.party), { from: 'screen', rid: r.rid, to: r.who.id, results: list.map(t => ({ u: t.uri, n: t.name.slice(0, 80), a: t.artist.slice(0, 60), m: coverId(artUrl(t.images, 300)), d: t.dur })) });
   }, () => hqReply(r.who.id, 'Spotify didn\'t answer. Try again in a moment.', false));
 }
-/** Tells the party what's playing and what's next, a moment after anything changes. */
+/** Tells the party what's playing and what's next, a moment after anything changes; again later if the relay refused. */
 function hqPartyTell(force){
   if (!HQ.party) return;
   clearTimeout(HQ.sendTimer);
   HQ.sendTimer = setTimeout(() => {
-    const t = tmTrack(), m = tmModel();
-    const msg = { from: 'screen', party: { open: true, at: Date.now(), now: t ? { n: t.name.slice(0, 80), a: t.artist.slice(0, 60), m: coverId(artUrl(t.images, 300)), p: !!(m && m.playing) } : null,
-      q: queueWire(HQ.q), more: Math.max(0, HQ.q.length - WIRE_MAX) } };
+    if (!HQ.party) return;
+    const t = tmTrack(), m = tmModel(), party = HQ.party;
+    const now = t ? { n: t.name.slice(0, 80), a: t.artist.slice(0, 60), m: coverId(artUrl(t.images, 300)), p: !!(m && m.playing) } : null;
+    const msg = wireFit(HQ.q, WIRE_MAX, wire => ({ from: 'screen', party: { open: true, at: Date.now(), now: now, q: wire, more: Math.max(0, HQ.q.length - wire.length) } }));
     const key = JSON.stringify([msg.party.now, msg.party.q, msg.party.more]);
     if (key === HQ.partySent && !force) return;
     HQ.partySent = key;
-    sendTopic(partyTopic(HQ.party), msg);
+    sendTopic(partyTopic(party), msg).then(ok => {
+      clearTimeout(HQ.retryTimer);
+      if (ok || HQ.party !== party){ HQ.retryWait = 0; return; }
+      HQ.partySent = ''; HQ.retryWait = Math.min((HQ.retryWait || 10e3) * 2, 5 * 60e3);
+      HQ.retryTimer = setTimeout(() => hqPartyTell(), HQ.retryWait);
+    });
   }, force ? 50 : 700);
 }
 function hqPartyUrl(){
@@ -6157,7 +6268,7 @@ function hqPartyUrl(){
   return location.href.split('#')[0].replace(/[^\/]*$/, '') + 'party.html#' + HQ.party;
 }
 /** After a reload, a party that was on carries on. */
-function hqResume(){ if (HQ.party && !D.embed) hqParty(true); }
+function hqResume(){ if (HQ.party && !D.embed) hqParty(true, true); }
 
 /* ---------- on the Music view: what's next in the house queue, and the party's code ---------- */
 function hqNextHtml(){
@@ -6180,6 +6291,7 @@ function tmListen(id){
   if (!a){ toast('That Spotify isn\'t on this screen.', 4000); return; }
   s.active = a.id; saveSpotifyStore(s);
   TM.acc = a; TM.lastTrack = '';
+  tmWebRestart();
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
   toast('Listening as ' + (a.name || a.id), 3000);
   D.sentState = ''; tellRemote('Listening as ' + (a.name || a.id)); render();
@@ -6679,16 +6791,33 @@ function startRemote(){
   });
   D.sentState = ''; tellRemote();
 }
-/** Tells a listening phone what's on screen, when that changes, and whether an account is connected here. */
+/**
+ * Tells a listening phone what's on screen, when that changes, and whether an account is connected here. Changes a
+ * moment apart go as one message, since the relay allows a household about 250 a day; one the relay refuses is
+ * sent again later. What takes over by itself (the screensaver, the night clock) isn't news on its own.
+ */
 function tellRemote(note){
   if (!D.remote || D.embed) return;
   const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '';
-  const key = D.mode + '/' + shown() + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
+  const key = D.mode + '/' + !!NET.creds + '/' + sp + '/' + TM.sleepAt + '/' + TM.sleepSong + '/' + HQ.party;
   if (key === D.sentState && !note) return;
   D.sentState = key;
+  if (note) D.tellNote = note;
+  clearTimeout(D.tellTimer);
+  D.tellTimer = setTimeout(tellNow, 400);
+}
+function tellNow(){
+  const sp = TM.acc ? (TM.acc.name || TM.acc.id) : '', note = D.tellNote || '';
+  D.tellNote = '';
   // with the house queue (the first few), the party's code, and whose Spotify the TV has (src/display/tvqueue.js)
-  sendRemote(D.remote, { from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note || '',
-    queue: queueWire(HQ.q, 8), more: Math.max(0, HQ.q.length - 8), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } });
+  const msg = wireFit(HQ.q, 8, wire => ({ from: 'screen', state: { mode: D.mode, shown: shown(), at: Date.now(), account: !!NET.creds, spotify: sp, sleepAt: TM.sleepAt, sleepSong: !!TM.sleepSong, note: note,
+    queue: wire, more: Math.max(0, HQ.q.length - wire.length), party: HQ.party, people: tmPeople().slice(0, 8), listening: TM.acc ? TM.acc.id : '' } }));
+  sendRemote(D.remote, msg).then(ok => {
+    clearTimeout(D.tellRetry);
+    if (ok){ D.tellWait = 0; return; }
+    D.sentState = ''; D.tellWait = Math.min((D.tellWait || 10e3) * 2, 5 * 60e3);
+    D.tellRetry = setTimeout(() => tellRemote(note), D.tellWait);
+  });
 }
 /** What the phone sends, sealed with the site's PIN: the account, guest Wi-Fi, dates, the calendar (src/lib/remote.js). */
 async function takeDetails(box){
@@ -6918,6 +7047,8 @@ function importSetup(hash){
 function wire(){
   $('#picker').innerHTML = MODES.map(m => `<button class="btn" type="button" role="tab" data-mode="${m.id}" aria-selected="false"><span class="k">${m.key}</span>${m.label}</button>`).join('');
   $('#picker').addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-mode]'); if (b){ setMode(b.getAttribute('data-mode')); showChrome(); } });
+  // the first tap or click anywhere also lets this screen's Spotify player make a sound (tmWebWake), as a key does
+  document.addEventListener('click', tmWebWake, true); document.addEventListener('touchstart', tmWebWake, true);
   $('#setBtn').addEventListener('click', openSheet);
   $('#fsBtn').addEventListener('click', toggleFullscreen);
   $('#wifiBtn').addEventListener('click', () => showWifi());

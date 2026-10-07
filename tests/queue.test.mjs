@@ -59,6 +59,35 @@ test('the TV hands Spotify the next song just before this one ends, and drops it
   assert.deepEqual(lost.q, [], 'a song handed over that never played is forgotten');
 });
 
+test('a song handed over and then skipped past is dropped, so the queue carries on', () => {
+  const T = 1e6, at = (uri, progress) => ({ playing: true, progress, at: T, track: { uri, dur: 200000 } });
+  let q = build([1, KYLE], [2, SAM], [3, KYLE]);
+  // a skip hands song 1 over while "other" plays; then a second skip passes song 1 before the TV saw it
+  q = Q.queueFed(q, 'idx1', T, 'spotify:track:other');
+  assert.deepEqual(names(Q.queueStep(q, at('spotify:track:other', 5000), T + 2000).q), ['1', '2', '3'], 'still waiting while what was on plays');
+  const r = Q.queueStep(q, at('spotify:track:context', 1000), T + 4000);
+  assert.deepEqual(names(r.q), ['2', '3'], 'gone once something else plays');
+  assert.equal(r.played, null);
+  const near = Q.queueStep(r.q, at('spotify:track:context', 180000), T + 5000);
+  assert.equal(near.feed && near.feed.id, 'idx2', 'and the next is handed over as this one ends');
+  assert.equal(near.feed.over, 'spotify:track:context');
+  // just handed over: a moment's grace for Spotify to start it
+  assert.deepEqual(names(Q.queueStep(q, at('spotify:track:context', 1000), T + 1000).q), ['1', '2', '3']);
+  assert.equal(Q.queueFed(q, 'idx1', 0).find(x => x.id === 'idx1').over, '', 'refused: not handed over');
+});
+
+test('the queue\'s message shrinks to fit the relay', () => {
+  const long = 'Ä very long song title with letters from all over the world, ünïcödé ✓ '.slice(0, 80);
+  let q = [];
+  for (let i = 0; i < 14; i++) q.push(Object.assign(Q.queueItem({ uri: 'spotify:track:t' + i, name: long, artist: long, dur: 200000, images: [] }, { id: 'phone00001', name: 'Kyle Mckinney' }, 1, 'idx' + i), { votes: Array.from({ length: 20 }, (_, k) => 'guest' + String(k).padStart(5, '0')) }));
+  const msg = Q.wireFit(q, Q.WIRE_MAX, wire => ({ from: 'screen', party: { open: true, q: wire, more: q.length - wire.length } }));
+  assert.ok(Q.bytesOf(JSON.stringify(msg)) <= Q.RELAY_MAX, 'under 4 KB');
+  assert.ok(msg.party.q.length >= 5, 'with as many songs as fit');
+  assert.equal(msg.party.more, q.length - msg.party.q.length);
+  const small = Q.wireFit(q.slice(0, 2).map(x => Object.assign({}, x, { votes: [] })), Q.WIRE_MAX, wire => ({ q: wire }));
+  assert.equal(small.q.length, 2, 'a small queue goes as it is');
+});
+
 test('the relay carries the queue in short form, and parties only what guests may ask', () => {
   const q = Q.queueVote(build([1, KYLE], [2, SAM]), 'idx2', 'g1');
   const wire = Q.queueWire(q);

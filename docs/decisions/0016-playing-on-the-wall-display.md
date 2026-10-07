@@ -13,3 +13,7 @@
 - Whether the TV's own browser supports the SDK can only be known on the TV: it is a Chromium-based browser of unknown age. If it doesn't, the Google speakers or the phone are the fallback.
 - The TV's Spotify sign-in must be renewed once from the phone (Screen, Spotify on the TV) to bring the new permission.
 - Tests: the ranking in `tests/music.test.mjs`; the SDK itself only runs over https and isn't loaded in tests.
+
+## Revisions
+
+- **October 2026:** the phone no longer picks a device by itself. With nothing playing anywhere, picking a song asks "Where to play?" first, and remembers the answer on that phone (`hse.musicDevice`, matched by id or by name, since the wall display's player gets a new id each time it starts). It only asks again when that device isn't awake. `bestDevice` is still how the TV itself chooses, for its favourites and the house queue.

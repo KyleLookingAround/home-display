@@ -30,3 +30,11 @@
 - Spotify's own queue still shows under the house queue, as "Then from…": what Spotify will play once the house queue runs out.
 - The relay (ntfy.sh) is free and promises nothing; if it's down, the queue on the TV keeps playing but phones and guests can't change it.
 - Tests: `tests/queue.test.mjs` (the queue's rules and what the relay lets through) and three browser tests in `tests/music.browser.mjs` (the TV feeding Spotify and running a party, the phone's house queue and the guests' page, and who's listening).
+
+## Revisions
+
+- **October 2026:**
+  - **The relay's allowance.** ntfy.sh allows about 250 messages a day from one internet address, and the TV, the phones and guests on the house Wi-Fi share one. So the TV sends one message a moment after changes (not one per change), says nothing when a song is only handed to Spotify, and sends again later when the relay refuses one.
+  - **Queue messages fit.** A queue message over 4 KB would arrive as a file, which nothing could read. Queue messages are made smaller to fit (`wireFit`: fewer voters, then fewer songs).
+  - **Saying hello.** The relay keeps nothing for a page that wasn't listening, so phones and guests say hello once their stream is open, and again until the TV answers. A stream the relay closes is opened again.
+  - **A song handed over that's then skipped past** (`over` in `queueFed`) is dropped from the queue, rather than blocking it for 20 minutes.

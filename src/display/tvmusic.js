@@ -22,7 +22,10 @@ async function pollSpotify(){
   const sp = tmSp();
   if (!sp) return null;
   tmWebStart();                             // this screen as a player of its own, once
+  const acc = TM.acc, asked = Date.now();
   const m = playerModel(await sp.player(), Date.now());
+  // an answer that left before a command, or for someone else (listening as another person since), is out of date
+  if (TM.acc !== acc || asked < TM.cmdAt) return SRC.music.data;
   const id = m && m.track ? m.track.id : '';
   if (id !== TM.lastTrack){
     TM.lastTrack = id; TM.lyrics = null; TM.lyricsFor = ''; TM.story = null; TM.storyFor = ''; TM.notes = null; TM.notesFor = ''; TM.notePage = 0; TM.shownLine = -2;
@@ -38,12 +41,20 @@ async function pollSpotify(){
 function tmSoon(ms){ const s = SRC.music; s.last = Date.now() - s.every() + (ms || 700); }
 async function tmAct(fn, after){
   const sp = tmSp(); if (!sp) return;
+  TM.cmdAt = Date.now();
   try { await fn(sp); SRC.music.err = null; }
-  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
+  catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); tellRemote(t[0]); }
   tmSoon(after);
 }
-/** Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own player. */
-const tmDevice = () => { const m = tmModel(); return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null); };
+/**
+ * Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own
+ * player. This screen's player gets a new id each time it starts, so it's always asked for by the id it has now.
+ */
+const tmDevice = () => {
+  const m = tmModel();
+  if (m && m.device && m.device.name === SCREEN_PLAYER && WEB.id) return WEB.id;
+  return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null);
+};
 
 /* ---------- this screen as a Spotify player of its own (Spotify's Web Playback SDK) ---------- */
 // So music plays here, through the TV's speakers, and Spotify's own app never takes the screen over. It needs
@@ -64,6 +75,8 @@ function tmWebStart(){
       p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
       p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
       p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      // the browser won't let it make a sound until someone presses something on this screen
+      p.addListener('autoplay_failed', function(){ WEB.woke = false; toast('Press OK on the remote to let the TV play sound.', 8000); tellRemote('Press OK on the TV remote to let it play sound'); });
       p.connect();
       WEB.player = p;
     } catch(e){ cant('This TV\'s browser can\'t play Spotify itself'); }
@@ -73,8 +86,15 @@ function tmWebStart(){
   s.onerror = function(){ WEB.loading = false; cant('Spotify\'s player didn\'t load'); };
   document.head.appendChild(s);
 }
-/** Browsers only let a page make sound after someone presses something: the first key on the remote does it. */
+/** Browsers only let a page make sound after someone presses something: the first key, tap or click does it. */
 function tmWebWake(){ if (WEB.player && !WEB.woke && WEB.player.activateElement){ WEB.woke = true; try { WEB.player.activateElement(); } catch(e){} } }
+/** Starts this screen's player again, as whoever's listening now (a new sign-in, or listening as someone else). */
+function tmWebRestart(){
+  if (!WEB.player) return;
+  try { WEB.player.disconnect(); } catch(e){}
+  WEB.player = null; WEB.id = ''; WEB.err = ''; WEB.woke = false;
+  if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady();
+}
 /** Where music plays, for the foot of the Music view. */
 const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
@@ -82,8 +102,21 @@ function tmToggle(){
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
   return tmAct(sp => m && m.playing ? sp.pause(tmDevice()) : sp.play({ device: tmDevice() }));
 }
-const tmNext = () => tmAct(sp => hqSkip(sp, tmDevice()), 600);
-const tmPrev = () => tmAct(sp => progressAt(tmModel(), Date.now()) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(tmDevice()), 600);
+/** One skip at a time: a held key, or a second press before Spotify has moved on, doesn't skip again. */
+function tmNext(){
+  const now = Date.now();
+  if (now - (TM.skipAt || 0) < 1500) return;
+  TM.skipAt = now;
+  return tmAct(sp => hqSkip(sp), 600);
+}
+/** Back to the start of the song, or (in its first seconds, or just after a skip) the song before. */
+function tmPrev(){
+  const now = Date.now();
+  if (now - (TM.skipAt || 0) < 1500) return;
+  const fresh = now - (TM.skipAt || 0) > 8000 || SRC.music.at > (TM.skipAt || 0);   // the song shown is the one playing
+  TM.skipAt = now;
+  return tmAct(sp => fresh && progressAt(tmModel(), now) > 4000 ? sp.seek(0, tmDevice()) : sp.previous(null), 600);
+}
 /** A favourite from the number keys: a playlist or album, from the top. */
 function tmFavourite(i){
   const f = tmFavs()[i];
@@ -163,7 +196,11 @@ function tmTick(now){
   if (!TM.acc) return;
   if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
   const m = tmModel();
-  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading) tmFade(60);
+  if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading){
+    // nothing playing when the time comes: the timer is done, rather than waiting to stop the next song someone plays
+    if (!(m && m.playing)){ if (now >= TM.sleepAt){ TM.sleepAt = 0; render(); tellRemote('Sleep timer off'); } }
+    else tmFade(60);
+  }
   if (TM.sleepSong && m && m.track){
     if (m.track.id !== TM.sleepSong){ TM.sleepSong = ''; tmAct(sp => sp.pause(tmDevice())); }
     else if (m.track.dur - progressAt(m, now) < 9000 && !TM.fading) tmFade(8);
@@ -254,9 +291,10 @@ function tmNotesHtml(){
  */
 function tmKey(e){
   if (!TM.acc) return false;
+  if (e.repeat && tmTrack() && /^(Arrow|Enter)/.test(e.key)) return true;
   if (/^[1-9]$/.test(e.key)){ tmFavourite(+e.key - 1); return true; }
   if (e.key === '0'){ tmRadio(); return true; }
-  if (!tmTrack() && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
+  if (hqIdle(tmModel(), Date.now()) && e.key === 'Enter' && HQ.q.some(x => !x.fed)){ hqStart(); return true; }
   if (!tmTrack()) return false;
   if (e.key === 'Enter'){ tmToggle(); return true; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
@@ -273,6 +311,7 @@ const MEDIA_KEYS = { MediaPlayPause: 'toggle', MediaPlay: 'toggle', MediaPause: 
 function tmMediaKey(e){
   const a = MEDIA_KEYS[e.key] || MEDIA_KEYS[e.keyCode];
   if (!a || !TM.acc) return false;
+  if (e.repeat) return true;
   if (a === 'toggle') tmToggle(); else if (a === 'next') tmNext(); else tmPrev();
   return true;
 }
@@ -288,6 +327,6 @@ function tmTake(acc){
   rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
   // a new sign-in may bring the permission to play here: start this screen's player again with it
-  if (WEB.player){ try { WEB.player.disconnect(); } catch(e){} WEB.player = null; WEB.id = ''; WEB.err = ''; if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady(); }
+  tmWebRestart();
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
 }
