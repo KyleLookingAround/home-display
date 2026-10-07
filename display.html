@@ -4658,7 +4658,7 @@ const Cockpit = (() => {
   let drops = [], flakes = [], dropSprite = null, frostCache = null, fogCache = null, vignette = null, glassKey = '';
   let rotI = 0, boards = [], nextNear = 0, laneI = 0, train = null;
   let voyage = null, lights = [], rem = 16;
-  let actx = null, tier = 0, learnt = 0, adapt = true, detail = 'auto', aheadAt = -1e9, aheadDt = 0, intervals = [], auroraCv = null, auroraAt = -1e9, nearClear = false, glassDrawn = '';
+  let actx = null, tier = 0, learnt = 0, adapt = true, detail = 'auto', hushed = false, aheadAt = -1e9, aheadDt = 0, intervals = [], auroraCv = null, auroraAt = -1e9, nearClear = false, glassDrawn = '';
   let bolt = null, nextBolt = 0, flash = 0, view = { x: 0, y: 0 }, issShown = -1e9;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[(Math.random() * a.length) | 0];
@@ -4680,6 +4680,7 @@ const Cockpit = (() => {
   function chooseTier(){
     adapt = detail !== 'high' && detail !== 'low';
     tier = detail === 'high' ? 0 : detail === 'low' ? 2 : Math.max(learnt, TV ? 2 : (navigator.hardwareConcurrency || 4) <= 2 ? 1 : 0);   // a step down is remembered until the page reloads
+    if (hushed) tier = Math.max(tier, 2);                        // music playing through this screen comes first
     quality = tier === 0 ? 1 : .5;
     document.body.classList.toggle('lite', tier > 0);
   }
@@ -5449,7 +5450,7 @@ const Cockpit = (() => {
     if (!on) return;
     raf = requestAnimationFrame(loop);
     const T = TIERS[tier];
-    if (last && t - last < 1000 / T.fps - 4) return;                // a frame cap, so a slow screen isn't asked for more
+    if (last && t - last < 1000 / (hushed ? Math.min(T.fps, 20) : T.fps) - 4) return;   // a frame cap, so a slow screen isn't asked for more
     const gap = last ? t - last : 16, dt = Math.min(80, gap); last = t; frame++; clock += dt;
     const growing = nebulae.some(l => !l.ready);
     nebulae.forEach(l => { if (!l.ready) growLayer(l, quality === 1 ? 10 : 6); });
@@ -5533,6 +5534,8 @@ const Cockpit = (() => {
       drops = []; flakes = []; things = [];
     },
     resize(){ if (on){ resize(); if (still()) drawStill(); } },
+    /** Music is playing through this screen's own Spotify player: draw less, so its sound never stutters. */
+    hush(v){ v = !!v; if (v === hushed) return; hushed = v; if (on){ chooseTier(); resize(); } },
     /** New data: the billboards, the sky, the engines, the world outside and the dashboard. */
     update(info){
       sky = info.sky; engine = info.engine; world = info.world; cards = info.cards; voyage = info.voyage || null;
@@ -5843,12 +5846,17 @@ function tmWebStart(){
   window.onSpotifyWebPlaybackSDKReady = function(){
     try {
       const p = new window.Spotify.Player({ name: SCREEN_PLAYER, volume: 0.7,
-        getOAuthToken: function(cb){ const a = TM.acc; if (!a) return cb(''); accessToken(a, a.client).then(cb, function(){ cb(''); }); } });
+        // a refresh that fails (the network dropped for a moment) is tried again, rather than the music stopping
+        getOAuthToken: function(cb){
+          const a = TM.acc; if (!a) return cb('');
+          accessToken(a, a.client).then(cb, function(){ setTimeout(function(){ accessToken(a, a.client).then(cb, function(){ cb(''); }); }, 3000); });
+        } });
       p.addListener('ready', function(e){ WEB.id = e.device_id; WEB.err = ''; render(); });
       p.addListener('not_ready', function(){ WEB.id = ''; });
       p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
       p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
       p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      p.addListener('playback_error', function(e){ toast('Spotify couldn\'t play that here' + (e && e.message ? ': ' + e.message : '') + '.', 6000); tellRemote('Spotify couldn\'t play that on the TV'); });
       // the browser won't let it make a sound until someone presses something on this screen
       p.addListener('autoplay_failed', function(){ WEB.woke = false; toast('Press OK on the remote to let the TV play sound.', 8000); tellRemote('Press OK on the TV remote to let it play sound'); });
       p.connect();
@@ -5869,6 +5877,8 @@ function tmWebRestart(){
   WEB.player = null; WEB.id = ''; WEB.err = ''; WEB.woke = false;
   if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady();
 }
+/** Music is coming out of this screen: its own Spotify player is the one playing. */
+function tmPlayingHere(){ const m = tmModel(); return !!(WEB.id && m && m.playing && m.device && (m.device.id === WEB.id || m.device.name === SCREEN_PLAYER)); }
 /** Where music plays, for the foot of the Music view. */
 const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
@@ -5970,6 +5980,9 @@ function tmTick(now){
   if (!TM.acc) return;
   if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
   const m = tmModel();
+  // while music plays through this screen, the starfield and the screensaver draw less (body.hush)
+  const here = tmPlayingHere();
+  if (here !== !!TM.here){ TM.here = here; document.body.classList.toggle('hush', here); if (typeof Cockpit !== 'undefined') Cockpit.hush(here); }
   if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading){
     // nothing playing when the time comes: the timer is done, rather than waiting to stop the next song someone plays
     if (!(m && m.playing)){ if (now >= TM.sleepAt){ TM.sleepAt = 0; render(); tellRemote('Sleep timer off'); } }
@@ -6158,7 +6171,7 @@ function hqTick(now){
   // someone paused: the party doesn't start the music again by itself until a song is added after that
   if (m && m.track && !m.playing && !hqIdle(m, now)) HQ.pausedAt = now;
   // at a party, a song added while nothing is playing (or the last song has ended) starts the music
-  if (HQ.party && SRC.music.at && hqIdle(m, now) && HQ.q.some(x => !x.fed && x.at > (HQ.pausedAt || 0)) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStart(); return; }
+  if (HQ.party && SRC.music.at && hqIdle(m, now) && HQ.q.some(x => !x.fed && x.at > (HQ.pausedAt || 0)) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStartIfIdle(); return; }
   if (!HQ.q.length || !m) return;
   const r = queueStep(HQ.q, m, now);
   if (!r.feed && !r.played && r.q.length === HQ.q.length) return;
@@ -6167,6 +6180,14 @@ function hqTick(now){
   const sp = tmSp();
   // to whatever is playing: no device named, so a song moved elsewhere in the meantime still gets it
   if (r.feed && sp) sp.addToQueue(r.feed.uri, null).catch(() => hqSet(queueFed(HQ.q, r.feed.id, 0)));
+}
+/** Starts the queue by itself only if Spotify, asked now, says nothing is playing: the moment between two songs isn't the end. */
+async function hqStartIfIdle(){
+  const sp = tmSp(); if (!sp) return;
+  let m = null;
+  try { m = playerModel(await sp.player(), Date.now()); } catch(e){ return; }
+  SRC.music.data = m; SRC.music.at = Date.now();
+  if (hqIdle(m, Date.now())) hqStart();
 }
 /** Plays the house queue from the top, when nothing is playing: on the device last used, or the first awake. */
 function hqStart(){
@@ -6452,7 +6473,8 @@ function tick(){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
   if (now >= D.reloadAt && !D.embed){
-    if (navigator.onLine !== false && !open()){ store.set('display.reloaded', String(now)); location.reload(); return; }
+    // not while music is playing through this screen: that would stop it mid-song
+    if (navigator.onLine !== false && !open() && !tmPlayingHere()){ store.set('display.reloaded', String(now)); location.reload(); return; }
     D.reloadAt = now + 5*MIN;
   }
   if (D.chromeUntil && now > D.chromeUntil && !open() && (!$('#bar').contains(document.activeElement) || idle > 30e3)) hideChrome();
@@ -6502,9 +6524,12 @@ function fitScreen(){
   if (innerWidth < 1144){ if (html.style.fontSize){ html.style.fontSize = ''; D.fit = 1; } return; }
   const base = Math.min(innerWidth * 0.014, innerHeight * 0.025);
   const over = () => Math.max(html.scrollHeight / innerHeight, html.scrollWidth / innerWidth, toolbarWraps() ? 1.06 : 0);
-  // from full size each time, so it grows back once there's room (the page is never shorter than the screen, so
-  // room can't be measured, only tried)
-  let f = 1;
+  // from full size for a new view or screen size, and every minute, so it grows back once there's room (the page is
+  // never shorter than the screen, so room can't be measured, only tried); in between, from where it was, which costs
+  // one measure when nothing has changed (the Music view redraws every few seconds)
+  const key = shown() + '/' + innerWidth + 'x' + innerHeight, now = Date.now(), fresh = key !== D.fitKey || now - (D.fitAt || 0) > 60e3;
+  if (fresh){ D.fitKey = key; D.fitAt = now; }
+  let f = fresh ? 1 : D.fit;
   html.style.fontSize = (base * f).toFixed(2) + 'px';
   for (let i = 0; i < 8; i++){
     const o = over();
@@ -7133,7 +7158,9 @@ function wire(){
   function draw(t){
     // the screensaver covers the whole screen: rest until it's gone
     if (document.body.classList.contains('cockpit')){ last = 0; setTimeout(() => requestAnimationFrame(draw), 500); return; }
-    const dt = Math.min(64, t - last || 16); last = t;
+    // music coming out of this screen (body.hush on the wall display): a dozen frames a second, so Spotify's player has the time it needs
+    if (document.body.classList.contains('hush') && last && t - last < 80){ requestAnimationFrame(draw); return; }
+    const dt = Math.min(100, t - last || 16); last = t;
     ctx.clearRect(0,0,W,H);
     for (const s of stars){
       if (!still){ s.x -= (0.004 + s.z*s.z*0.03)*dt; if (s.x < -2){ s.x = W + 2; s.y = Math.random()*H; } s.tw += s.ts*dt/1000; }

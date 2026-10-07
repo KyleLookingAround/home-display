@@ -15,7 +15,9 @@
   function draw(t){
     // the screensaver covers the whole screen: rest until it's gone
     if (document.body.classList.contains('cockpit')){ last = 0; setTimeout(() => requestAnimationFrame(draw), 500); return; }
-    const dt = Math.min(64, t - last || 16); last = t;
+    // music coming out of this screen (body.hush on the wall display): a dozen frames a second, so Spotify's player has the time it needs
+    if (document.body.classList.contains('hush') && last && t - last < 80){ requestAnimationFrame(draw); return; }
+    const dt = Math.min(100, t - last || 16); last = t;
     ctx.clearRect(0,0,W,H);
     for (const s of stars){
       if (!still){ s.x -= (0.004 + s.z*s.z*0.03)*dt; if (s.x < -2){ s.x = W + 2; s.y = Math.random()*H; } s.tw += s.ts*dt/1000; }

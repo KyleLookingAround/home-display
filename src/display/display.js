@@ -154,7 +154,8 @@ function tick(){
     const i = ROTATING.indexOf(D.mode); setMode(ROTATING[(i + 1) % ROTATING.length], { rotation: true });
   }
   if (now >= D.reloadAt && !D.embed){
-    if (navigator.onLine !== false && !open()){ store.set('display.reloaded', String(now)); location.reload(); return; }
+    // not while music is playing through this screen: that would stop it mid-song
+    if (navigator.onLine !== false && !open() && !tmPlayingHere()){ store.set('display.reloaded', String(now)); location.reload(); return; }
     D.reloadAt = now + 5*MIN;
   }
   if (D.chromeUntil && now > D.chromeUntil && !open() && (!$('#bar').contains(document.activeElement) || idle > 30e3)) hideChrome();
@@ -204,9 +205,12 @@ function fitScreen(){
   if (innerWidth < 1144){ if (html.style.fontSize){ html.style.fontSize = ''; D.fit = 1; } return; }
   const base = Math.min(innerWidth * 0.014, innerHeight * 0.025);
   const over = () => Math.max(html.scrollHeight / innerHeight, html.scrollWidth / innerWidth, toolbarWraps() ? 1.06 : 0);
-  // from full size each time, so it grows back once there's room (the page is never shorter than the screen, so
-  // room can't be measured, only tried)
-  let f = 1;
+  // from full size for a new view or screen size, and every minute, so it grows back once there's room (the page is
+  // never shorter than the screen, so room can't be measured, only tried); in between, from where it was, which costs
+  // one measure when nothing has changed (the Music view redraws every few seconds)
+  const key = shown() + '/' + innerWidth + 'x' + innerHeight, now = Date.now(), fresh = key !== D.fitKey || now - (D.fitAt || 0) > 60e3;
+  if (fresh){ D.fitKey = key; D.fitAt = now; }
+  let f = fresh ? 1 : D.fit;
   html.style.fontSize = (base * f).toFixed(2) + 'px';
   for (let i = 0; i < 8; i++){
     const o = over();

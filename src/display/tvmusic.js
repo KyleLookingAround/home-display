@@ -69,12 +69,17 @@ function tmWebStart(){
   window.onSpotifyWebPlaybackSDKReady = function(){
     try {
       const p = new window.Spotify.Player({ name: SCREEN_PLAYER, volume: 0.7,
-        getOAuthToken: function(cb){ const a = TM.acc; if (!a) return cb(''); accessToken(a, a.client).then(cb, function(){ cb(''); }); } });
+        // a refresh that fails (the network dropped for a moment) is tried again, rather than the music stopping
+        getOAuthToken: function(cb){
+          const a = TM.acc; if (!a) return cb('');
+          accessToken(a, a.client).then(cb, function(){ setTimeout(function(){ accessToken(a, a.client).then(cb, function(){ cb(''); }); }, 3000); });
+        } });
       p.addListener('ready', function(e){ WEB.id = e.device_id; WEB.err = ''; render(); });
       p.addListener('not_ready', function(){ WEB.id = ''; });
       p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
       p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
       p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      p.addListener('playback_error', function(e){ toast('Spotify couldn\'t play that here' + (e && e.message ? ': ' + e.message : '') + '.', 6000); tellRemote('Spotify couldn\'t play that on the TV'); });
       // the browser won't let it make a sound until someone presses something on this screen
       p.addListener('autoplay_failed', function(){ WEB.woke = false; toast('Press OK on the remote to let the TV play sound.', 8000); tellRemote('Press OK on the TV remote to let it play sound'); });
       p.connect();
@@ -95,6 +100,8 @@ function tmWebRestart(){
   WEB.player = null; WEB.id = ''; WEB.err = ''; WEB.woke = false;
   if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady();
 }
+/** Music is coming out of this screen: its own Spotify player is the one playing. */
+function tmPlayingHere(){ const m = tmModel(); return !!(WEB.id && m && m.playing && m.device && (m.device.id === WEB.id || m.device.name === SCREEN_PLAYER)); }
 /** Where music plays, for the foot of the Music view. */
 const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
@@ -196,6 +203,9 @@ function tmTick(now){
   if (!TM.acc) return;
   if (D.embed){ if (shown() === 'music') tmTickView(now); return; }
   const m = tmModel();
+  // while music plays through this screen, the starfield and the screensaver draw less (body.hush)
+  const here = tmPlayingHere();
+  if (here !== !!TM.here){ TM.here = here; document.body.classList.toggle('hush', here); if (typeof Cockpit !== 'undefined') Cockpit.hush(here); }
   if (TM.sleepAt && now >= TM.sleepAt - 60e3 && !TM.fading){
     // nothing playing when the time comes: the timer is done, rather than waiting to stop the next song someone plays
     if (!(m && m.playing)){ if (now >= TM.sleepAt){ TM.sleepAt = 0; render(); tellRemote('Sleep timer off'); } }

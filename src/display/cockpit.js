@@ -16,7 +16,7 @@ const Cockpit = (() => {
   let drops = [], flakes = [], dropSprite = null, frostCache = null, fogCache = null, vignette = null, glassKey = '';
   let rotI = 0, boards = [], nextNear = 0, laneI = 0, train = null;
   let voyage = null, lights = [], rem = 16;
-  let actx = null, tier = 0, learnt = 0, adapt = true, detail = 'auto', aheadAt = -1e9, aheadDt = 0, intervals = [], auroraCv = null, auroraAt = -1e9, nearClear = false, glassDrawn = '';
+  let actx = null, tier = 0, learnt = 0, adapt = true, detail = 'auto', hushed = false, aheadAt = -1e9, aheadDt = 0, intervals = [], auroraCv = null, auroraAt = -1e9, nearClear = false, glassDrawn = '';
   let bolt = null, nextBolt = 0, flash = 0, view = { x: 0, y: 0 }, issShown = -1e9;
   const rnd = (a, b) => a + Math.random() * (b - a);
   const pick = a => a[(Math.random() * a.length) | 0];
@@ -38,6 +38,7 @@ const Cockpit = (() => {
   function chooseTier(){
     adapt = detail !== 'high' && detail !== 'low';
     tier = detail === 'high' ? 0 : detail === 'low' ? 2 : Math.max(learnt, TV ? 2 : (navigator.hardwareConcurrency || 4) <= 2 ? 1 : 0);   // a step down is remembered until the page reloads
+    if (hushed) tier = Math.max(tier, 2);                        // music playing through this screen comes first
     quality = tier === 0 ? 1 : .5;
     document.body.classList.toggle('lite', tier > 0);
   }
@@ -807,7 +808,7 @@ const Cockpit = (() => {
     if (!on) return;
     raf = requestAnimationFrame(loop);
     const T = TIERS[tier];
-    if (last && t - last < 1000 / T.fps - 4) return;                // a frame cap, so a slow screen isn't asked for more
+    if (last && t - last < 1000 / (hushed ? Math.min(T.fps, 20) : T.fps) - 4) return;   // a frame cap, so a slow screen isn't asked for more
     const gap = last ? t - last : 16, dt = Math.min(80, gap); last = t; frame++; clock += dt;
     const growing = nebulae.some(l => !l.ready);
     nebulae.forEach(l => { if (!l.ready) growLayer(l, quality === 1 ? 10 : 6); });
@@ -891,6 +892,8 @@ const Cockpit = (() => {
       drops = []; flakes = []; things = [];
     },
     resize(){ if (on){ resize(); if (still()) drawStill(); } },
+    /** Music is playing through this screen's own Spotify player: draw less, so its sound never stutters. */
+    hush(v){ v = !!v; if (v === hushed) return; hushed = v; if (on){ chooseTier(); resize(); } },
     /** New data: the billboards, the sky, the engines, the world outside and the dashboard. */
     update(info){
       sky = info.sky; engine = info.engine; world = info.world; cards = info.cards; voyage = info.voyage || null;

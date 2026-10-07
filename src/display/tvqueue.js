@@ -52,7 +52,7 @@ function hqTick(now){
   // someone paused: the party doesn't start the music again by itself until a song is added after that
   if (m && m.track && !m.playing && !hqIdle(m, now)) HQ.pausedAt = now;
   // at a party, a song added while nothing is playing (or the last song has ended) starts the music
-  if (HQ.party && SRC.music.at && hqIdle(m, now) && HQ.q.some(x => !x.fed && x.at > (HQ.pausedAt || 0)) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStart(); return; }
+  if (HQ.party && SRC.music.at && hqIdle(m, now) && HQ.q.some(x => !x.fed && x.at > (HQ.pausedAt || 0)) && now - (HQ.started || 0) > 30e3){ HQ.started = now; hqStartIfIdle(); return; }
   if (!HQ.q.length || !m) return;
   const r = queueStep(HQ.q, m, now);
   if (!r.feed && !r.played && r.q.length === HQ.q.length) return;
@@ -61,6 +61,14 @@ function hqTick(now){
   const sp = tmSp();
   // to whatever is playing: no device named, so a song moved elsewhere in the meantime still gets it
   if (r.feed && sp) sp.addToQueue(r.feed.uri, null).catch(() => hqSet(queueFed(HQ.q, r.feed.id, 0)));
+}
+/** Starts the queue by itself only if Spotify, asked now, says nothing is playing: the moment between two songs isn't the end. */
+async function hqStartIfIdle(){
+  const sp = tmSp(); if (!sp) return;
+  let m = null;
+  try { m = playerModel(await sp.player(), Date.now()); } catch(e){ return; }
+  SRC.music.data = m; SRC.music.at = Date.now();
+  if (hqIdle(m, Date.now())) hqStart();
 }
 /** Plays the house queue from the top, when nothing is playing: on the device last used, or the first awake. */
 function hqStart(){

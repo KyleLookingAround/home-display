@@ -4,6 +4,11 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-07
 
+- **Finding**: music on the TV sometimes cut out or skipped a song. Spotify's player in the page needs time from the page to keep its sound going, and a TV browser has little to spare. While music plays through the TV's own player:
+  - the starfield draws a dozen frames a second, not sixty;
+  - the screensaver drops to a lighter detail level at 20 frames a second (body.hush, `Cockpit.hush`);
+  - the 03:30 fresh start waits until the music stops.
+  The fitting of each view to the screen now measures once per update (it starts over only for a new view, a new screen size, or once a minute). Spotify's player tries a sign-in refresh again before giving up (a moment without the network had stopped the music), and says when it can't play something. At a party, the queue only starts by itself when Spotify, asked again just then, says nothing is playing: the moment between two songs had been taken for the end, starting the house queue over the next song.
 - **Update**: "This phone" in Where to play. A phone's browser can't play Spotify itself, so with the phone's Spotify app asleep the list could be empty. "This phone" opens what you picked in the Spotify app; back on the page, it's played there through Spotify, now that the app is awake (`playOnThisPhone`, `backFromApp`). Once Spotify has looked, an empty list says nothing is awake rather than "Looking for speakers…".
 - **Finding**: Your listening could open empty when the background read of your recent plays was still running; it now waits for that read (`recordPlays`).
 - **Update**: choosing where music plays. With nothing playing anywhere, picking a song on the phone now asks "Where to play?" first, from any page, then plays there and remembers it on that phone, asking again only when that speaker or screen isn't awake. The TV's own Spotify app is marked as taking over the screen. "Play on" is now a sheet of its own (`DevicePicker.svelte`), the same from the full player.
