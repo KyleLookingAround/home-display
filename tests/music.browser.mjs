@@ -88,7 +88,7 @@ async function openLibraries(page){
 const LRC = '[00:00.50]Streetlights hum along the viaduct\n[00:08.00]Kettle on at half past nine\n[00:16.00]The meter ticks, the prices drop\n[00:24.00]We wait for cheaper time\n[00:32.00]Harold Street, Harold Street\n[00:40.00]Stars above the chimney pots';
 
 function spotify(opts = {}){
-  const S = { calls: [], authorize: null, token: [], premium: opts.premium !== false, noDevice: !!opts.noDevice, fail401: opts.fail401 || 0,
+  const S = { calls: [], authorize: null, token: [], premium: opts.premium !== false, noDevice: !!opts.noDevice, fail401: opts.fail401 || 0, devices: opts.devices || DEVICES,
     valid: new Set(['acc1', 'acc2']), liked: new Set(['t3']), queue: [TRACKS[1], TRACKS[2]],
     state: opts.nothing ? null : { is_playing: true, progress_ms: 20000, timestamp: Date.now(), item: TRACKS[0], shuffle_state: false, repeat_state: 'off', device: DEVICES[0], currently_playing_type: 'track', context: { type: 'playlist', uri: 'spotify:playlist:p1' } } };
   const err = (status, message, reason) => ({ status, json: { error: Object.assign({ status, message }, reason ? { reason } : {}) } });
@@ -105,11 +105,11 @@ function spotify(opts = {}){
     const st = S.state;
     if (p === '/me') return { json: { id: 'kyle', display_name: 'Kyle', product: S.premium ? 'premium' : 'free' } };
     if (p === '/me/player' && method === 'GET') return st ? { json: st } : { status: 204 };
-    if (p === '/me/player/devices') return { json: { devices: DEVICES.map(d => Object.assign({}, d, { is_active: !!st && st.device.id === d.id })) } };
-    if (p === '/me/player' && method === 'PUT'){ const d = DEVICES.find(x => x.id === body.device_ids[0]); S.noDevice = false; if (st) st.device = d; return { status: 204 }; }
+    if (p === '/me/player/devices') return { json: { devices: S.devices.map(d => Object.assign({}, d, { is_active: !!st && st.device.id === d.id })) } };
+    if (p === '/me/player' && method === 'PUT'){ const d = S.devices.find(x => x.id === body.device_ids[0]); S.noDevice = false; if (st) st.device = d; return { status: 204 }; }
     if (p === '/me/player/play'){
       const b = body || {}; S.noDevice = false;
-      if (!S.state) S.state = { is_playing: true, progress_ms: 0, item: TRACKS[0], shuffle_state: false, repeat_state: 'off', device: DEVICES.find(d => d.id === q.get('device_id')) || DEVICES[0], context: null, currently_playing_type: 'track' };
+      if (!S.state) S.state = { is_playing: true, progress_ms: 0, item: TRACKS[0], shuffle_state: false, repeat_state: 'off', device: S.devices.find(d => d.id === q.get('device_id')) || DEVICES[0], context: null, currently_playing_type: 'track' };
       const s = S.state;
       if (b.uris){ s.item = find(b.uris[b.offset && b.offset.position ? b.offset.position : 0]); s.context = null; s.progress_ms = 0; }
       if (b.context_uri){ s.context = { type: b.context_uri.split(':')[1], uri: b.context_uri }; s.item = (b.offset && b.offset.uri && find(b.offset.uri)) || TRACKS.find(t => t.album.uri === b.context_uri) || TRACKS[0]; s.progress_ms = 0; }
@@ -405,6 +405,23 @@ test('music: an expired sign-in is refreshed, and what goes wrong is said plainl
   await o.page.locator('.tr', { hasText: 'Harold Street' }).locator('.go').click();
   await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.query.device_id === 'kitchen'), 'played on the speaker chosen before');
   assert.equal(await o.page.locator('.picker').count(), 0, 'without asking');
+  await o.ctx.close();
+  // nothing awake but this phone, whose browser can't play: "This phone" opens the Spotify app, and once back it plays there
+  sp = spotify({ nothing: true, noDevice: true, devices: [] });
+  o = await open('/music.html', { sp });
+  await o.page.fill('input[type=search]', 'harold');
+  await until(() => o.page.locator('.tr', { hasText: 'Harold Street' }).count().then(n => n === 1), 'results');
+  await o.page.locator('.tr', { hasText: 'Harold Street' }).locator('.go').click();
+  await until(() => o.page.locator('.picker').textContent().then(t => /No speakers are awake/.test(t)), 'says nothing is awake');
+  await o.page.waitForTimeout(500);
+  await shot(o.page, 'music-this-phone');
+  await o.page.locator('.picker .d', { hasText: 'This phone' }).click();
+  await until(() => o.page.evaluate(() => !!sessionStorage.getItem('hse-phone-wait')), 'waiting for the app');
+  assert.equal(await o.page.locator('.picker').count(), 0);
+  sp.devices = [DEVICES[2]];                                         // the Spotify app on the phone is awake now
+  await o.page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await until(() => calls(sp, 'PUT', '/me/player/play').some(c => c.query.device_id === 'phone'), 'played on the phone\'s Spotify app');
+  assert.deepEqual(await o.page.evaluate(() => JSON.parse(localStorage.getItem('hse.musicDevice'))), { id: 'phone', name: 'Kyle\'s phone', phone: true });
   await o.ctx.close();
   // not Premium: the player says so
   sp = spotify({ premium: false });
@@ -885,7 +902,7 @@ test('music: weather radio, new releases, gigs, more like this, and your listeni
   // your listening
   await page.locator('a.you').click();
   await until(() => page.locator('.grid li').count().then(n => n === 2), 'top artists', 8000);
-  assert.match(await page.textContent('main'), /Your listening[\s\S]*this week[\s\S]*Top songs[\s\S]*When you listen[\s\S]*Every day[\s\S]*plays kept on this phone/);
+  await until(() => page.textContent('main').then(t => /Your listening[\s\S]*this week[\s\S]*Top songs[\s\S]*When you listen[\s\S]*Every day[\s\S]*plays kept on this phone/.test(t)), 'your listening, with the plays kept here', 8000);
   await page.waitForTimeout(400);
   if (SHOTS) await page.screenshot({ path: join(SHOTS, 'music-listening.png'), fullPage: true });
   await page.locator('.seg button', { hasText: 'All time' }).click();

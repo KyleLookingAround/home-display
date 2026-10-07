@@ -4,7 +4,7 @@
    * you pick something to play and nothing is playing anywhere and you haven't chosen yet (play in music.svelte.js).
    * The choice is remembered on this phone, so it only asks again when that device isn't awake.
    */
-  import { music, loadDevices, chooseDevice, closePicker, chosenDevice } from '../../state/music.svelte.js';
+  import { music, loadDevices, chooseDevice, closePicker, chosenDevice, playOnThisPhone, choseThisPhone } from '../../state/music.svelte.js';
   import { tv } from '../../state/tv.svelte.js';
   import { SCREEN_PLAYER } from '../../lib/music.js';
   import Icon from './Icon.svelte';
@@ -18,6 +18,8 @@
   const usual = $derived(chosenDevice(music.devices));
   const playing = $derived(!!(music.player && music.player.playing));
   const noScreen = $derived(!!tv.code && !music.devices.some(d => d.name === SCREEN_PLAYER));
+  // this phone, when its Spotify app isn't awake (when it is, it's in the list by its own name)
+  const phoneRow = $derived(!music.devices.some(d => d.kind === 'phone'));
   const what = d => d.active ? (playing ? 'Playing here' : 'Ready here')
     : d.kind === 'screen' ? 'The wall display' : d.kind === 'tv' ? 'The TV\'s Spotify app: it takes over the screen'
     : d.kind === 'phone' ? 'Phone' : d.kind === 'speaker' ? 'Speaker' : d.kind === 'computer' ? 'Computer' : 'Spotify device';
@@ -40,7 +42,14 @@
         {#if d.active}<span class="eq" aria-hidden="true" class:paused={!playing}><i></i><i></i><i></i></span>
         {:else if usual && usual.id === d.id}<span class="tick" aria-label="Chosen before"><Icon name="check" size={18} /></span>{/if}
       </button>
-    {:else}<p class="note">Looking for speakers… Open Spotify on a speaker, the TV or this phone and it'll appear here.</p>{/each}
+    {:else}<p class="note">{music.devicesAt ? 'No speakers are awake just now. Open Spotify on a speaker or the TV and it\'ll appear here.' : 'Looking for speakers…'}</p>{/each}
+    {#if phoneRow}
+      <button type="button" class="d" onclick={playOnThisPhone}>
+        <span class="dicon"><Icon name="phone" size={22} /></span>
+        <span class="dn"><b>This phone</b><span>Opens Spotify on this phone, then plays there</span></span>
+        {#if choseThisPhone()}<span class="tick" aria-label="Chosen before"><Icon name="check" size={18} /></span>{/if}
+      </button>
+    {/if}
     {#if noScreen}<p class="note">The wall display isn't here yet. Wake it with any button on the TV remote, or sign it in again on <a href="screen.html#spotify">Screen</a>.</p>{/if}
     <p class="note">Google speakers sometimes only appear after they've been played to once from the Spotify app.</p>
   </div>

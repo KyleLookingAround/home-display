@@ -17,3 +17,4 @@
 ## Revisions
 
 - **October 2026:** the phone no longer picks a device by itself. With nothing playing anywhere, picking a song asks "Where to play?" first, and remembers the answer on that phone (`hse.musicDevice`, matched by id or by name, since the wall display's player gets a new id each time it starts). It only asks again when that device isn't awake. `bestDevice` is still how the TV itself chooses, for its favourites and the house queue.
+- **October 2026:** "This phone" is always offered while the phone's Spotify app isn't in the list: a phone's browser can't play Spotify (the Web Playback SDK doesn't run on phones), so it opens the Spotify app with what was picked and, back on the page, plays it there through Spotify.

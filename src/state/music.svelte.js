@@ -19,6 +19,7 @@ class Music {
   player = $state.raw(null);        // what's playing, where, and how (playerModel), or null
   checked = $state(false);          // the player has been read at least once
   devices = $state.raw([]);         // where it can play (playOn)
+  devicesAt = $state(0);            // when that list was last read (0: not yet)
   queue = $state.raw(null);         // Up next: [track]
   liked = $state(false);            // whether the song playing is in your liked songs
   lyrics = $state.raw(null);        // { synced, plain, instrumental } for the song playing, or null
@@ -67,8 +68,8 @@ export function watchMusic(){
   started = true;
   music.acc = activeAccount();
   if (!music.acc) return;
-  poll();
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+  poll(); backFromApp();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden){ poll(); backFromApp(); } });
   tickTimer = setInterval(() => { if (music.player && music.player.playing && !document.hidden) music.now = Date.now(); }, 500);
 }
 /** After signing in or out on this page. */
@@ -260,7 +261,7 @@ export function volume(pct, deviceId){
   volTimer = setTimeout(() => act(() => sp().volume(pct, id), 1500), 250);
 }
 export async function loadDevices(){
-  try { music.devices = playOn(await sp().devices(), music.player && music.player.device); }
+  try { music.devices = playOn(await sp().devices(), music.player && music.player.device); music.devicesAt = Date.now(); }
   catch (e){ fail(e, true); }
 }
 /* ---------- where to play: chosen once, then remembered on this phone (hse.musicDevice) ---------- */
@@ -270,7 +271,9 @@ export function chosenDevice(ds){
   const c = store.getJ(CHOSEN, null);
   return c ? (ds || []).find(d => d.id === c.id) || (ds || []).find(d => d.name === c.name) || null : null;
 }
-const remember = d => store.setJ(CHOSEN, { id: d.id, name: d.name });
+const remember = d => store.setJ(CHOSEN, d.kind === 'phone' ? { id: d.id, name: d.name, phone: true } : { id: d.id, name: d.name });
+/** Whether this phone (its Spotify app) is what was chosen. */
+export const choseThisPhone = () => !!(store.getJ(CHOSEN, null) || {}).phone;
 function showOn(d){
   const m = music.player;
   if (m) music.player = Object.assign({}, m, { device: { id: d.id, name: d.name, type: d.type, volume: d.volume, canVolume: d.canVolume } });
@@ -297,6 +300,37 @@ export function transfer(d){
   remember(d); showOn(d);
   say('Playing on ' + d.name);
   return act(() => sp().transfer(d.id, true), 1200);
+}
+/* ---------- this phone: a phone's browser can't play Spotify itself, so "this phone" is the Spotify app on it ---------- */
+const PHONE_WAIT = 'hse-phone-wait';      // in this tab, in case the page reloads on the way back
+/** Opens what was picked in the Spotify app; once back here, it's played there (backFromApp). */
+export function playOnThisPhone(){
+  const o = music.pending ? music.pending.o : null;
+  music.pending = null; music.picker = false;
+  store.setJ(CHOSEN, { id: '', name: '', phone: true });
+  try { sessionStorage.setItem(PHONE_WAIT, JSON.stringify({ o, at: Date.now() })); } catch (e){}
+  const u = o && o.uris ? o.uris : [], link = o ? o.context || u[typeof o.offset === 'number' ? o.offset : 0] || u[0] || 'spotify:' : 'spotify:';
+  // the page may be in the full-screen frame (state/fullscreen.js): the app link has to leave from the top
+  try { (window.top || window).location.href = link; } catch (e){ location.href = link; }
+}
+/** Back from the Spotify app: it's awake now, so Spotify can play there what was waiting. */
+async function backFromApp(){
+  let w = null;
+  try { w = JSON.parse(sessionStorage.getItem(PHONE_WAIT) || 'null'); sessionStorage.removeItem(PHONE_WAIT); } catch (e){}
+  if (!w || !music.acc || Date.now() - w.at > 10 * 60e3) return;
+  for (let i = 0; i < 4; i++){
+    let ds = [];
+    try { ds = playOn(await sp().devices(), null); } catch (e){}
+    const d = ds.find(x => x.kind === 'phone' && x.active) || ds.find(x => x.kind === 'phone');
+    if (d){
+      remember(d); cmdAt = Date.now();
+      try { await (w.o ? sp().play(Object.assign({}, w.o, { device: d.id })) : sp().transfer(d.id, true)); say('Playing on ' + d.name); }
+      catch (e){ say('Press play in Spotify on this phone.'); }
+      soon(900); return;
+    }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  say('Press play in Spotify on this phone.');
 }
 /**
  * Plays a list of songs (uris), from one of them; or an album or playlist (context), from a song in it. On the

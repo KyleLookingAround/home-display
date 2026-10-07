@@ -106,10 +106,16 @@ export async function loadRadio(weather){
 }
 
 /* ---------- your listening: Spotify keeps your last 50 plays; this phone keeps them all ---------- */
-let lastRecord = 0;
-export async function recordPlays(){
-  const id = who(); if (!id || Date.now() - lastRecord < 10 * 60e3) return disc.log;
+let lastRecord = 0, recording = null;
+/** Adds Spotify's last 50 plays to this phone's log, at most every ten minutes; a second ask while one runs waits for it. */
+export function recordPlays(){
+  if (recording) return recording;
+  const id = who(); if (!id || Date.now() - lastRecord < 10 * 60e3) return Promise.resolve(disc.log);
   lastRecord = Date.now();
+  recording = readPlays(id).finally(() => { recording = null; });
+  return recording;
+}
+async function readPlays(id){
   const key = 'plays:' + id, c = await cacheGet(key);
   let log = c ? c.value : [];
   try {
