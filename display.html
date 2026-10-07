@@ -353,7 +353,7 @@ body.night #stars{opacity:.12}
 .msky::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(90deg,rgba(4,5,13,.25),rgba(4,5,13,.72) 62%),linear-gradient(0deg,rgba(4,5,13,.85),rgba(4,5,13,0) 45%)}
 .lite .msky img{filter:none;opacity:.25}
 .music-mode > .m-empty{margin:auto;max-width:56rem;text-align:center}
-.mwall{display:flex;justify-content:center;margin-top:2.2rem}
+.mwall{display:flex;justify-content:center;margin-top:2.2rem;overflow:hidden;max-height:8.5rem;flex-wrap:wrap}
 .mwall img{width:7rem;height:7rem;margin:0 .3rem;border-radius:var(--radius-sm);object-fit:cover;box-shadow:0 .8rem 2rem rgba(0,0,0,.5);opacity:.85}
 .m-empty .big{font:700 2.2rem/1.15 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin:.5rem 0 .6rem}
 .m-empty .note{font-size:1.1rem;line-height:1.5}
@@ -415,6 +415,8 @@ body.night #stars{opacity:.12}
 .party-on .m-cover{width:19rem;height:19rem;margin-right:2rem}
 .music-mode > .m-empty.with-party{display:flex;align-items:center;max-width:none;width:100%}
 .m-empty.with-party .m-idle{flex:1 1 auto;min-width:0;padding-right:3rem}
+/* beside the party's code, the album wall shows only the covers that fit on its row (the rest wrap out of sight) */
+.m-empty.with-party .mwall img{margin-bottom:2rem}
 .m-empty.with-party .m-party{flex:none;text-align:center}
 .m-idle .m-next{margin:1.4rem auto 0;display:inline-block;text-align:left;max-width:100%}
 /* Today: what's playing, under the date */
