@@ -36,6 +36,8 @@ const SRC = {
   // The outdoors: rain every quarter hour, air and pollen, flood warnings, the grid's mix, and bank holidays for the bins.
   nowcast: { label: 'Rain',    every: () => shown() === 'night' ? 30*MIN : 10*MIN, need: () => true, run: loadNowcast },
   air:     { label: 'Air',     every: () => 60*MIN, need: () => true, run: loadAir },
+  // the rain radar's frames, only while the Weather view shows them
+  radar:   { label: 'Radar',   every: () => 10*MIN, need: () => shown() === 'weather', run: loadRadar },
   floods:  { label: 'Floods',  every: () => 15*MIN, need: () => true, run: loadFloods },
   grid:    { label: 'Grid mix', every: () => 30*MIN, need: () => true, run: () => loadGridMix(CI_REGION[region()]) },
   holidays: { label: 'Bank holidays', every: () => 24*60*MIN, need: () => true, run: loadBankHolidays },
@@ -141,6 +143,8 @@ function tick(){
   $$('[data-clock]').forEach(el => { if (el.textContent !== clock) el.textContent = clock; });
   tickSign(now);
   tmTick(now);
+  // the radar: a frame a second, resting three seconds on the latest
+  if (shown() === 'weather'){ D.radarRest = (D.radarRest || 0) + 1; const fr = $$('#wRadar .frame'); if (fr.length && (!fr[fr.length - 1].classList.contains('on') || D.radarRest > 3)){ D.radarRest = 0; playRadar(); } }
   const idle = D.embed ? 0 : now - D.lastInput;
   const night = !D.embed && set.night && inWindow(now, set.nightFrom, set.nightTo);
   if (night && idle > 2*MIN && D.mode !== 'night' && !open() && !(HQ.party && D.mode === 'music')) setOverride('night');
@@ -181,6 +185,7 @@ function render(){
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
   else if (m === 'music') renderMusic();
+  else if (m === 'weather') renderWeather();
   fitScreen();
 }
 /*
@@ -199,13 +204,14 @@ function fitScreen(){
   if (innerWidth < 1144){ if (html.style.fontSize){ html.style.fontSize = ''; D.fit = 1; } return; }
   const base = Math.min(innerWidth * 0.014, innerHeight * 0.025);
   const over = () => Math.max(html.scrollHeight / innerHeight, html.scrollWidth / innerWidth, toolbarWraps() ? 1.06 : 0);
-  let f = D.fit;
+  // from full size each time, so it grows back once there's room (the page is never shorter than the screen, so
+  // room can't be measured, only tried)
+  let f = 1;
   html.style.fontSize = (base * f).toFixed(2) + 'px';
   for (let i = 0; i < 8; i++){
     const o = over();
-    if (o > 1.0005 && f > 0.55) f = Math.max(0.55, f / o * 0.985);
-    else if (f < 1 && o < 0.94){ f = Math.min(1, f * 1.03); html.style.fontSize = (base * f).toFixed(2) + 'px'; if (over() > 1.0005){ f = f / 1.03; } html.style.fontSize = (base * f).toFixed(2) + 'px'; break; }
-    else break;
+    if (!(o > 1.0005 && f > 0.55)) break;
+    f = Math.max(0.55, f / o * 0.985);
     html.style.fontSize = (base * f).toFixed(2) + 'px';
   }
   if (f !== D.fit){ D.fit = f; if (shown() === 'screensaver' && typeof Cockpit !== 'undefined') Cockpit.resize(); }
@@ -366,6 +372,61 @@ function renderTravel(){
     $('#tTrams').innerHTML = html;
   }
   $('#tFoot').innerHTML = '<span>Live trains from National Rail</span>' + foot(['trains', 'trams']);
+}
+
+/* ---------- the Weather view ---------- */
+function renderWeather(){
+  const now = Date.now(), W = SRC.weather.data, A = SRC.air.data, nc = SRC.nowcast.data;
+  if (!W){
+    $('#wNow').innerHTML = `<p class="empty">${SRC.weather.err ? 'No weather signal: ' + esc(errorText(SRC.weather.err)[0]) + ' Trying again shortly.' : 'Checking the weather…'}</p>`;
+    ['#wVerdict', '#wSun', '#wHours', '#wWeek', '#wAir', '#wRainSoon'].forEach(id => { $(id).innerHTML = ''; });
+  } else {
+    const wn = weatherText(W.now.code), today = W.days.filter(d => d.k === dayKey(now))[0] || W.days[0];
+    $('#wNow').innerHTML = `<span class="i" aria-hidden="true">${wn.icon}</span><span class="t">${Math.round(W.now.temp)}°</span><p class="d"><b>${esc(wn.text)}</b><br>Feels ${Math.round(W.now.feels)}°${today ? ` · High ${Math.round(today.max)}° · low ${Math.round(today.min)}°` : ''}</p>`;
+    const v = weatherVerdict(W, nc, now);
+    $('#wVerdict').innerHTML = v ? `<p class="big ${v.tone}">${esc(v.title)}</p><p class="line">${esc(v.line)}</p>` : '';
+    // the sun: today's, or tomorrow's rise once today's has set
+    const next = W.days.filter(d => d.set > now)[0];
+    if (next){
+      const up = now > next.rise, mins = Math.round((next.set - next.rise) / 60e3);
+      $('#wSun').innerHTML = `<p class="label">${up ? 'Sunset' : next.k === dayKey(now) ? 'Sunrise' : 'Sunrise tomorrow'}</p><p class="st">${hhmm(up ? next.set : next.rise)}</p><p class="sub">${up ? 'Rose ' + hhmm(next.rise) : 'Sets ' + hhmm(next.set)} · ${Math.floor(mins / 60)} h ${mins % 60} min of daylight</p>`;
+    } else $('#wSun').innerHTML = '';
+    const mm = (W.day || []).reduce((a, h) => a + nz(h.mm, 0), 0);
+    $('#wRainSoon').textContent = (W.day || []).length ? (mm < 0.2 ? 'Dry for the next 24 hours' : `About ${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm of rain in the next 24 hours`) : '';
+    const box = $('#wHours');
+    box.innerHTML = wxHoursSvg({ hours: W.day || W.hours, days: W.days, now, width: box.clientWidth || 1000, height: box.clientHeight || 220, aria: 'Temperature and the chance of rain for the next 24 hours' });
+    $('#wWeek').innerHTML = weekHtml(W.days, now);
+    const st = (k, v) => v ? `<div class="stat"><span class="k">${k}</span><span class="v">${v}</span></div>` : '';
+    const uv = A && A.uv != null ? uvLabel(A.uv) + (uvLabel(A.uvMax) !== uvLabel(A.uv) && A.uvMax > A.uv ? `<span class="small muted"> · up to ${uvLabel(A.uvMax).toLowerCase()}</span>` : '') : '';
+    // pollen: only the kinds there are any of
+    const pk = A && A.pollen ? ['grass', 'tree'].filter(k => A.pollen[k] != null) : [], some = pk.filter(k => pollenLabel(A.pollen[k], k) !== 'None');
+    const pol = !pk.length ? '' : !some.length ? 'None' : some.map((k, i) => (i ? (k === 'grass' ? 'grass ' : 'trees ') : (k === 'grass' ? 'Grass ' : 'Trees ')) + pollenLabel(A.pollen[k], k).toLowerCase()).join(' · ');
+    $('#wAir').innerHTML = st('Wind', W.now.wind != null ? `${Math.round(W.now.wind)} mph${W.now.dir != null ? ' ' + windFrom(W.now.dir) : ''}${W.now.gust != null && W.now.gust > W.now.wind + 5 ? `<span class="small muted"> · gusts ${Math.round(W.now.gust)}</span>` : ''}` : '')
+      + st('Humidity', W.now.damp != null ? Math.round(W.now.damp) + '%' : '')
+      + st('Rain today', today && today.mm != null ? (today.mm < 0.1 ? 'None' : today.mm.toFixed(1) + ' mm') : '')
+      + st('Air · UV', A && A.aqi != null ? aqiLabel(A.aqi) + (uv ? ' · ' + uv.charAt(0).toLowerCase() + uv.slice(1) : '') : '') + st('Pollen', pol)
+      // flood warnings within 15 km, the worst first
+      + (SRC.floods.data || []).slice(0, 2).map(f => `<div class="stat flood ${f.level <= 2 ? 'bad' : 'warn'}"><span class="k">${esc(f.title)}</span><span class="v small">${esc(f.area)}</span></div>`).join('');
+  }
+  renderRadar();
+  $('#wFoot').innerHTML = `<span>Open-Meteo · RainViewer · Environment Agency · Map ${esc(BASE_CREDIT)}</span>` + foot(['weather', 'nowcast', 'air', 'floods', 'radar']);
+}
+/** The radar is only rebuilt when its frames or its size change; in between, playRadar moves from frame to frame. */
+D.radarKey = '';
+function renderRadar(){
+  const box = $('#wRadar'), R = SRC.radar.data, w = box.clientWidth, h = box.clientHeight;
+  if (!R || !R.frames || !R.frames.length || !w || !h){ if (!R){ box.innerHTML = `<p class="empty">${SRC.radar.err ? 'No radar signal.' : 'Loading the radar…'}</p>`; D.radarKey = ''; } return; }
+  const key = R.frames.map(f => f.path).join() + '|' + w + 'x' + h;
+  if (key === D.radarKey) return;
+  D.radarKey = key; box.innerHTML = radarHtml(R, w, h); playRadar(true);
+}
+function playRadar(still){
+  const fr = $$('#wRadar .frame'); if (!fr.length) return;
+  let i = 0; fr.forEach((f, k) => { if (f.classList.contains('on')) i = k; });
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!still && !reduce){ fr[i].classList.remove('on'); i = (i + 1) % fr.length; fr[i].classList.add('on'); }
+  const f = fr[i], t = +f.getAttribute('data-t'), el = $('#wRadarWhen');
+  if (el) el.textContent = hhmm(t) + (f.getAttribute('data-ahead') ? ' forecast' : i === fr.length - 1 ? ' latest' : '');
 }
 
 function renderNight(){

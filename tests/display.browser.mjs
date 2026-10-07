@@ -42,17 +42,21 @@ function carbon(){
   return { data: { regionid: 3, shortname: 'North West England', data } };
 }
 function weather(){
-  const time = [], temperature_2m = [], precipitation_probability = [], weather_code = [];
-  for (let h = 0; h < 48; h++){
+  const time = [], temperature_2m = [], precipitation_probability = [], precipitation = [], weather_code = [];
+  for (let h = 0; h < 168; h++){
     const d = new Date(day0 + h * 3600e3), loc = new Date(d.getTime() + 3600e3);
     time.push(loc.toISOString().slice(0, 13) + ':00');
     temperature_2m.push(+(11 + 4 * Math.sin((h - 9) / 24 * 2 * Math.PI)).toFixed(1));
     precipitation_probability.push((h * 7) % 60);
+    precipitation.push(+(((h * 7) % 60) / 40).toFixed(1));
     weather_code.push([2, 3, 61, 80, 1][h % 5]);
   }
-  return { current: { temperature_2m: 13.4, apparent_temperature: 11.2, weather_code: 3, wind_speed_10m: 9.1 },
-           hourly: { time, temperature_2m, precipitation_probability, weather_code },
-           daily: { time: ['2026-10-05', '2026-10-06'], sunrise: ['2026-10-05T07:15', '2026-10-06T07:17'], sunset: ['2026-10-05T18:40', '2026-10-06T18:38'], temperature_2m_max: [15.2, 14.1], temperature_2m_min: [8.3, 7.9] } };
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => new Date(day0 + i * 864e5 + 12 * 3600e3).toISOString().slice(0, 10));
+  return { current: { temperature_2m: 13.4, apparent_temperature: 11.2, weather_code: 3, wind_speed_10m: 9.1, wind_gusts_10m: 21, wind_direction_10m: 230, relative_humidity_2m: 81 },
+           hourly: { time, temperature_2m, precipitation_probability, precipitation, weather_code },
+           daily: { time: days, sunrise: days.map(k => k + 'T07:' + (15 + days.indexOf(k) * 2)), sunset: days.map(k => k + 'T18:' + (40 - days.indexOf(k) * 2)),
+             temperature_2m_max: [15.2, 14.1, 12.6, 16.3, 13.0, 11.4, 12.2], temperature_2m_min: [8.3, 7.9, 6.1, 9.4, 7.0, 4.2, 5.5],
+             weather_code: [3, 61, 80, 2, 63, 1, 3], precipitation_probability_max: [45, 80, 60, 10, 90, 5, 30], precipitation_sum: [1.2, 6.4, 3.1, 0, 9.8, 0, 0.4], wind_speed_10m_max: [14, 22, 18, 9, 27, 8, 12] } };
 }
 function trains(){
   const svc = (min, dest, plat, extra = {}) => {
@@ -220,7 +224,7 @@ async function layout(page){
 }
 async function shot(page, name){ if (SHOTS) await page.screenshot({ path: join(SHOTS, name + '.png') }); }
 
-const MODES = ['today', 'energy', 'travel', 'screensaver', 'night', 'music'];
+const MODES = ['today', 'energy', 'travel', 'screensaver', 'night', 'music', 'weather'];
 
 test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll', async () => {
   for (const withHelper of [true, false]) {
@@ -257,7 +261,7 @@ test('display: every view fits a TV whatever its browser leaves of the screen, w
   for (const [width, height, zoom] of [[1920, 940, 1], [1280, 720, 1], [1680, 1050, 1], [1920, 1080, 1.2]]) {
     const { page, ctx, errors } = await open('/display.html#today', { width, height, settings: { ...COMMUTE, tramStop: '' }, at: TUESDAY_EARLY });
     if (zoom !== 1) await page.addStyleTag({ content: `body *{font-size-adjust:none} .mode{font-size:${zoom}em}` });
-    for (const m of ['today', 'energy', 'travel', 'music', 'night']) {
+    for (const m of ['today', 'energy', 'travel', 'music', 'night', 'weather']) {
       await page.evaluate(id => { location.hash = id; }, m);
       await page.waitForTimeout(700);
       await page.evaluate(() => { document.body.classList.add('chrome-on'); window.dispatchEvent(new Event('resize')); });
@@ -432,6 +436,8 @@ test('display: the remote control drives everything', async () => {
   assert.equal(await page.evaluate(() => location.hash), '#energy');
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
+  assert.equal(await visibleMode(page), 'weather');
+  await page.keyboard.press('ArrowLeft');
   assert.equal(await visibleMode(page), 'music');
   await page.keyboard.press('ArrowLeft');                // with no music on, the arrows still change view
   assert.equal(await visibleMode(page), 'night');
@@ -448,6 +454,8 @@ test('display: the remote control drives everything', async () => {
   assert.equal(await visibleMode(page), 'screensaver');
   await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement.dataset.mode), 'music');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.evaluate(() => document.activeElement.dataset.mode), 'weather');
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'wifiBtn', 'guest Wi-Fi is on the toolbar');
   await page.keyboard.press('ArrowRight');

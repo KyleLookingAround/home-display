@@ -11,7 +11,7 @@ import { shared } from './shared.mjs';
 const read = f => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 const src = shared('format', 'browser', 'net', 'octopus', 'carbon', 'analysis', 'outdoors', 'household', 'geo', 'remote', 'qr', 'voyage');
 const ctx = vm.createContext({ console, btoa, Intl, fetch: () => Promise.reject(new Error('offline')), location: { protocol: 'file:' } });
-const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere waysHome logDay commuteStats readTrip tripHome tripHead workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
+const names = 'MODES ukDate parseUkDate countdowns countdownText wifiCode qrEncode newRemoteCode cleanCode showCode remoteTopic readRemote priceVerdict priceTone stepMode modeFromHash hashOptions inWindow displaySettings mergeSettings deviceChanges nextCollections councilBins parseBankHolidays parseNowcast rainSoon tileOf parseAir aqiLabel uvLabel pollenLabel parseFloods parseGridMix mergeBins parseICal calendarWindow icalDate zonedTime calendarUrl parseTrains parseTrams parseHuxley boardTime leaveBy catchable distKm walkMins stationIndex nearestStations parseService trainAt trainText dueAt worldPx fitView onView viewTiles mapTile journeyMap atPlace legFromHere waysHome logDay commuteStats readTrip tripHome tripHead workDay officeDay cleanPlan commuteLeg commuteTrain arriveBy commuteLine trainsTitle trainWalkOf ordinal signStatus signExpected signGo signLine signTrains headsUp todayCost nextReload isStale parseWeather weatherText weatherVerdict wearFor windFrom relDay skyFor engineFor buildBillboards billboardRotation moonPhase issPass kmBetween worldFor boardCards voyageFor shownAhead recordCost usualCost instrumentsFor wetKind NET';
 vm.runInContext(src + `\n;globalThis.__api = { ${names.split(' ').join(', ')} };`, ctx);
 const A = ctx.__api;
 const at = s => +new Date(s);
@@ -23,9 +23,12 @@ test('modes come from the link and wrap round with left and right', () => {
   assert.equal(A.modeFromHash('#TRAVEL', 'energy'), 'travel');
   assert.equal(A.modeFromHash('#nonsense', 'energy'), 'energy');
   assert.equal(A.modeFromHash('', 'night'), 'night');
-  assert.equal(A.stepMode('today', -1), 'music');
+  assert.equal(A.stepMode('today', -1), 'weather');
   assert.equal(A.stepMode('night', 1), 'music');
-  assert.equal(A.stepMode('music', 1), 'today');
+  assert.equal(A.stepMode('music', 1), 'weather');
+  assert.equal(A.stepMode('weather', 1), 'today');
+  assert.equal(A.modeFromHash('#weather', 'today'), 'weather');
+  assert.equal(A.MODES.filter(m => m.id === 'weather')[0].key, '7');
   assert.equal(A.modeFromHash('#music', 'today'), 'music');
   assert.equal(A.stepMode('energy', 1), 'travel');
   assert.equal(A.displaySettings({ mode: 'home' }).mode, 'today');
@@ -278,6 +281,38 @@ test('weather: the next twelve hours from now', () => {
   assert.equal(w.days[0].rise, at('2026-10-05T07:12:00'));
   assert.equal(A.weatherText(61).text, 'Rain');
   assert.equal(A.weatherText(1234).text, '—');
+  assert.equal(w.day.length, 24, 'the next 24 hours, for the Weather view');
+  assert.equal(w.days[0].code, null, 'older answers without the week still parse');
+});
+
+test('weather: the week, and the Weather view\'s answer', () => {
+  const now = at('2026-10-05T14:20:00');
+  const hour = (h, code, rain) => ({ t: at('2026-10-05T14:00:00') + h * 3600e3, temp: 12, rain, code });
+  const W = (code, feels, hours) => ({ now: { temp: 12, feels, code }, day: hours, hours: hours.slice(0, 12), days: [] });
+  const dry = W(2, 11, [0, 1, 2, 3, 4, 5].map(h => hour(h, 2, 5)));
+  assert.deepEqual(plain(A.weatherVerdict(dry, [], now)), { title: 'Dry for the day', tone: 'dry', line: 'Jacket weather.' });
+  const later = W(3, 6, [hour(1, 3, 10), hour(2, 3, 20), hour(3, 61, 70)]);
+  assert.deepEqual(plain(A.weatherVerdict(later, [], now)), { title: 'Rain from 17:00', tone: 'wet', line: 'Coat weather, and take a brolly.' });
+  // the quarter-hour rain wins over the hours: raining now, stopping at 15:00
+  const slot = (m, mm) => ({ t: at('2026-10-05T14:15:00') + m * 60e3, mm, chance: 80 });
+  const raining = A.weatherVerdict(later, [slot(0, .4), slot(15, .3), slot(30, .2), slot(45, 0), slot(60, 0)], now);
+  assert.equal(raining.title, 'Raining now');
+  assert.match(raining.line, /^Stops around 15:00\. Coat weather, and take a brolly\.$/);
+  assert.equal(A.weatherVerdict(W(71, -1, [hour(1, 73, 80)]), [], now).tone, 'snow');
+  assert.equal(A.weatherVerdict(W(71, -1, [hour(1, 73, 80)]), [], now).title, 'Snow from 15:00');
+  assert.equal(A.weatherVerdict(null, [], now), null);
+  assert.deepEqual([-2, 5, 12, 18, 24].map(A.wearFor), ['Coat, hat and gloves', 'Coat weather', 'Jacket weather', 'A light layer', 'T-shirt weather']);
+  assert.deepEqual([0, 44, 230, 359, null].map(A.windFrom), ['N', 'NE', 'SW', 'N', '']);
+  // a full answer: the week with its sky, rain and wind
+  const time = [], z = [];
+  for (let h = 0; h < 48; h++){ const d = new Date(at('2026-10-05T00:00:00') + h * 3600e3); time.push(`2026-10-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:00`); z.push(h % 10); }
+  const w = plain(A.parseWeather({ current: { temperature_2m: 12, apparent_temperature: 10, weather_code: 61, wind_speed_10m: 9, wind_gusts_10m: 20, wind_direction_10m: 225, relative_humidity_2m: 80 },
+    hourly: { time, temperature_2m: z, precipitation_probability: z, precipitation: z.map(v => v / 10), weather_code: z },
+    daily: { time: ['2026-10-05', '2026-10-06'], sunrise: ['2026-10-05T07:12', '2026-10-06T07:14'], sunset: ['2026-10-05T18:33', '2026-10-06T18:31'], temperature_2m_max: [15, 13], temperature_2m_min: [8, 6],
+      weather_code: [61, 3], precipitation_probability_max: [80, 20], precipitation_sum: [4.2, 0.1], wind_speed_10m_max: [22, 12] } }, now));
+  assert.deepEqual(w.now, { temp: 12, feels: 10, code: 61, wind: 9, gust: 20, dir: 225, damp: 80 });
+  assert.deepEqual(w.days[1], { k: '2026-10-06', rise: at('2026-10-06T07:14:00'), set: at('2026-10-06T18:31:00'), max: 13, min: 6, code: 3, rain: 20, mm: 0.1, wind: 12 });
+  assert.equal(w.day[0].mm, 0.4);
 });
 
 test('bins from Stockport Council: the saved page parses, and old or missing feeds fall back', async () => {

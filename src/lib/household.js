@@ -22,9 +22,10 @@ export const MODES = [
   { id: 'travel', label: 'Travel', key: '3' },
   { id: 'screensaver', label: 'Screensaver', key: '4' },
   { id: 'night', label: 'Night', key: '5' },
-  { id: 'music', label: 'Music', key: '6' }
+  { id: 'music', label: 'Music', key: '6' },
+  { id: 'weather', label: 'Weather', key: '7' }
 ];
-export const ROTATING = ['today', 'energy', 'travel'];
+export const ROTATING = ['today', 'energy', 'travel', 'weather'];
 /** Older links and settings named the overview "home". */
 export const MODE_ALIASES = { home: 'today' };
 export const modeFromHash = (hash, fallback) => {
@@ -141,16 +142,52 @@ export const WMO = [
   [[71, 73, 75, 77], 'Snow', '❄'], [[80, 81, 82], 'Showers', '☂'], [[85, 86], 'Snow showers', '❄'], [[95, 96, 99], 'Thunder', '⚡']
 ];
 export function weatherText(code){ const w = WMO.find(x => x[0].indexOf(+code) >= 0); return w ? { text: w[1], icon: w[2] } : { text: '—', icon: '·' }; }
-export const METEO_Q = `latitude=${HOME.lat}&longitude=${HOME.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min&forecast_days=2&timezone=Europe%2FLondon&wind_speed_unit=mph`;
+export const METEO_Q = `latitude=${HOME.lat}&longitude=${HOME.lon}&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,relative_humidity_2m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code&daily=sunrise,sunset,temperature_2m_max,temperature_2m_min,weather_code,precipitation_probability_max,precipitation_sum,wind_speed_10m_max&forecast_days=7&timezone=Europe%2FLondon&wind_speed_unit=mph`;
+/**
+ * Open-Meteo's forecast for home: now, the next 12 hours (`hours`, for Today and the cockpit), the next 24 (`day`, for
+ * the TV's Weather) and the week (`days`, today first).
+ */
 export function parseWeather(j, now = Date.now()){
-  const c = j.current || {}, h = j.hourly || {}, d = j.daily || {};
-  const hours = [];
+  const c = j.current || {}, h = j.hourly || {}, d = j.daily || {}, at = (a, i) => a ? nz(a[i], null) : null;
+  const day = [];
   (h.time || []).forEach((k, i) => {
     const t = +new Date(k);
-    if (t >= now - 3600e3 + 1 && hours.length < 12) hours.push({ t, temp: h.temperature_2m[i], rain: h.precipitation_probability ? h.precipitation_probability[i] : null, code: h.weather_code[i] });
+    if (t >= now - 3600e3 + 1 && day.length < 24) day.push({ t, temp: h.temperature_2m[i], rain: at(h.precipitation_probability, i), mm: at(h.precipitation, i), code: h.weather_code[i] });
   });
-  const days = (d.time || []).map((k, i) => ({ k, rise: +new Date(d.sunrise[i]), set: +new Date(d.sunset[i]), max: d.temperature_2m_max[i], min: d.temperature_2m_min[i] }));
-  return { now: { temp: c.temperature_2m, feels: c.apparent_temperature, code: c.weather_code, wind: c.wind_speed_10m }, hours, days };
+  const days = (d.time || []).map((k, i) => ({ k, rise: +new Date(d.sunrise[i]), set: +new Date(d.sunset[i]), max: d.temperature_2m_max[i], min: d.temperature_2m_min[i],
+    code: at(d.weather_code, i), rain: at(d.precipitation_probability_max, i), mm: at(d.precipitation_sum, i), wind: at(d.wind_speed_10m_max, i) }));
+  return { now: { temp: c.temperature_2m, feels: c.apparent_temperature, code: c.weather_code, wind: c.wind_speed_10m, gust: nz(c.wind_gusts_10m, null), dir: nz(c.wind_direction_10m, null), damp: nz(c.relative_humidity_2m, null) },
+    hours: day.slice(0, 12), day, days };
+}
+/** Where the wind comes from, as a compass point. */
+export const windFrom = deg => deg == null ? '' : ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(((+deg % 360) + 360) % 360 / 45) % 8];
+const wetHour = h => (+h.code >= 51 && +h.code <= 67) || (+h.code >= 71 && +h.code <= 86) || +h.code >= 95 || h.rain >= 50;
+const snowy = c => (+c >= 71 && +c <= 77) || +c === 85 || +c === 86;
+/** What to wear, from how warm it feels. */
+export function wearFor(feels){
+  if (feels == null) return '';
+  return feels <= 3 ? 'Coat, hat and gloves' : feels <= 9 ? 'Coat weather' : feels <= 14 ? 'Jacket weather' : feels <= 19 ? 'A light layer' : 'T-shirt weather';
+}
+/**
+ * The Weather view's answer: is it raining, will it, and what to wear. From the quarter-hour rain (`slots`, parseNowcast)
+ * for the next three hours, then the hourly forecast for the rest of the day.
+ * Returns { title, line, tone: 'wet' | 'snow' | 'dry' } or null.
+ */
+export function weatherVerdict(W, slots, now){
+  if (!W || !W.now) return null;
+  const soon = rainSoon(slots, now), hours = (W.day || W.hours || []).filter(h => h.t > now && h.t < now + 12 * 3600e3);
+  const snow = snowy(W.now.code) || hours.slice(0, 3).some(h => snowy(h.code));
+  let title, tone = 'wet', brolly = true;
+  if (soon && soon.raining) title = snow ? 'Snowing now' : 'Raining now';
+  else if (soon) title = soon.mins <= 15 ? 'Rain any minute' : 'Rain from ' + hhmm(soon.starts);
+  else {
+    const first = hours.filter(wetHour)[0];
+    if (first){ title = (snowy(first.code) ? 'Snow from ' : 'Rain from ') + hhmm(first.t); brolly = first.rain == null || first.rain >= 40; }
+    else { title = hours.length ? 'Dry for the day' : 'Dry for now'; tone = 'dry'; brolly = false; }
+  }
+  if (snow && tone === 'wet') tone = 'snow';
+  const wear = wearFor(W.now.feels), stops = soon && soon.raining ? (soon.stops ? 'Stops around ' + hhmm(soon.stops) + '. ' : 'Set in for a few hours. ') : '';
+  return { title, tone, line: stops + (wear ? wear + (brolly ? ', and take a brolly.' : '.') : brolly ? 'Take a brolly.' : '') };
 }
 export async function loadDisplayWeather(){
   try { return parseWeather(await request(`https://api.open-meteo.com/v1/forecast?${METEO_Q}`)); }

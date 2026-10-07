@@ -79,6 +79,90 @@ function stripSvg(o){
   return s + '</svg>';
 }
 
+/* ---------- the Weather view ---------- */
+/** A colour for a temperature: icy blue through cyan and amber to hot orange. */
+function tempCol(t){
+  const stops = [[-2, [159, 216, 255]], [7, [79, 214, 255]], [13, [255, 209, 102]], [22, [255, 138, 92]]];
+  if (t <= stops[0][0]) return 'rgb(' + stops[0][1].join(',') + ')';
+  for (let i = 1; i < stops.length; i++) if (t <= stops[i][0]){
+    const a = stops[i - 1], b = stops[i], f = (t - a[0]) / (b[0] - a[0]);
+    return 'rgb(' + a[1].map((v, k) => Math.round(v + (b[1][k] - v) * f)).join(',') + ')';
+  }
+  return 'rgb(' + stops[stops.length - 1][1].join(',') + ')';
+}
+/**
+ * The next 24 hours: temperature as a line coloured by warmth, with the sky and the temperature every three hours,
+ * the chance of rain as bars beneath it, the night shaded, and now as a dashed line. Sized in real pixels.
+ * o: { hours: [{ t, temp, rain, code }], days: [{ rise, set }], now, width, height }
+ */
+function wxHoursSvg(o){
+  const hs = o.hours || [], W = Math.max(200, o.width), H = Math.max(120, o.height), fs = Math.round(remPx() * 0.9);
+  if (hs.length < 2) return '';
+  const top = fs * 3.4, bottom = fs * 1.8, ih = H - top - bottom, from = hs[0].t, to = hs[hs.length - 1].t + 3600e3, x = t => (t - from) / (to - from) * W;
+  const ts = hs.map(h => h.temp), lo = Math.min.apply(null, ts) - 1, hi = Math.max.apply(null, ts) + 1, tb = top + ih * 0.58;
+  const y = v => tb - (v - lo) / (hi - lo) * (tb - top);
+  const id = 'w' + Math.round(Math.random() * 1e6);
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.aria || 'The next 24 hours')}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="${W}" y2="0" gradientUnits="userSpaceOnUse">`
+    + hs.map(h => `<stop offset="${Math.max(0, Math.min(1, x(h.t + 1800e3) / W)).toFixed(4)}" stop-color="${tempCol(h.temp)}"/>`).join('') + '</linearGradient></defs>';
+  // the night, from each sunset to the next sunrise
+  (o.days || []).forEach((d, i, all) => {
+    const a = Math.max(0, x(d.set)), nx = all[i + 1] ? all[i + 1].rise : d.rise + 864e5, e = Math.min(W, x(nx));
+    if (e > a) s += `<rect class="nightb" x="${a.toFixed(1)}" y="${(top - fs * 0.4).toFixed(1)}" width="${(e - a).toFixed(1)}" height="${(ih + fs * 0.4).toFixed(1)}"/>`;
+  });
+  // the chance of rain, as bars along the bottom
+  const bw = W / hs.length, bh = ih * 0.36;
+  hs.forEach(h => { if (h.rain > 0){ const hh = h.rain / 100 * bh; s += `<rect class="rainbar" x="${(x(h.t) + bw * 0.2).toFixed(1)}" y="${(top + ih - hh).toFixed(1)}" width="${(bw * 0.6).toFixed(1)}" height="${hh.toFixed(1)}"/>`; } });
+  const peak = hs.reduce((m, h) => h.rain > (m ? m.rain : 0) ? h : m, null);
+  if (peak && peak.rain >= 20) s += `<text class="lbl rain" x="${(x(peak.t) + bw / 2).toFixed(1)}" y="${(top + ih - peak.rain / 100 * bh - fs * 0.35).toFixed(1)}" text-anchor="middle" font-size="${fs}">${Math.round(peak.rain)}%</text>`;
+  // the temperature, smoothed
+  const pts = hs.map(h => [x(h.t + 1800e3), y(h.temp)]);
+  pts.unshift([0, pts[0][1]]); pts.push([W, pts[pts.length - 1][1]]);
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++){
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  s += `<path d="${d}" fill="none" stroke="url(#${id})" stroke-width="${Math.max(3, fs * 0.16).toFixed(1)}" stroke-linecap="round"/>`;
+  // every three hours (six on a narrow screen): the sky and the temperature, and the time beneath
+  const every = W / hs.length * 3 < fs * 3.6 ? 6 : 3;
+  hs.forEach((h, i) => {
+    if (new Date(h.t).getHours() % every) return;
+    const cx = x(h.t + 1800e3); if (cx < fs * 1.2 || cx > W - fs * 1.2) return;
+    const cy = y(h.temp), wn = weatherText(h.code);
+    s += `<circle class="wdot" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${(fs * 0.2).toFixed(1)}" fill="${tempCol(h.temp)}"/>`
+      + `<text class="wi" x="${cx.toFixed(1)}" y="${(cy - fs * 1.55).toFixed(1)}" text-anchor="middle" font-size="${Math.round(fs * 1.25)}">${wn.icon}</text>`
+      + `<text class="lbl temp" x="${cx.toFixed(1)}" y="${(cy - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">${Math.round(h.temp)}°</text>`;
+    const dt = new Date(h.t);
+    if (Math.abs(cx - x(o.now)) > fs * 3.4) s += `<text class="lbl" x="${cx.toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">${dt.getHours() === 0 ? DOW[dt.getDay()] : pad2(dt.getHours()) + ':00'}</text>`;
+  });
+  if (o.now >= from && o.now <= to){ const nx = x(o.now); s += `<line class="nowl" x1="${nx.toFixed(1)}" x2="${nx.toFixed(1)}" y1="${(top - fs * 0.4).toFixed(1)}" y2="${(top + ih).toFixed(1)}"/><text class="lbl now" x="${Math.max(fs * 1.4, nx).toFixed(1)}" y="${(H - fs * 0.45).toFixed(1)}" text-anchor="middle" font-size="${fs}">Now</text>`; }
+  return s + '</svg>';
+}
+/** The week: each day's sky, high and low (with a bar across the week's range), and its chance of rain. */
+function weekHtml(days, now){
+  if (!days || !days.length) return '';
+  const lo = Math.min.apply(null, days.map(d => d.min)), hi = Math.max.apply(null, days.map(d => d.max)), span = Math.max(1, hi - lo);
+  return '<ol class="week">' + days.map((d, i) => {
+    const wn = weatherText(d.code), date = new Date(d.k + 'T12:00');
+    return `<li${i === 0 ? ' class="today"' : ''}><span class="dn">${i === 0 ? 'Today' : DOW[date.getDay()]}</span><span class="wi" title="${esc(wn.text)}">${wn.icon}</span>`
+      + `<span class="hi" style="color:${tempCol(d.max)}">${Math.round(d.max)}°</span><span class="rng"><i style="left:${((d.min - lo) / span * 100).toFixed(1)}%;width:${Math.max(6, (d.max - d.min) / span * 100).toFixed(1)}%"></i></span><span class="lo">${Math.round(d.min)}°</span>`
+      + `<span class="rp${d.rain >= 50 ? ' wet' : ''}">${d.rain != null ? Math.round(d.rain) + '%' : ''}</span></li>`;
+  }).join('') + '</ol>';
+}
+/**
+ * The rain radar: RainViewer's recent frames over Esri's dark grey map, home in the middle. Every frame is on the page
+ * and only one shows (`.on`), so playing it is a class change. Returns the markup; the frames are r.frames.
+ */
+function radarHtml(r, w, h){
+  const z = RADAR_ZOOM, home = tileOf(HOME.lat, HOME.lon, z);
+  const ox = w / 2 - home.fx * 256, oy = h / 2 - home.fy * 256, tiles = [];
+  for (let dy = -Math.ceil(oy / 256); oy + dy * 256 < h; dy++) for (let dx = -Math.ceil(ox / 256); ox + dx * 256 < w; dx++) tiles.push({ x: home.x + dx, y: home.y + dy, left: Math.round(ox + dx * 256), top: Math.round(oy + dy * 256) });
+  const frames = r && r.frames ? r.frames.slice(-6) : [];
+  let s = tiles.map(t => `<img class="base" src="${baseTile(z, t.x, t.y)}" alt="" style="left:${t.left}px;top:${t.top}px">`).join('');
+  frames.forEach((f, k) => { s += `<div class="frame${k === frames.length - 1 ? ' on' : ''}" data-t="${f.t}" data-ahead="${f.ahead ? 1 : ''}">` + tiles.map(t => `<img src="${radarTile(r.host, f.path, z, t.x, t.y)}" alt="" style="left:${t.left}px;top:${t.top}px">`).join('') + '</div>'; });
+  return `<div class="wradar" style="height:${h}px">${s}<i class="home" aria-hidden="true"></i><span class="when" id="wRadarWhen"></span></div>`;
+}
+
 /**
  * The trains as the station shows them, in orange dot-matrix: the departures board (time, destination, platform,
  * expected, and when to leave with your walk; the ones it's too late for dimmed) and the platform sign (1st, 2nd, 3rd

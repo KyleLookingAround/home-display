@@ -4,10 +4,10 @@
 <header class="bar" id="bar">
   <nav class="picker" id="picker" role="tablist" aria-label="Display mode"></nav>
   <div class="bar-actions">
-    <button class="btn" id="wifiBtn" type="button">Guest Wi-Fi</button>
+    <button class="btn" id="wifiBtn" type="button" aria-label="Guest Wi-Fi">Wi-Fi</button>
     <button class="btn" id="setBtn" type="button">Settings</button>
     <button class="btn" id="fsBtn" type="button">Full screen</button>
-    <a class="btn" id="dashBtn" href="index.html">Phone pages</a>
+    <a class="btn" id="dashBtn" href="index.html" aria-label="Phone pages">Phone</a>
   </div>
 </header>
 
@@ -118,6 +118,22 @@
       <div class="night-clock" data-clock>--:--</div>
       <p class="night-sub" id="nSub"></p>
     </div>
+  </section>
+
+  <!-- ================= WEATHER: now, the next 24 hours, the week, the rain radar and the air ================= -->
+  <section class="mode" data-mode="weather" aria-label="Weather" hidden>
+    <div class="top">
+      <div class="wnow" id="wNow"></div>
+      <div class="verdict" id="wVerdict"></div>
+      <div class="wsun" id="wSun"></div>
+    </div>
+    <section class="card strip-card"><div class="card-head"><h2 class="label">The next 24 hours</h2><span class="aside wet" id="wRainSoon"></span></div><div class="strip wstrip" id="wHours"></div></section>
+    <div class="wgrid">
+      <section class="card"><h2 class="label">The week</h2><div id="wWeek"></div></section>
+      <section class="card wradar-card"><h2 class="label">Rain radar</h2><div class="wradar-box" id="wRadar"></div></section>
+      <section class="card wout"><h2 class="label">Outside</h2><div id="wAir"></div></section>
+    </div>
+    <p class="foot" id="wFoot"></p>
   </section>
 
   <!-- ================= MUSIC: Spotify, on this screen's own sign-in (tvmusic.js) ================= -->

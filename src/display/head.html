@@ -222,6 +222,60 @@ body.lite .jmap .train-ring{animation:none}
 
 @media (max-width:520px){.dmx{font-size:.95rem}.deps-sign .row{grid-template-columns:5ch minmax(0,1fr) 3ch 9ch}.deps-sign .g{display:none}.travel .solo .dmx{font-size:.95rem}}
 
+/* the Weather view: now, the next 24 hours, the week, the rain radar and the air */
+.wnow{display:flex;align-items:center}
+.wnow .i{font-size:3.2rem;line-height:1;margin-right:.7rem}
+.wnow .t{font:500 4rem/1 var(--f-mono)}
+.wnow .d{font-size:1rem;color:var(--muted);margin:0 0 0 1rem;line-height:1.4}
+.wnow .d b{color:var(--ink);font-weight:600;font-size:1.15rem}
+.verdict .big.wet{color:var(--gas);text-shadow:0 0 1.4rem rgba(79,214,255,.45)}
+.verdict .big.snow{color:#cfe8ff;text-shadow:0 0 1.4rem rgba(207,232,255,.45)}
+.verdict .big.dry{color:var(--cheap);text-shadow:0 0 1.4rem rgba(70,230,161,.4)}
+.wsun{text-align:right}
+.wsun .st{font:500 2rem/1 var(--f-mono);margin:.15rem 0}
+.wsun .sub{font-size:.95rem;color:var(--muted);margin:0}
+.wstrip{height:8.4rem}
+.wout .stat .v{font:500 1.05rem/1.3 var(--f-body);min-width:0;overflow:hidden;text-overflow:ellipsis}
+.wout .stat .k{white-space:nowrap}
+.card-head .aside.wet{color:var(--gas)}
+.stat.flood .k{font-weight:600}
+.stat.flood.warn .k{color:var(--warn)} .stat.flood.bad .k{color:var(--peak)}
+
+.strip .nightb{fill:rgba(120,130,255,.07)}
+.strip .rainbar{fill:rgba(79,214,255,.55)}
+.strip .lbl.temp{fill:var(--ink);font-weight:600}
+.strip .wi{fill:var(--ink)}
+.wgrid{display:grid;grid-template-columns:1fr;grid-gap:.75rem;flex:1 1 auto;min-height:0}
+@media (min-width:900px){ .wgrid{grid-template-columns:1.55fr 1fr .95fr} }
+.wgrid > .card{display:flex;flex-direction:column}
+.wgrid > .card > div{flex:1 1 auto}
+#wWeek{display:flex}
+.week{list-style:none;margin:.4rem 0 0;padding:0;display:flex;flex:1 1 auto}
+.week li{flex:1 1 0;min-width:0;text-align:center;padding:.3rem .15rem;margin-left:.3rem;border-radius:var(--radius-sm);display:flex;flex-direction:column;justify-content:space-around}
+.week li:first-child{margin-left:0}
+.week li.today{background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px var(--line-hot)}
+.week span{display:block}
+.week .dn{font:500 .95rem/1.3 var(--f-mono);color:var(--muted)}
+.week .today .dn{color:var(--ink)}
+.week .wi{font-size:1.7rem;line-height:1.3}
+.week .hi{font:500 1.35rem/1.2 var(--f-mono)}
+.week .lo{font:500 1rem/1.3 var(--f-mono);color:var(--muted)}
+.week .rng{position:relative;height:.3rem;margin:.35rem .3rem;border-radius:.15rem;background:rgba(255,255,255,.08)}
+.week .rng i{position:absolute;top:0;bottom:0;border-radius:.15rem;background:linear-gradient(90deg,var(--gas),var(--elec))}
+.week .rp{font:500 .95rem/1.4 var(--f-mono);color:var(--muted);margin-top:.2rem}
+.week .rp.wet{color:var(--gas)}
+.wradar-card{display:flex;flex-direction:column}
+.wradar-box{position:relative;flex:1 1 auto;min-height:9rem;margin-top:.4rem}
+.wradar{position:absolute;left:0;top:0;right:0;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16}
+.wradar img{position:absolute;width:256px;height:256px;max-width:none}
+.wradar .base{filter:brightness(.6) contrast(1.15)}
+.wradar .frame{position:absolute;left:0;top:0;opacity:0}
+.wradar .frame.on{opacity:.85}
+.wradar .home{position:absolute;left:50%;top:50%;width:.6rem;height:.6rem;margin:-.3rem 0 0 -.3rem;border-radius:50%;background:var(--elec);box-shadow:0 0 0 .2rem rgba(255,181,71,.3),0 0 .8rem var(--elec)}
+.wradar .when{position:absolute;left:.5rem;top:.5rem;font:500 .95rem/1 var(--f-mono);background:rgba(4,6,18,.8);padding:.35rem .5rem;border-radius:.3rem;color:var(--ink)}
+.wradar .credit{position:absolute;right:.4rem;bottom:.3rem;font:.9rem var(--f-mono);color:var(--muted);text-shadow:0 0 3px #000}
+@media (max-width:899px){ .wradar-box{min-height:18rem} .wnow .t{font-size:3rem} .wsun{text-align:left;margin-top:.4rem} .wsun .st,.wsun .label{display:inline-block;margin-right:.6rem} }
+
 /* toolbar: hidden until a key, tap or mouse move, then fades after a few seconds */
 .bar{position:fixed;z-index:20;top:0;left:0;right:0;padding:calc(var(--edge-y) * .6 + env(safe-area-inset-top,0px)) var(--edge-x) .7rem;background:rgba(4,5,13,.96);border-bottom:1px solid var(--line-hot);display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;transform:translateY(-110%);opacity:0;transition:transform .3s,opacity .3s;visibility:hidden}
 .chrome-on .bar{transform:none;opacity:1;visibility:visible}
@@ -233,7 +287,8 @@ body.lite .jmap .train-ring{animation:none}
 .btn .k{opacity:.55;margin-right:.45em;font-family:var(--f-mono)}
 .btn:focus,select:focus,input:focus{outline:4px solid var(--elec);outline-offset:3px;box-shadow:0 0 26px -2px var(--elec)}
 .btn::-moz-focus-inner{border:0}
-.bar .btn{padding:.65em .75em;margin-right:.35rem}      /* six views and four actions on one row at 1080p */
+.bar .btn{padding:.65em .55em;margin-right:.3rem}      /* seven views and four actions on one row at 1080p */
+.bar .btn .k{margin-right:.35em}
 
 /* screensaver: a side window onto space. Space and billboards outside, then close things, the glass, the frame and the cabin. */
 .mode-saver{position:fixed;top:0;left:0;right:0;bottom:0;z-index:5;overflow:hidden;background:#02030a;--amb:126,146,255}

@@ -18,3 +18,4 @@
 | [0014](0014-finding-music.md) | Finding music without Spotify's recommendations: ListenBrainz (and Last.fm), new releases, Ticketmaster gigs with the key on the phone, a weather radio, and a listening log kept on the phone |
 | [0015](0015-maps-and-location.md) | Maps, location and distance: a train placed between stations from its live times, an open station list, our own map on CARTO's tiles, and location kept on the phone (sealed to the TV) |
 | [0016](0016-playing-on-the-wall-display.md) | Playing music on the wall display itself (Spotify's Web Playback SDK, "Harold Street TV"), and never starting the TV's Spotify app by itself |
+| [0017](0017-weather-view.md) | A Weather view on the wall display (key 7): the answer first, the next 24 hours, the week, the rain radar and the air; one wider forecast call |

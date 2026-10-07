@@ -4,6 +4,15 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-07
 
+- **Creation**: a Weather view on the wall display, key 7 ([decision 0017](decisions/0017-weather-view.md)).
+  - The answer first: "Raining now" (and when it stops), "Rain from 15:00" or "Dry for the day", and what to wear ("Jacket weather, and take a brolly").
+  - Now and how warm it feels, and the sun (sunset or sunrise, and the hours of daylight).
+  - The next 24 hours: temperature coloured by warmth with the sky every three hours, the chance of rain as bars, the night shaded, and how much rain to expect.
+  - The week: each day's sky, high and low across the week's range, and its chance of rain.
+  - The rain radar, playing; and outside: wind and gusts, humidity, the day's rain, air quality and UV, pollen, and flood warnings within 15 km.
+  - It joins the rotation with Today, Energy and Travel, and the phone's Screen page lists it.
+- **Update**: the forecast now covers the week, with hourly rain amounts, wind direction, gusts and humidity (`parseWeather`: `day` for the next 24 hours, `days` for the week).
+- **Finding**: the TV's text could shrink for one view and never grow back, because a page is never shorter than the screen, so the fitting never saw room to grow. It now starts from full size each time. The toolbar's buttons are tighter, and "Guest Wi-Fi" and "Phone pages" read "Wi-Fi" and "Phone", so seven views and four buttons stay on one row at full size.
 - **Finding**: from photos of the TV, four things.
   - Every view ran off the bottom of the TV and the toolbar wrapped onto two rows: the TV's browser gives the page less room than a true 1920 by 1080 (or zooms its text, or doesn't know `min()`). After each render the display now shrinks its root size until the view, and the toolbar on one row, fit the screen, and grows back when there's room (`fitScreen` in display.js). A test checks a TV with a browser bar, 720p and 16:10.
   - The dropdowns in the TV's settings couldn't be changed with the remote: left and right only moved on, and OK tried to open a list the TV can't show. Now OK starts changing a dropdown, the arrows step through its choices in place, and OK or Back is done; a tag under it says which (`stepSelect`).
