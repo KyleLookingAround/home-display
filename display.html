@@ -104,6 +104,7 @@ h1,h2,h3{margin:0;font-weight:600}
 .verdict.big .big{font-size:2.6rem}
 .verdict .line{font-size:1.2rem;margin-top:.35rem}
 .verdict .note{margin-top:.2rem}
+#dVerdict .note{display:none}   /* Today: the tariff and region are in its footer already, and the room is needed */
 .glow-cheap{color:var(--cheap);text-shadow:0 0 1.2rem rgba(70,230,161,.45)} .glow-normal{color:var(--normal);text-shadow:0 0 1.2rem rgba(255,209,102,.4)}
 .glow-peak{color:var(--peak);text-shadow:0 0 1.2rem rgba(255,107,125,.45)} .glow-neg{color:var(--neg);text-shadow:0 0 1.2rem rgba(184,146,255,.5)}
 .wx{display:flex;align-items:center;text-align:right}
@@ -173,13 +174,38 @@ body.lite .dmx{text-shadow:none}
 .travel .solo{grid-column:1/-1}
 /* the journey map (mapHtml in board.js), beside the sign when there are no trams */
 .jmap{position:relative;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16;margin-top:.5rem}
-.jmap img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.6) contrast(1.15)}
+.jmap img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.75) contrast(1.1)}
 .jmap svg{position:absolute;left:0;top:0}
 .jmap .route{fill:none;stroke:var(--elec);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
 .jmap .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
 .jmap .walk{fill:none;stroke:var(--gas);stroke-width:4;stroke-dasharray:3 10;stroke-linecap:round}
 .jmap .stn{fill:#0b0d16;stroke:var(--elec);stroke-width:3}
 .jmap .stn.big{stroke-width:4;fill:#1a1408}
+.jmap .home-ring{fill:rgba(79,214,255,.12);stroke:var(--gas);stroke-width:2.5}
+/* the journey as a line of stops (stepsHtml) */
+.jsteps{position:relative;margin:.7rem 0 0;padding:0;list-style:none;overflow:hidden}
+.jsteps .jstop{float:left;text-align:center;position:relative}
+.jtrack{position:absolute;top:.38rem;height:.15rem;border-radius:.1rem;background:var(--line-hot)}
+.jfill{position:absolute;left:0;top:0;bottom:0;background:var(--elec);box-shadow:0 0 .5rem rgba(255,181,71,.6)}
+.jhere{position:absolute;top:50%;width:1.1rem;height:1.1rem;margin:-.55rem 0 0 -.55rem;border-radius:50%;background:var(--elec);border:.18rem solid #04050d;box-shadow:0 0 0 .2rem rgba(255,181,71,.35),0 0 .9rem var(--elec)}
+.jstop .dot{display:block;width:.9rem;height:.9rem;margin:0 auto;border-radius:50%;background:#0b0d16;border:.12rem solid var(--line-hot);position:relative}
+.jstop.done .dot{border-color:var(--elec);background:#1a1408}
+.jstop.end .dot{border-color:var(--gas)}
+.jstop .nm{display:block;margin-top:.35rem;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .2rem}
+.jstop .tm{display:block;font:500 1rem var(--f-mono);color:var(--muted)}
+.jstop.done .tm{color:var(--elec)}
+/* the commute's answer under the station sign (answerHtml) */
+.tgo{margin-top:.8rem;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid var(--line);border-left:.2rem solid var(--elec);background:rgba(255,181,71,.07)}
+.tgo.warn{border-left-color:var(--warn);background:rgba(255,209,102,.08)} .tgo.bad{border-left-color:var(--bad);background:rgba(255,107,125,.08)}
+.tgo .top{overflow:hidden}
+.tgo .big{font:700 1.6rem/1.2 var(--f-display);letter-spacing:.03em;text-transform:uppercase;color:var(--elec)}
+.tgo.warn .big{color:var(--warn)} .tgo.bad .big{color:var(--bad)}
+.tgo .why{float:right;font:500 1rem/2.2 var(--f-mono);color:var(--muted)}
+.tgo .chain{margin-top:.3rem;font:500 1.05rem var(--f-mono)}
+.tgo .sep{color:var(--muted);margin:0 .5rem}
+.tgo .st{white-space:nowrap}
+.tgo .st.work,.tgo .st.home{color:var(--gas)} .tgo .st.late{color:var(--bad)}
+.rows .ln{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jmap .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .jmap .train{fill:var(--elec);stroke:#04050d;stroke-width:3}
 .jmap .you{fill:var(--gas);stroke:#04050d;stroke-width:3}
@@ -1990,6 +2016,25 @@ function commuteTrain(trains, now){
   }
   return { d: list[0], kind: 'next' };
 }
+/** A station's short name for a tight space: "Piccadilly" for Manchester Piccadilly. */
+const shortStation = n => String(n || '').replace(/^Manchester (?=\w)/, '').replace(/ \(.*\)$/, '');
+/**
+ * The commute's answer, first, the same on the phone and the TV: what to do (`title`: "Leave by 07:38", or "Leave in
+ * 12 min", "Leave now", "Run for it" when it's close), why (`note`: "In for 09:00"), how it goes (`steps`: the train,
+ * where you get off, when you're there) and its `tone`: good, warn (soon) or bad (late, or a run).
+ */
+function commuteAnswer(trains, now){
+  const c = commuteTrain(trains, now);
+  if (!c || !trains.leg || (!trains.leg.work && !trains.leg.home && !trains.leg.to)) return null;
+  const leg = trains.leg, d = c.d, a = arriveBy(d, leg), dep = d.exp || d.sched, l = leaveBy(dep, leg.walk, now);
+  const from = leg.walkHere ? '' : leg.home ? 'work ' : leg.work ? 'home ' : '';
+  const where = shortStation(trains.toName || leg.to);
+  const steps = [{ k: 'train', text: hhmm(d.sched) + (d.platform ? ' · plat ' + d.platform : '') }, { k: 'off', text: where + ' ' + hhmm(d.arr) }];
+  if (a && (leg.work || leg.home)) steps.push({ k: leg.home ? 'home' : 'work', text: (leg.home ? 'Home ' : 'Work ') + hhmm(a.t), late: a.late });
+  return { title: l.mins > 15 ? 'Leave ' + from + 'by ' + hhmm(dep - leg.walk * 60e3) : l.text, tone: c.kind === 'late' || (a && a.late) ? 'bad' : l.mins > 15 ? 'good' : l.cls,
+    note: c.kind === 'on' ? 'In for ' + hhmm(leg.start) : c.kind === 'late' ? 'Nothing gets you in for ' + hhmm(leg.start) : c.kind === 'after' ? 'After you finish at ' + hhmm(leg.end) : '',
+    steps: steps, kind: c.kind, train: d };
+}
 /** The trains card's title: "Trains to work", "Trains home", or "Trains from Stockport" (to Manchester Piccadilly). */
 function trainsTitle(trains, s){
   const leg = trains && trains.leg, from = (trains && trains.station) || (leg ? leg.from : s.trainFrom), to = (trains && trains.toName) || (leg ? leg.to : s.trainTo);
@@ -2334,19 +2379,19 @@ function trainAt(stops, now, index){
   const span = Math.max(60e3, b.t - a.t), f = Math.max(0, Math.min(0.95, (now - a.t) / span));
   return { lat: pa.lat + (pb.lat - pa.lat) * f, lon: pa.lon + (pb.lon - pa.lon) * f, from: a, to: b, frac: f, late: lateAt(b), stops: s };
 }
-/** In words: "Between Heaton Chapel and Levenshulme, 2 min late", "At Stockport", "Not left Hazel Grove yet". */
-function trainText(p){
+/** In words: "Between Heaton Chapel and Levenshulme, 2 min late", "At Stockport", "Not left Hazel Grove yet"; `bare` leaves out how late. */
+function trainText(p, bare){
   if (!p) return '';
-  const late = p.late >= 1 ? ', ' + p.late + ' min late' : ', on time';
-  if (p.end) return 'Arrived at ' + p.at.name + (p.late >= 1 ? ', ' + p.late + ' min late' : '');
-  if (p.before) return 'Not left ' + p.at.name + ' yet' + (p.late >= 1 ? ', expected ' + p.late + ' min late' : '');
+  const late = bare ? '' : p.late >= 1 ? ', ' + p.late + ' min late' : ', on time';
+  if (p.end) return 'Arrived at ' + p.at.name + (p.late >= 1 && !bare ? ', ' + p.late + ' min late' : '');
+  if (p.before) return 'Not left ' + p.at.name + ' yet' + (p.late >= 1 && !bare ? ', expected ' + p.late + ' min late' : '');
   if (p.at) return 'At ' + p.at.name + late;
   return (p.frac < 0.25 ? 'Just left ' + p.from.name : p.frac > 0.75 ? 'Nearly at ' + p.to.name : 'Between ' + p.from.name + ' and ' + p.to.name) + late;
 }
 /** When the train is due at a station on its way ("Due at Stockport 18:01"), from its stops. */
 function dueAt(p, crs){
   const x = p && p.stops ? p.stops.filter(s => s.crs === crs)[0] : null;
-  return x ? { t: x.t, done: x.done, text: (x.done ? 'At ' : 'Due at ') + x.name + ' ' + hhmm(x.t) } : null;
+  return x ? { t: x.t, done: x.done, name: x.name, text: (x.done ? 'At ' : 'Due at ') + x.name + ' ' + hhmm(x.t) } : null;
 }
 
 /** The train to show: once one has left with you on it, that one until it arrives; else the commute's, else the next. */
@@ -2439,15 +2484,32 @@ function journeyView(pos, leg, index, home){
   stops.forEach(s => {
     const p = at(s.crs); if (!p) return;
     const ends = s.crs === onCrs || s.crs === offCrs, next = pos && pos.to && pos.to.crs === s.crs && stops.length > 2;
-    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, label: ends || next ? (index[s.crs] || s).name : '', right: s.crs === homeEnd ? true : undefined });   // home's label is on the left
+    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, home: s.crs === homeEnd, label: ends || next ? (index[s.crs] || s).name : '' });   // home's station ringed in cyan
   });
-  if (home) places.push({ lat: home.lat, lon: home.lon, kind: 'home', label: 'Home', right: false });   // labelled to the left: home is a walk from the station
   if (pos && !pos.end) places.push({ lat: pos.lat, lon: pos.lon, kind: 'train' });
   const off = pos && offCrs ? dueAt(pos, offCrs) : null, board = pos ? pos.stops.filter(s => s.crs === onCrs)[0] || null : null;
-  return { places: places, route: stops.map(s => at(s.crs)).filter(Boolean), walks: home && at(homeEnd) ? [[home, at(homeEnd)]] : [],
-    fit: [at(onCrs), at(offCrs), home, pos && !pos.end ? pos : null].filter(Boolean), board: board, off: off,
+  return { places: places, route: stops.map(s => at(s.crs)).filter(Boolean), walks: [],
+    fit: [at(onCrs), at(offCrs), pos && !pos.end ? pos : null].concat(stops.map(s => at(s.crs))).filter(Boolean), board: board, off: off,
     there: off && (leg.work || leg.home) ? (leg.home ? 'home by ' : 'at work by ') + hhmm(off.t + (leg.after || 0) * 60e3) : '',
     title: leg.work ? 'Your way in' : leg.home ? 'Your way home' : 'Your next train' };
+}
+/**
+ * The journey as a line of stops, for the timeline under the map: where you set off (home, work or here), where you
+ * get on, where you get off and, on the commute, where you end up, each with its time and whether it's done; and
+ * `at`, how far along you are (1.5 is halfway between the second and third).
+ */
+function journeySteps(j, pos, leg, now){
+  if (!j || !leg || !j.board || !j.off) return null;
+  const startAt = j.board.t - (leg.walk || 0) * 60e3, steps = [{ label: leg.walkHere ? 'Here' : leg.home ? 'Work' : 'Home', t: startAt, done: now >= startAt || j.board.done }];
+  steps.push({ label: shortStation(j.board.name), t: j.board.t, done: !!j.board.done });
+  steps.push({ label: shortStation(j.off.name), t: j.off.t, done: !!j.off.done });
+  if (leg.work || leg.home) steps.push({ label: leg.home ? 'Home' : 'Work', t: j.off.t + (leg.after || 0) * 60e3, done: false });
+  const frac = (a, b) => b.t > a.t ? Math.max(0, Math.min(1, (now - a.t) / (b.t - a.t))) : 0;
+  let at = 0;
+  if (!j.board.done) at = now < startAt ? 0 : frac(steps[0], steps[1]) * 0.98;
+  else if (!j.off.done) at = 1 + frac(steps[1], steps[2]) * 0.98;
+  else at = steps.length > 3 ? 2 + frac(steps[2], steps[3]) : 2;
+  return { steps: steps, at: at };
 }
 /** The lines under the map: where you get on and off, and when you're there. */
 function journeyLines(j, pos){
@@ -5438,13 +5500,27 @@ function mapHtml(j, w, h){
   if (j.route.length) svg += `<polyline class="glow" points="${j.route.map(xy).join(' ')}"/><polyline class="route" points="${j.route.map(xy).join(' ')}"/>`;
   j.places.forEach(p => {
     const q = pt(p);
-    if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
+    if (p.kind === 'station') svg += (p.home ? `<circle class="home-ring" cx="${q.x}" cy="${q.y}" r="18"/>` : '') + `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
     else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
     else if (p.kind === 'you') svg += `<circle class="you-ring" cx="${q.x}" cy="${q.y}" r="22"/><circle class="you" cx="${q.x}" cy="${q.y}" r="11"/>`;
     else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
   });
   j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false || (p.right !== true && q.x > w * 0.6); svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
   return `<div class="jmap" style="height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg><span class="credit">${esc(MAP_CREDIT)}</span></div>`;
+}
+
+/** The journey as a line of stops (journeySteps in geo.js): where you set off, get on, get off and end up, with times. */
+function stepsHtml(line){
+  if (!line) return '';
+  const n = line.steps.length, p = n > 1 ? Math.max(0, Math.min(n - 1, line.at)) / (n - 1) : 0;
+  return `<ol class="jsteps"><li class="jtrack" style="left:${(50 / n).toFixed(3)}%;right:${(50 / n).toFixed(3)}%"><i class="jfill" style="width:${(p * 100).toFixed(1)}%"></i><i class="jhere" style="left:${(p * 100).toFixed(1)}%"></i></li>${line.steps.map((s, i) =>
+    `<li class="jstop${i <= line.at ? ' done' : ''}${i === n - 1 ? ' end' : ''}" style="width:${(100 / n).toFixed(3)}%"><span class="dot"></span><span class="nm">${esc(s.label)}</span> <span class="tm">${hhmm(s.t)}</span></li>`).join(' ')}</ol>`;
+}
+/** The commute's answer, under the station sign (commuteAnswer in household.js). */
+function answerHtml(a){
+  if (!a) return '';
+  return `<div class="tgo ${a.tone}"><div class="top"><span class="big">${esc(a.title)}</span> ${a.note ? `<span class="why">${esc(a.note)}</span>` : ''}</div>`
+    + ` <div class="chain">${a.steps.map((s, i) => (i ? ' <span class="sep">›</span> ' : '') + `<span class="st ${s.k}${s.late ? ' late' : ''}">${esc(s.text)}</span>`).join('')}</div></div>`;
 }
 /* ===================== display: music on the TV (Spotify) ===================== */
 // Plain script for TV browsers (Chromium 63): no ?. or ??. The TV is signed in to Spotify from a phone (sealed with
@@ -5949,10 +6025,11 @@ function renderJourney(now){
   $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
   // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
   const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length, j.places.length].join('|');
-  if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
+  if (!box.querySelector('.jm')){ box.innerHTML = '<p class="jnow"></p><div class="jm"></div><div class="js"></div><div class="jl"></div>'; box.__key = ''; }
   if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
   box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
-  const lines = trip ? [(j.off ? j.off.text : 'On the ' + hhmm(trip.sched)) + (j.there ? ' · ' + j.there : '')] : journeyLines(j, pos);
+  setHtml(box.querySelector('.js'), stepsHtml(journeySteps(j, pos, leg, now)));
+  const lines = trip && !j.off ? ['On the ' + hhmm(trip.sched) + (j.there ? ' · ' + j.there : '')] : [];
   setHtml(box.querySelector('.jl'), lines.concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
 }
 function due(s, now){
@@ -6113,7 +6190,7 @@ function renderToday(){
   else if (T){
     const caught = catchable(T.list, walk, now), rows = caught.list.slice(0, 3);
     tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, walk, now), late = d.exp && d.exp - d.sched >= 60e3, a = arriveBy(d, T.leg);
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
+      return `<li><span class="main"><span class="ln"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}</span><span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -6125,7 +6202,7 @@ function renderToday(){
   const moved = days.slice(0, 2).filter(d => d.bins[0].moved)[0];
   $('#dDay').innerHTML = rows.length ? `<ul class="rows">${rows.join('')}</ul>` + (moved ? `<p class="note">* A day later for ${esc(moved.bins[0].moved)}, probably.</p>` : !s.ical ? '<p class="note">Add your calendar on your phone to see what\'s on.</p>' : '') : '<p class="empty">Nothing on today or tomorrow.</p>';
   $('#dNow').innerHTML = nowStats(now);
-  $('#dFoot').innerHTML = `<span>Harold Street · region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
+  $('#dFoot').innerHTML = `<span>Harold Street · Agile, region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
 }
 
 function renderEnergy(){
@@ -6164,10 +6241,10 @@ function renderTravel(){
   const box = $('#tTrains');
   if (list){
     // the station's sign: the board, dimmed where it's too late to make it, and the platform sign for the next you can
-    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div><p class="note" id="tCommute"></p>';
+    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div><div id="tCommute"></div>';
     const sign = signHtml(T.data, trainWalkOf(T.data, s), now);
     setHtml($('#tBoard'), sign.board); setHtml($('#tPlat'), sign.platform);
-    $('#tCommute').textContent = commuteLine(T.data, now);
+    setHtml($('#tCommute'), answerHtml(commuteAnswer(T.data, now)));
     tickSign(now);
   } else box.innerHTML = html;
   // Trams only show once a stop is set: TfGM needs a server that holds the key.

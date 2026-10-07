@@ -2,6 +2,18 @@
 
 Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
+## 2026-10-07
+
+- **Update**: a design pass over the commute and the maps, phone, laptop and TV.
+  - The commute's answer comes first, above the station sign: "Leave by 07:38" (or "Leave in 4 min", "Run for it", in red when you'd be late), why ("In for 08:30"), and the train, where you get off and when you're at work or home (`commuteAnswer`). The same block sits under the sign on the TV's Travel.
+  - The journey card opens with where the train is, with its time, platform and lateness in a pill, then the map, then a line of stops with their times and a marker for where you are now (`journeySteps`; `JourneySteps.svelte`, `stepsHtml` on the TV).
+  - Maps: no "Home" pin (home on the map was only the rounded point for Stockport, so it sat on top of the station); your station is ringed in cyan instead. The tiles are a little brighter.
+  - Settings, Location: two clear options, each with a line saying what it does.
+  - On Home, the trains and your journey sit side by side on a laptop.
+  - Fixed: the TV's Today ran taller than the screen in the morning, when a train to Manchester Piccadilly wrapped onto two lines and the price line did too. Destinations now stay on one line, and the tariff moves to Today's footer.
+  - `COMMUTE=1 SHOTS=1 REAL_TILES=1` takes screenshots of every commute and map screen with the real map, for looking at.
+- **Finding**: two browser tests run on the real clock (the service worker and the sealed account) and broke when the date moved past their fixed birthday and prices. Sam's test birthday is now always today, and the offline Now page is checked for what it kept, whatever the day.
+
 ## 2026-10-06
 
 - **Finding**: the rain radar (and the new journey maps) showed "API KEY REQUIRED" where the map should be: CARTO's base map tiles now ask for a key. The radar itself (RainViewer) still needs none. The map underneath is now Esri's World Dark Gray Base, which needs no key and allows browsers (checked), drawn darker to sit in the night sky (`baseTile` in outdoors.js, used by `mapTile` too). OpenStreetMap's own tile servers block apps like this one, so they weren't an option.

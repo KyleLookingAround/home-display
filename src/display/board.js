@@ -109,11 +109,25 @@ function mapHtml(j, w, h){
   if (j.route.length) svg += `<polyline class="glow" points="${j.route.map(xy).join(' ')}"/><polyline class="route" points="${j.route.map(xy).join(' ')}"/>`;
   j.places.forEach(p => {
     const q = pt(p);
-    if (p.kind === 'station') svg += `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
+    if (p.kind === 'station') svg += (p.home ? `<circle class="home-ring" cx="${q.x}" cy="${q.y}" r="18"/>` : '') + `<circle class="stn${p.major ? ' big' : ''}" cx="${q.x}" cy="${q.y}" r="${p.major ? 9 : 6}"/>`;
     else if (p.kind === 'home') svg += `<g class="home" transform="translate(${q.x},${q.y}) scale(1.8)"><path d="M-7 1 0-6 7 1M-5 0v6h10V0"/></g>`;
     else if (p.kind === 'you') svg += `<circle class="you-ring" cx="${q.x}" cy="${q.y}" r="22"/><circle class="you" cx="${q.x}" cy="${q.y}" r="11"/>`;
     else if (p.kind === 'train') svg += `<circle class="train-ring" cx="${q.x}" cy="${q.y}" r="24"/><circle class="train" cx="${q.x}" cy="${q.y}" r="14"/>`;
   });
   j.places.filter(p => p.label).forEach(p => { const q = pt(p), left = p.right === false || (p.right !== true && q.x > w * 0.6); svg += `<text class="lbl${p.kind !== 'station' || p.major ? ' strong' : ''}" x="${q.x + (left ? -20 : 18)}" y="${q.y + 8}" text-anchor="${left ? 'end' : 'start'}">${esc(p.label)}</text>`; });
   return `<div class="jmap" style="height:${h}px">${tiles}<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">${svg}</svg><span class="credit">${esc(MAP_CREDIT)}</span></div>`;
+}
+
+/** The journey as a line of stops (journeySteps in geo.js): where you set off, get on, get off and end up, with times. */
+function stepsHtml(line){
+  if (!line) return '';
+  const n = line.steps.length, p = n > 1 ? Math.max(0, Math.min(n - 1, line.at)) / (n - 1) : 0;
+  return `<ol class="jsteps"><li class="jtrack" style="left:${(50 / n).toFixed(3)}%;right:${(50 / n).toFixed(3)}%"><i class="jfill" style="width:${(p * 100).toFixed(1)}%"></i><i class="jhere" style="left:${(p * 100).toFixed(1)}%"></i></li>${line.steps.map((s, i) =>
+    `<li class="jstop${i <= line.at ? ' done' : ''}${i === n - 1 ? ' end' : ''}" style="width:${(100 / n).toFixed(3)}%"><span class="dot"></span><span class="nm">${esc(s.label)}</span> <span class="tm">${hhmm(s.t)}</span></li>`).join(' ')}</ol>`;
+}
+/** The commute's answer, under the station sign (commuteAnswer in household.js). */
+function answerHtml(a){
+  if (!a) return '';
+  return `<div class="tgo ${a.tone}"><div class="top"><span class="big">${esc(a.title)}</span> ${a.note ? `<span class="why">${esc(a.note)}</span>` : ''}</div>`
+    + ` <div class="chain">${a.steps.map((s, i) => (i ? ' <span class="sep">›</span> ' : '') + `<span class="st ${s.k}${s.late ? ' late' : ''}">${esc(s.text)}</span>`).join('')}</div></div>`;
 }

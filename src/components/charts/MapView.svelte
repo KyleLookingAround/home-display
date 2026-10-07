@@ -22,7 +22,7 @@
       {#if line}<polyline class="glow" points={line} /><polyline class="route" points={line} />{/if}
       {#each marks as m}
         {#if m.kind === 'station'}
-          <circle class="stn" class:big={m.major} cx={m.x} cy={m.y} r={m.major ? 5 : 3.5} />
+          {#if m.home}<circle class="home-ring" cx={m.x} cy={m.y} r="10" />{/if}<circle class="stn" class:big={m.major} cx={m.x} cy={m.y} r={m.major ? 5 : 3.5} />
         {:else if m.kind === 'home'}
           <g class="home" transform="translate({m.x},{m.y})"><path d="M-7 1 0-6 7 1M-5 0v6h10V0" /></g>
         {:else if m.kind === 'office'}
@@ -44,13 +44,14 @@
 
 <style>
   .map{position:relative;width:100%;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16}
-  img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.6) contrast(1.15)}
+  img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.75) contrast(1.1)}
   svg{position:absolute;left:0;top:0}
   .route{fill:none;stroke:var(--elec);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
   .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:10;stroke-linecap:round;stroke-linejoin:round}
   .walk{fill:none;stroke:var(--gas);stroke-width:2.5;stroke-dasharray:2 6;stroke-linecap:round;opacity:.9}
   .stn{fill:#0b0d16;stroke:var(--elec);stroke-width:2}
   .stn.big{stroke-width:2.5;fill:#1a1408}
+  .home-ring{fill:rgba(79,214,255,.12);stroke:var(--gas);stroke-width:1.5}
   .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 4px var(--gas))}
   .office{fill:none;stroke:var(--neg);stroke-width:2}
   .you{fill:var(--gas);stroke:#04050d;stroke-width:2}

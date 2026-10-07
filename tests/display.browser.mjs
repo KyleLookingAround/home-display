@@ -162,7 +162,7 @@ let base, browser;
 before(async () => {
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
-  browser = await chromium.launch();
+  browser = await chromium.launch(process.env.REAL_TILES && process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY, bypass: '<-loopback>,localhost,127.0.0.1' } } : {});
 });
 after(async () => { await browser.close(); server.close(); });
 
@@ -174,7 +174,7 @@ const TUESDAY_EARLY = new Date('2026-10-06T07:35:00+01:00');
 
 async function open(path, { width = 1920, height = 1080, at = NOW, settings = SETTINGS, withHelper = true, account = false, clock = true, sw = false, geo = null } = {}){
   helper = withHelper;
-  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: sw ? 'allow' : 'block', ...(geo ? { geolocation: geo, permissions: ['geolocation'] } : {}) });
+  const ctx = await browser.newContext({ viewport: { width, height }, timezoneId: 'Europe/London', locale: 'en-GB', serviceWorkers: sw ? 'allow' : 'block', ignoreHTTPSErrors: !!process.env.REAL_TILES, ...(geo ? { geolocation: geo, permissions: ['geolocation'] } : {}) });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -187,7 +187,9 @@ async function open(path, { width = 1920, height = 1080, at = NOW, settings = SE
   await page.route(/^https:\/\/www\.gov\.uk\/bank-holidays\.json/, r => r.fulfill({ json: holidays }));
   await page.route(/^https:\/\/environment\.data\.gov\.uk\//, r => r.fulfill({ json: floods }));
   await page.route(/^https:\/\/api\.rainviewer\.com\//, r => r.fulfill({ json: radar }));
-  await page.route(/^https:\/\/(tilecache\.rainviewer\.com|server\.arcgisonline\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  // REAL_TILES=1: the real map under the radar and the journeys, for looking at by eye (commute shots)
+  if (!process.env.REAL_TILES) await page.route(/^https:\/\/(tilecache\.rainviewer\.com|server\.arcgisonline\.com)\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+  else await page.route(/^https:\/\/tilecache\.rainviewer\.com\//, r => r.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
   await page.route(/^https:\/\/(national-rail-api\.davwheat\.dev|ntfy\.sh)\//, r => r.fulfill({ status: 500, body: '' }));
   await page.route(/^https:\/\/calendar\.google\.com\//, r => r.abort());
   boardAt = at;
@@ -624,7 +626,8 @@ test('dashboard: the phone sends its account to the TV, sealed with the site PIN
   const code = await tv.page.evaluate(() => localStorage.getItem('hse.remote'));
   assert.equal(await tv.page.evaluate(() => localStorage.getItem('hse.account')), null, 'the TV starts with no account');
   // the phone, in its own browser, with its account and the same PIN remembered
-  const phone = await open('/screen.html', { clock: false, settings: { ...SETTINGS, wifi: { ssid: 'Harold Guests', password: 'cuppa-tea-22', security: 'WPA' }, dates: [{ name: 'Sam', date: '2019-10-06', kind: 'birthday' }] }, withHelper: false });
+  const todayMD = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/London' }).slice(5);   // this runs on the real clock: Sam's birthday is today, whenever that is
+  const phone = await open('/screen.html', { clock: false, settings: { ...SETTINGS, wifi: { ssid: 'Harold Guests', password: 'cuppa-tea-22', security: 'WPA' }, dates: [{ name: 'Sam', date: '2019-' + todayMD, kind: 'birthday' }] }, withHelper: false });
   const phoneSent = await relay(phone.page, () => []);
   await phone.page.addInitScript(([s, c]) => { try { localStorage.setItem('staticrypt_passphrase', s); localStorage.setItem('hse.remoteTV', c); localStorage.setItem('hse.account', 'A-TEST1234'); localStorage.setItem('hse.key', 'sk_test_test123456'); } catch (e) {} }, [LOCK, code]);
   await phone.page.reload(); await ready(phone.page);
@@ -727,7 +730,7 @@ test('dashboard: the pages open with no signal, once seen', async () => {
   assert.ok(await page.evaluate(() => !!navigator.serviceWorker.controller), 'the pages are kept on this device');
   for (const id of ['money', 'usage', 'index']) { await page.goto(`${base}/${id}.html`); await ready(page); }
   await ctx.setOffline(true);
-  for (const [id, text] of [['money', /so far/i], ['index', /Wait if you can|Good time|price|Paid/i]]) {
+  for (const [id, text] of [['money', /so far/i], ['index', /Wait if you can|Good time|price|Paid|Right now/i]]) {   // on the real clock: the test's prices may be days old
     await page.goto(`${base}/${id}.html`); await ready(page);
     await page.waitForFunction(() => /Offline/.test(document.getElementById('status').textContent));
     assert.match(await page.textContent('main'), text, `${id} opens offline, with what was kept`);
@@ -760,7 +763,7 @@ test('the commute: the train that gets you in, then the way home, on the phone a
   let { page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: COMMUTE, withHelper: false });
   const card = page.locator('.card', { hasText: 'Trains to work' });
   await card.locator('.dmx').waitFor(); await ready(page);
-  assert.equal(await card.locator('.commute').textContent(), 'For 08:30, the 07:44: Manchester Piccadilly 07:55, at work by 08:20. Leave home by 07:39.');
+  assert.match((await card.locator('.go').textContent()).replace(/\s+/g, ' ').trim(), /^Leave in \d min In for 08:30 07:44 · plat 1 › Piccadilly 07:55 › Work 08:20$/, 'the answer first: the last train that gets you in for 08:30');
   assert.doesNotMatch(await card.locator('.dmx').textContent(), /Buxton|Euston/, 'only trains that call at Piccadilly');
   await card.locator('.office').scrollIntoViewIfNeeded(); await shot(page, 'home-commute');
   assert.deepEqual(errors, []);
@@ -769,7 +772,7 @@ test('the commute: the train that gets you in, then the way home, on the phone a
   const evening = new Date('2026-10-05T17:30:00+01:00');
   ({ page, ctx, errors } = await open('/display.html#travel', { at: evening, settings: COMMUTE }));
   await page.waitForFunction(() => /Trains home/.test(document.getElementById('tTrainTitle').textContent));
-  assert.equal(await page.textContent('#tCommute'), 'The 17:50: Stockport 17:58, home by 18:03.');
+  assert.equal((await page.textContent('#tCommute')).replace(/\s+/g, ' ').trim(), 'Run for it 17:50 · plat 5 › Stockport 17:58 › Home 18:03');
   assert.match(await page.textContent('#tBoard'), /Crewe/);
   await shot(page, 'tv-travel-home');
   await page.evaluate(() => { location.hash = 'today'; }); await page.waitForTimeout(500);
@@ -818,7 +821,7 @@ test('the commute: a day changed on the phone changes the trains there and on th
   await office.getByRole('button', { name: /Back to your usual/ }).click();
   await phone.page.waitForFunction(() => [...document.querySelectorAll('.card h2')].some(h => h.textContent === 'Trains to work'));
   await office.locator('select').first().selectOption('08:45');
-  await phone.page.waitForFunction(() => /^For 08:45, the 07:44/.test((document.querySelector('.commute') || {}).textContent || ''));
+  await phone.page.waitForFunction(() => /In for 08:45\s*07:44/.test((document.querySelector('.go') || {}).textContent || ''));
   assert.deepEqual(await phone.page.evaluate(() => JSON.parse(localStorage.getItem('hse.plan'))), { '2026-10-06': { in: true, start: '08:45', end: '17:30' } });
   await office.scrollIntoViewIfNeeded(); await shot(phone.page, 'home-office-days');
   assert.deepEqual(tv.errors, []); assert.deepEqual(phone.errors, []);
@@ -832,13 +835,14 @@ test('journey: your train on a map, moving between its live times, on the phone 
   await card.waitFor();
   await page.waitForFunction(() => /Hazel Grove/.test((document.querySelector('.journey .now') || {}).textContent || ''), null, { timeout: 15000 });
   assert.match(await card.locator('.label').textContent(), /Your way in/);
-  assert.match(await card.textContent(), /07:44\s*to Manchester Piccadilly, platform 1/);
-  assert.match(await card.locator('.now').textContent(), /(Just left Hazel Grove|Between Hazel Grove and Stockport), on time/);
-  assert.match(await card.textContent(), /Leaves Stockport 07:44 · Manchester Piccadilly 07:55 · at work by 08:20/);
+  assert.match(await card.locator('.to').textContent(), /^The 07:44 to Manchester Piccadilly$/);
+  assert.match(await card.locator('.now').textContent(), /^(Just left Hazel Grove|Between Hazel Grove and Stockport)$/);
+  assert.match(await card.locator('.pill').textContent(), /07:44 · plat 1 · on time/);
+  assert.match((await card.locator('.steps').textContent()).replace(/\s+/g, ' '), /Here 07:3\d Stockport 07:44 Piccadilly 07:55 Work 08:20|Home 07:39 Stockport 07:44 Piccadilly 07:55 Work 08:20/);
   await page.waitForFunction(() => /In town at 17:30: \d+°/.test(document.querySelector('.journey').textContent), null, { timeout: 15000 });
   assert.ok(await card.locator('.map img').count() >= 2, 'map tiles');
   assert.equal(await card.locator('.map circle.train').count(), 1, 'the train on the map');
-  assert.equal(await card.locator('.map .lbl', { hasText: 'Home' }).count(), 1);
+  assert.equal(await card.locator('.map .home-ring').count(), 1, 'home\'s station ringed');
   await card.scrollIntoViewIfNeeded(); await shot(page, 'home-journey');
   assert.deepEqual(errors, []);
   await ctx.close();
@@ -851,12 +855,18 @@ test('journey: your train on a map, moving between its live times, on the phone 
   ({ page, ctx, errors } = await open('/display.html#travel', { at: TUESDAY_EARLY, settings: { ...COMMUTE, tramStop: '' } }));
   await page.waitForFunction(() => !document.getElementById('tJourneyCard').hidden && /Hazel Grove/.test(document.querySelector('#tJourney .jnow').textContent), null, { timeout: 15000 });
   assert.equal(await page.textContent('#tJourneyTitle'), 'Your way in · 07:44 to Manchester Piccadilly');
-  assert.match(await page.textContent('#tJourney'), /Leaves Stockport 07:44 · Manchester Piccadilly 07:55 · at work by 08:20/);
+  assert.match((await page.textContent('#tJourney .jsteps')).replace(/\s+/g, ' '), /Home 07:39 Stockport 07:44 Piccadilly 07:55 Work 08:20/);
+  assert.match((await page.textContent('#tCommute')).replace(/\s+/g, ' '), /^(Leave in \d+ min|Leave now) In for 08:30 07:44 · plat 1 › Piccadilly 07:55 › Work 08:20$/);
   assert.ok(await page.locator('#tJourney .jmap img').count() >= 2);
   await page.evaluate(() => document.body.classList.remove('chrome-on'));
   const l = await layout(page);
   assert.ok(l.sh <= l.ih, `Travel fits (${l.sh})`); assert.ok(l.sw <= l.iw); assert.deepEqual(l.small, []);
   await shot(page, 'tv-travel-journey');
+  // Today fits too, with a long destination and the price line wrapping
+  await page.evaluate(() => { location.hash = 'today'; }); await page.waitForTimeout(600);
+  await page.evaluate(() => document.body.classList.remove('chrome-on'));
+  const t = await layout(page);
+  assert.ok(t.sh <= t.ih, `Today fits (${t.sh})`); assert.deepEqual(t.small, []);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -887,10 +897,10 @@ test('location: the walk from where you are, work remembered, and an office day 
   ({ page, ctx, errors } = await open('/home.html', { width: 390, height: 844, at: TUESDAY_EARLY, settings: { ...COMMUTE, trainWalk: 30 }, withHelper: false, geo: NEAR_STATION }));
   await page.evaluate(() => localStorage.setItem('hse.useLocation', '1'));
   await page.reload(); await ready(page);
-  await page.waitForFunction(() => /With a \d+ minute walk from where you are/.test(document.body.textContent), null, { timeout: 15000 });
-  const walk = +(/With a (\d+) minute walk from where you are/.exec(await page.textContent('body'))[1]);
+  await page.waitForFunction(() => /A \d+ minute walk from where you are/.test(document.body.textContent), null, { timeout: 15000 });
+  const walk = +(/A (\d+) minute walk from where you are/.exec(await page.textContent('body'))[1]);
   assert.ok(walk >= 4 && walk <= 9, `about 400 m from the station: ${walk} minutes`);
-  assert.match(await page.textContent('.commute'), /Leave by \d\d:\d\d\.$/, 'leave from here, not from home');
+  assert.match((await page.textContent('.go')).replace(/\s+/g, ' '), /07:44 · plat 1/, 'the 07:44 can be made from here, though not with the usual 30 minute walk');
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -918,7 +928,7 @@ test('the way home: the phone tells the TV, sealed, and the TV follows the train
   assert.match(await tv.page.textContent('#dHeads'), /On the way home\s*On the 17:50[^]*home about 18:03/);
   await tv.page.evaluate(() => { location.hash = 'travel'; });
   await tv.page.waitForFunction(() => !document.getElementById('tJourneyCard').hidden && /^On the way home · 17:50 to Crewe/.test(document.getElementById('tJourneyTitle').textContent), null, { timeout: 15000 });
-  assert.match(await tv.page.textContent('#tJourney'), /home about 18:03/);
+  assert.match(await tv.page.textContent('#tJourney .jsteps'), /Home\s*18:03/);
   await shot(tv.page, 'tv-travel-trip');
   // stopping clears it on the TV
   await card.getByRole('button', { name: 'Stop telling the TV' }).click();
@@ -969,7 +979,7 @@ test('dashboard: Home shows the trains as the station sign does, and taps throug
   assert.match(text, /Calling at: Macclesfield, Stoke-on-Trent, Milton Keynes Central and London Euston\./);
   assert.match(text, /2nd\s*14:34\s*Buxton/);
   assert.match(text, /\d\d:\d\d:\d\d/, 'a clock with seconds');
-  assert.match(await page.locator('.card', { hasText: 'Trains from' }).textContent(), /1 sooner one leaves too soon to make/);
+  assert.match(await page.locator('.card', { hasText: 'Trains from' }).textContent(), /A 25 minute walk to the station; 1 sooner one leaves too soon\./);
   await sign.scrollIntoViewIfNeeded();
   await shot(page, 'home-board-platform');
   // tap: the departures board, the one you can't make dimmed
@@ -1095,6 +1105,39 @@ test('page shots', { skip: !process.env.PAGES }, async () => {
       if (SHOTS) await page.screenshot({ path: join(SHOTS, `page-${id}-${width}${process.env.ACCOUNT ? '-account' : ''}.png`), fullPage: true });
     }
     assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+// COMMUTE=1 SHOTS=1 (REAL_TILES=1 for the real map): every commute and map screen, for looking at by eye (skipped otherwise).
+test('commute shots', { skip: !process.env.COMMUTE }, async () => {
+  const morning = TUESDAY_EARLY, evening = new Date('2026-10-05T17:30:00+01:00'), set = { ...COMMUTE, tramStop: '' };
+  const snap = async (page, name, sel) => { if (sel){ const el = page.locator(sel).first(); await el.scrollIntoViewIfNeeded(); await page.waitForTimeout(1500); await el.screenshot({ path: join(SHOTS, name + '.png') }); } else { await page.waitForTimeout(1500); await page.screenshot({ path: join(SHOTS, name + '.png'), fullPage: true }); } };
+  for (const [w, h, tag] of [[390, 844, 'phone'], [1280, 900, 'laptop']]) {
+    for (const [at, when] of [[morning, 'am'], [evening, 'pm']]) {
+      const { page, ctx } = await open('/home.html', { width: w, height: h, at, settings: set, withHelper: false, geo: { latitude: 53.4089, longitude: -2.1625 } });
+      await page.evaluate(() => { localStorage.setItem('hse.useLocation', '1'); localStorage.setItem('hse.officeLog', JSON.stringify(['2026-09-29', '2026-10-01'])); });
+      await page.reload(); await ready(page); await page.waitForTimeout(4000);
+      if (tag === 'laptop') await snap(page, `c-${tag}-${when}-home`);
+      else for (const [sel, n] of [['.card:has(.dmx)', 'trains'], ['.card.journey', 'journey'], ['#gethome', 'gethome'], ['.card:has-text("Your commute this year")', 'stats']]) if (await page.locator(sel).count()) await snap(page, `c-${tag}-${when}-${n}`, sel);
+      await page.goto(`${base}/index.html`); await ready(page); await page.waitForTimeout(4000);
+      if (tag === 'laptop') await snap(page, `c-${tag}-${when}-now`);
+      else { await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(800); await page.screenshot({ path: join(SHOTS, `c-${tag}-${when}-now.png`) }); }
+      await ctx.close();
+    }
+    const { page, ctx } = await open('/settings.html', { width: w, height: h, at: morning, settings: set, withHelper: false });
+    await ready(page);
+    if (tag === 'laptop') await snap(page, `c-${tag}-settings`);
+    else { await snap(page, `c-${tag}-location`, '#location'); await snap(page, `c-${tag}-household`, '#household fieldset:has-text("Travel")'); }
+    await ctx.close();
+  }
+  for (const [at, when] of [[morning, 'am'], [evening, 'pm']]) {
+    const { page, ctx } = await open('/display.html#travel', { at, settings: set });
+    await page.waitForTimeout(5000); await page.evaluate(() => document.body.classList.remove('chrome-on'));
+    await snap(page, `c-tv-${when}-travel`);
+    await page.evaluate(() => { location.hash = 'today'; }); await page.waitForTimeout(2500);
+    await page.evaluate(() => document.body.classList.remove('chrome-on'));
+    await snap(page, `c-tv-${when}-today`);
     await ctx.close();
   }
 });

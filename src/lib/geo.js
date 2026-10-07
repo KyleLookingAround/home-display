@@ -6,7 +6,7 @@
 import { HOME, hhmm } from './format.js';
 import { ApiError, request } from './net.js';
 import { baseTile, BASE_CREDIT } from './outdoors.js';
-import { HUXLEY, atClock, boardTime, catchable, commuteTrain } from './household.js';
+import { HUXLEY, atClock, boardTime, catchable, commuteTrain, shortStation } from './household.js';
 
 /* ---------- distance ---------- */
 /** Great-circle distance in kilometres between two { lat, lon }. */
@@ -106,19 +106,19 @@ export function trainAt(stops, now, index){
   const span = Math.max(60e3, b.t - a.t), f = Math.max(0, Math.min(0.95, (now - a.t) / span));
   return { lat: pa.lat + (pb.lat - pa.lat) * f, lon: pa.lon + (pb.lon - pa.lon) * f, from: a, to: b, frac: f, late: lateAt(b), stops: s };
 }
-/** In words: "Between Heaton Chapel and Levenshulme, 2 min late", "At Stockport", "Not left Hazel Grove yet". */
-export function trainText(p){
+/** In words: "Between Heaton Chapel and Levenshulme, 2 min late", "At Stockport", "Not left Hazel Grove yet"; `bare` leaves out how late. */
+export function trainText(p, bare){
   if (!p) return '';
-  const late = p.late >= 1 ? ', ' + p.late + ' min late' : ', on time';
-  if (p.end) return 'Arrived at ' + p.at.name + (p.late >= 1 ? ', ' + p.late + ' min late' : '');
-  if (p.before) return 'Not left ' + p.at.name + ' yet' + (p.late >= 1 ? ', expected ' + p.late + ' min late' : '');
+  const late = bare ? '' : p.late >= 1 ? ', ' + p.late + ' min late' : ', on time';
+  if (p.end) return 'Arrived at ' + p.at.name + (p.late >= 1 && !bare ? ', ' + p.late + ' min late' : '');
+  if (p.before) return 'Not left ' + p.at.name + ' yet' + (p.late >= 1 && !bare ? ', expected ' + p.late + ' min late' : '');
   if (p.at) return 'At ' + p.at.name + late;
   return (p.frac < 0.25 ? 'Just left ' + p.from.name : p.frac > 0.75 ? 'Nearly at ' + p.to.name : 'Between ' + p.from.name + ' and ' + p.to.name) + late;
 }
 /** When the train is due at a station on its way ("Due at Stockport 18:01"), from its stops. */
 export function dueAt(p, crs){
   const x = p && p.stops ? p.stops.filter(s => s.crs === crs)[0] : null;
-  return x ? { t: x.t, done: x.done, text: (x.done ? 'At ' : 'Due at ') + x.name + ' ' + hhmm(x.t) } : null;
+  return x ? { t: x.t, done: x.done, name: x.name, text: (x.done ? 'At ' : 'Due at ') + x.name + ' ' + hhmm(x.t) } : null;
 }
 
 /** The train to show: once one has left with you on it, that one until it arrives; else the commute's, else the next. */
@@ -211,15 +211,32 @@ export function journeyView(pos, leg, index, home){
   stops.forEach(s => {
     const p = at(s.crs); if (!p) return;
     const ends = s.crs === onCrs || s.crs === offCrs, next = pos && pos.to && pos.to.crs === s.crs && stops.length > 2;
-    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, label: ends || next ? (index[s.crs] || s).name : '', right: s.crs === homeEnd ? true : undefined });   // home's label is on the left
+    places.push({ lat: p.lat, lon: p.lon, kind: 'station', major: ends, home: s.crs === homeEnd, label: ends || next ? (index[s.crs] || s).name : '' });   // home's station ringed in cyan
   });
-  if (home) places.push({ lat: home.lat, lon: home.lon, kind: 'home', label: 'Home', right: false });   // labelled to the left: home is a walk from the station
   if (pos && !pos.end) places.push({ lat: pos.lat, lon: pos.lon, kind: 'train' });
   const off = pos && offCrs ? dueAt(pos, offCrs) : null, board = pos ? pos.stops.filter(s => s.crs === onCrs)[0] || null : null;
-  return { places: places, route: stops.map(s => at(s.crs)).filter(Boolean), walks: home && at(homeEnd) ? [[home, at(homeEnd)]] : [],
-    fit: [at(onCrs), at(offCrs), home, pos && !pos.end ? pos : null].filter(Boolean), board: board, off: off,
+  return { places: places, route: stops.map(s => at(s.crs)).filter(Boolean), walks: [],
+    fit: [at(onCrs), at(offCrs), pos && !pos.end ? pos : null].concat(stops.map(s => at(s.crs))).filter(Boolean), board: board, off: off,
     there: off && (leg.work || leg.home) ? (leg.home ? 'home by ' : 'at work by ') + hhmm(off.t + (leg.after || 0) * 60e3) : '',
     title: leg.work ? 'Your way in' : leg.home ? 'Your way home' : 'Your next train' };
+}
+/**
+ * The journey as a line of stops, for the timeline under the map: where you set off (home, work or here), where you
+ * get on, where you get off and, on the commute, where you end up, each with its time and whether it's done; and
+ * `at`, how far along you are (1.5 is halfway between the second and third).
+ */
+export function journeySteps(j, pos, leg, now){
+  if (!j || !leg || !j.board || !j.off) return null;
+  const startAt = j.board.t - (leg.walk || 0) * 60e3, steps = [{ label: leg.walkHere ? 'Here' : leg.home ? 'Work' : 'Home', t: startAt, done: now >= startAt || j.board.done }];
+  steps.push({ label: shortStation(j.board.name), t: j.board.t, done: !!j.board.done });
+  steps.push({ label: shortStation(j.off.name), t: j.off.t, done: !!j.off.done });
+  if (leg.work || leg.home) steps.push({ label: leg.home ? 'Home' : 'Work', t: j.off.t + (leg.after || 0) * 60e3, done: false });
+  const frac = (a, b) => b.t > a.t ? Math.max(0, Math.min(1, (now - a.t) / (b.t - a.t))) : 0;
+  let at = 0;
+  if (!j.board.done) at = now < startAt ? 0 : frac(steps[0], steps[1]) * 0.98;
+  else if (!j.off.done) at = 1 + frac(steps[1], steps[2]) * 0.98;
+  else at = steps.length > 3 ? 2 + frac(steps[2], steps[3]) : 2;
+  return { steps: steps, at: at };
 }
 /** The lines under the map: where you get on and off, and when you're there. */
 export function journeyLines(j, pos){

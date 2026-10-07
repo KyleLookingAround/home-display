@@ -24,11 +24,11 @@
 
 <section class="card" id="location">
   <h2 class="label">Location</h2>
-  <label class="sw"><input type="checkbox" checked={where.on} onchange={e => useLocation(e.currentTarget.checked)}><span>Use this phone's location</span></label>
-  <p class="note">The walk to the train becomes the walk from where you are, and the phone notices when you're at work, so the day counts as an office day. It's only asked for while the app is open, and never leaves this phone, except sealed to your TV if you share your way home.</p>
+  <label class="opt"><input type="checkbox" checked={where.on} onchange={e => useLocation(e.currentTarget.checked)}>
+    <span class="txt"><b>Use this phone's location</b><span class="sub">Walk times from where you are, and noticing when you're at work. Only while the app is open; it stays on this phone.</span></span></label>
   {#if where.denied}<p class="note warn">Your browser has blocked location for this site. Allow it in the browser's settings for the site, then turn this on again.</p>{/if}
-  <label class="sw"><input type="checkbox" checked={auto} onchange={e => setAuto(e.currentTarget.checked)}><span>Tell the TV when I'm on my train home</span></label>
-  <p class="note">Once your train home leaves, the paired TV shows you're on your way and when you'll be in, followed from the train's live times. With location on, it shows where you are too. Sealed with the site PIN. You can also tap "Show the TV I'm on my way" under your journey.</p>
+  <label class="opt"><input type="checkbox" checked={auto} onchange={e => setAuto(e.currentTarget.checked)}>
+    <span class="txt"><b>Tell the TV when I'm on my train home</b><span class="sub">Once it leaves, the TV shows you're on your way and when you'll be in. Sealed with the site PIN.</span></span></label>
   {#if where.on}
     <div class="work">
       {#if where.office}
@@ -45,8 +45,12 @@
 </section>
 
 <style>
-  .sw{display:flex;align-items:center;gap:8px;font-weight:500;cursor:pointer;margin-bottom:var(--s2)}
-  .sw input{width:18px;height:18px;accent-color:var(--elec)}
+  .opt{display:flex;align-items:flex-start;gap:12px;padding:var(--s2) 0;cursor:pointer}
+  .opt + .opt{border-top:1px solid var(--line)}
+  .opt input{flex:none;width:20px;height:20px;margin-top:2px;accent-color:var(--elec)}
+  .txt{display:grid;gap:2px}
+  .txt b{font-weight:600}
+  .sub{font-size:13px;line-height:1.4;color:var(--muted)}
   .work{margin-top:var(--s3);padding-top:var(--s3);border-top:1px solid var(--line)}
   .work p{margin:0 0 var(--s2)}
   .actions{display:flex;flex-wrap:wrap;gap:var(--s2)}

@@ -438,6 +438,25 @@ export function commuteTrain(trains, now){
   }
   return { d: list[0], kind: 'next' };
 }
+/** A station's short name for a tight space: "Piccadilly" for Manchester Piccadilly. */
+export const shortStation = n => String(n || '').replace(/^Manchester (?=\w)/, '').replace(/ \(.*\)$/, '');
+/**
+ * The commute's answer, first, the same on the phone and the TV: what to do (`title`: "Leave by 07:38", or "Leave in
+ * 12 min", "Leave now", "Run for it" when it's close), why (`note`: "In for 09:00"), how it goes (`steps`: the train,
+ * where you get off, when you're there) and its `tone`: good, warn (soon) or bad (late, or a run).
+ */
+export function commuteAnswer(trains, now){
+  const c = commuteTrain(trains, now);
+  if (!c || !trains.leg || (!trains.leg.work && !trains.leg.home && !trains.leg.to)) return null;
+  const leg = trains.leg, d = c.d, a = arriveBy(d, leg), dep = d.exp || d.sched, l = leaveBy(dep, leg.walk, now);
+  const from = leg.walkHere ? '' : leg.home ? 'work ' : leg.work ? 'home ' : '';
+  const where = shortStation(trains.toName || leg.to);
+  const steps = [{ k: 'train', text: hhmm(d.sched) + (d.platform ? ' · plat ' + d.platform : '') }, { k: 'off', text: where + ' ' + hhmm(d.arr) }];
+  if (a && (leg.work || leg.home)) steps.push({ k: leg.home ? 'home' : 'work', text: (leg.home ? 'Home ' : 'Work ') + hhmm(a.t), late: a.late });
+  return { title: l.mins > 15 ? 'Leave ' + from + 'by ' + hhmm(dep - leg.walk * 60e3) : l.text, tone: c.kind === 'late' || (a && a.late) ? 'bad' : l.mins > 15 ? 'good' : l.cls,
+    note: c.kind === 'on' ? 'In for ' + hhmm(leg.start) : c.kind === 'late' ? 'Nothing gets you in for ' + hhmm(leg.start) : c.kind === 'after' ? 'After you finish at ' + hhmm(leg.end) : '',
+    steps: steps, kind: c.kind, train: d };
+}
 /** The trains card's title: "Trains to work", "Trains home", or "Trains from Stockport" (to Manchester Piccadilly). */
 export function trainsTitle(trains, s){
   const leg = trains && trains.leg, from = (trains && trains.station) || (leg ? leg.from : s.trainFrom), to = (trains && trains.toName) || (leg ? leg.to : s.trainTo);

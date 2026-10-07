@@ -158,5 +158,5 @@ Phone first, each opening with its answer ([docs/redesign.md](docs/redesign.md))
    - the remote control and the cockpit in every weather;
    - the Home Mini's rate budget;
    - the lock.
-4. `npm run shots` also saves screenshots to `tests/screens/`. Look at them. For the screensaver, `GALLERY=1 SHOTS=1 node --test --test-name-pattern=gallery tests/display.browser.mjs` saves one per scene (`GALLERY_LOOKS='phase=night&show=train|wx=snow'` to choose, `GALLERY_PHONE=1` for the phone too).
+4. `npm run shots` also saves screenshots to `tests/screens/`. Look at them. `COMMUTE=1 SHOTS=1 REAL_TILES=1 node --test --test-name-pattern="commute shots" tests/display.browser.mjs` shoots every commute and map screen with the real map tiles. For the screensaver, `GALLERY=1 SHOTS=1 node --test --test-name-pattern=gallery tests/display.browser.mjs` saves one per scene (`GALLERY_LOOKS='phase=night&show=train|wx=snow'` to choose, `GALLERY_PHONE=1` for the phone too).
 5. `npm run ci` runs all of it, as CI does.

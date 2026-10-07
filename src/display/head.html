@@ -104,6 +104,7 @@ h1,h2,h3{margin:0;font-weight:600}
 .verdict.big .big{font-size:2.6rem}
 .verdict .line{font-size:1.2rem;margin-top:.35rem}
 .verdict .note{margin-top:.2rem}
+#dVerdict .note{display:none}   /* Today: the tariff and region are in its footer already, and the room is needed */
 .glow-cheap{color:var(--cheap);text-shadow:0 0 1.2rem rgba(70,230,161,.45)} .glow-normal{color:var(--normal);text-shadow:0 0 1.2rem rgba(255,209,102,.4)}
 .glow-peak{color:var(--peak);text-shadow:0 0 1.2rem rgba(255,107,125,.45)} .glow-neg{color:var(--neg);text-shadow:0 0 1.2rem rgba(184,146,255,.5)}
 .wx{display:flex;align-items:center;text-align:right}
@@ -173,13 +174,38 @@ body.lite .dmx{text-shadow:none}
 .travel .solo{grid-column:1/-1}
 /* the journey map (mapHtml in board.js), beside the sign when there are no trams */
 .jmap{position:relative;overflow:hidden;border-radius:var(--radius-sm);border:1px solid var(--line);background:#0b0d16;margin-top:.5rem}
-.jmap img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.6) contrast(1.15)}
+.jmap img{position:absolute;width:256px;height:256px;max-width:none;filter:brightness(.75) contrast(1.1)}
 .jmap svg{position:absolute;left:0;top:0}
 .jmap .route{fill:none;stroke:var(--elec);stroke-width:5;stroke-linecap:round;stroke-linejoin:round}
 .jmap .glow{fill:none;stroke:rgba(255,181,71,.28);stroke-width:16;stroke-linecap:round;stroke-linejoin:round}
 .jmap .walk{fill:none;stroke:var(--gas);stroke-width:4;stroke-dasharray:3 10;stroke-linecap:round}
 .jmap .stn{fill:#0b0d16;stroke:var(--elec);stroke-width:3}
 .jmap .stn.big{stroke-width:4;fill:#1a1408}
+.jmap .home-ring{fill:rgba(79,214,255,.12);stroke:var(--gas);stroke-width:2.5}
+/* the journey as a line of stops (stepsHtml) */
+.jsteps{position:relative;margin:.7rem 0 0;padding:0;list-style:none;overflow:hidden}
+.jsteps .jstop{float:left;text-align:center;position:relative}
+.jtrack{position:absolute;top:.38rem;height:.15rem;border-radius:.1rem;background:var(--line-hot)}
+.jfill{position:absolute;left:0;top:0;bottom:0;background:var(--elec);box-shadow:0 0 .5rem rgba(255,181,71,.6)}
+.jhere{position:absolute;top:50%;width:1.1rem;height:1.1rem;margin:-.55rem 0 0 -.55rem;border-radius:50%;background:var(--elec);border:.18rem solid #04050d;box-shadow:0 0 0 .2rem rgba(255,181,71,.35),0 0 .9rem var(--elec)}
+.jstop .dot{display:block;width:.9rem;height:.9rem;margin:0 auto;border-radius:50%;background:#0b0d16;border:.12rem solid var(--line-hot);position:relative}
+.jstop.done .dot{border-color:var(--elec);background:#1a1408}
+.jstop.end .dot{border-color:var(--gas)}
+.jstop .nm{display:block;margin-top:.35rem;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 .2rem}
+.jstop .tm{display:block;font:500 1rem var(--f-mono);color:var(--muted)}
+.jstop.done .tm{color:var(--elec)}
+/* the commute's answer under the station sign (answerHtml) */
+.tgo{margin-top:.8rem;padding:.7rem .9rem;border-radius:var(--radius-sm);border:1px solid var(--line);border-left:.2rem solid var(--elec);background:rgba(255,181,71,.07)}
+.tgo.warn{border-left-color:var(--warn);background:rgba(255,209,102,.08)} .tgo.bad{border-left-color:var(--bad);background:rgba(255,107,125,.08)}
+.tgo .top{overflow:hidden}
+.tgo .big{font:700 1.6rem/1.2 var(--f-display);letter-spacing:.03em;text-transform:uppercase;color:var(--elec)}
+.tgo.warn .big{color:var(--warn)} .tgo.bad .big{color:var(--bad)}
+.tgo .why{float:right;font:500 1rem/2.2 var(--f-mono);color:var(--muted)}
+.tgo .chain{margin-top:.3rem;font:500 1.05rem var(--f-mono)}
+.tgo .sep{color:var(--muted);margin:0 .5rem}
+.tgo .st{white-space:nowrap}
+.tgo .st.work,.tgo .st.home{color:var(--gas)} .tgo .st.late{color:var(--bad)}
+.rows .ln{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jmap .home path{fill:none;stroke:var(--gas);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .jmap .train{fill:var(--elec);stroke:#04050d;stroke-width:3}
 .jmap .you{fill:var(--gas);stroke:#04050d;stroke-width:3}

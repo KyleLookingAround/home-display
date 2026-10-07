@@ -92,10 +92,11 @@ function renderJourney(now){
   $('#tJourneyTitle').textContent = j.title + ' · ' + hhmm(d.sched) + ' to ' + d.dest;
   // the map is redrawn only when the train has moved a pixel or two, so the pulse runs on
   const key = [w, pos ? pos.lat.toFixed(4) + pos.lon.toFixed(4) : '', j.route.length, j.places.length].join('|');
-  if (!box.querySelector('.jm')){ box.innerHTML = '<div class="jm"></div><p class="jnow"></p><div class="jl"></div>'; box.__key = ''; }
+  if (!box.querySelector('.jm')){ box.innerHTML = '<p class="jnow"></p><div class="jm"></div><div class="js"></div><div class="jl"></div>'; box.__key = ''; }
   if (box.__key !== key){ box.__key = key; box.querySelector('.jm').innerHTML = mapHtml(j, w, 470); }
   box.querySelector('.jnow').textContent = pos ? trainText(pos) : 'Finding where it is…';
-  const lines = trip ? [(j.off ? j.off.text : 'On the ' + hhmm(trip.sched)) + (j.there ? ' · ' + j.there : '')] : journeyLines(j, pos);
+  setHtml(box.querySelector('.js'), stepsHtml(journeySteps(j, pos, leg, now)));
+  const lines = trip && !j.off ? ['On the ' + hhmm(trip.sched) + (j.there ? ' · ' + j.there : '')] : [];
   setHtml(box.querySelector('.jl'), lines.concat(town ? [town.text] : []).map(l => `<p class="jline">${esc(l)}</p>`).join(''));
 }
 function due(s, now){
@@ -256,7 +257,7 @@ function renderToday(){
   else if (T){
     const caught = catchable(T.list, walk, now), rows = caught.list.slice(0, 3);
     tr = rows.length ? `<ul class="rows">${rows.map(d => { const lv = leaveBy(d.exp || d.sched, walk, now), late = d.exp && d.exp - d.sched >= 60e3, a = arriveBy(d, T.leg);
-      return `<li><span class="main"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}<span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
+      return `<li><span class="main"><span class="ln"><b class="mono">${hhmm(d.sched)}</b> ${esc(d.dest)}</span><span class="sub">${d.cancelled ? 'Cancelled' : d.delayed ? 'Delayed' : late ? 'Expected ' + hhmm(d.exp) : 'On time'}${d.platform ? ' · platform ' + esc(d.platform) : ''}</span></span><span class="side ${d.cancelled ? 'muted' : lv.cls}">${d.cancelled ? '—' : lv.text}${a && (T.leg.work || T.leg.home) ? `<span class="sub${a.late ? ' late' : ''}">${esc(a.text)}</span>` : ''}</span></li>`; }).join('')}</ul>` : `<p class="empty">${caught.missed ? `None you can make with a ${walk} minute walk in the next hour or so.` : 'No trains in the next couple of hours.'}</p>`;
   } else tr = `<p class="empty">${SRC.trains.err ? 'No departures signal, trying again' : 'Checking departures…'}</p>`;
   $('#dTrains').innerHTML = tr;
   // today and tomorrow: bins, then the calendar
@@ -268,7 +269,7 @@ function renderToday(){
   const moved = days.slice(0, 2).filter(d => d.bins[0].moved)[0];
   $('#dDay').innerHTML = rows.length ? `<ul class="rows">${rows.join('')}</ul>` + (moved ? `<p class="note">* A day later for ${esc(moved.bins[0].moved)}, probably.</p>` : !s.ical ? '<p class="note">Add your calendar on your phone to see what\'s on.</p>' : '') : '<p class="empty">Nothing on today or tomorrow.</p>';
   $('#dNow').innerHTML = nowStats(now);
-  $('#dFoot').innerHTML = `<span>Harold Street · region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
+  $('#dFoot').innerHTML = `<span>Harold Street · Agile, region ${region()}</span>` + foot(['agile', 'weather', 'trains', 'cal']);
 }
 
 function renderEnergy(){
@@ -307,10 +308,10 @@ function renderTravel(){
   const box = $('#tTrains');
   if (list){
     // the station's sign: the board, dimmed where it's too late to make it, and the platform sign for the next you can
-    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div><p class="note" id="tCommute"></p>';
+    if (!$('#tBoard')) box.innerHTML = '<div class="dmx deps-sign" id="tBoard"></div><div class="dmx plat-sign" id="tPlat"></div><div id="tCommute"></div>';
     const sign = signHtml(T.data, trainWalkOf(T.data, s), now);
     setHtml($('#tBoard'), sign.board); setHtml($('#tPlat'), sign.platform);
-    $('#tCommute').textContent = commuteLine(T.data, now);
+    setHtml($('#tCommute'), answerHtml(commuteAnswer(T.data, now)));
     tickSign(now);
   } else box.innerHTML = html;
   // Trams only show once a stop is set: TfGM needs a server that holds the key.
