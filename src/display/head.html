@@ -436,6 +436,12 @@ body.night #stars{opacity:.12}
 .field.wide{flex-basis:30rem}
 .field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 .field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.5em .6em;width:100%}
+.field select{-webkit-appearance:none;appearance:none;padding-right:2.4em;background-color:var(--card-2);background-image:linear-gradient(45deg,transparent 50%,var(--gas) 50%),linear-gradient(135deg,var(--gas) 50%,transparent 50%);background-position:calc(100% - 1.1em) 50%,calc(100% - .75em) 50%;background-size:.35em .35em,.35em .35em;background-repeat:no-repeat}
+/* on the remote, OK starts changing a choice and the arrows step through it (stepSelect in display.js) */
+.field{position:relative}
+.field.pick:after{content:"OK to change";position:absolute;right:.6rem;top:100%;margin-top:-.25rem;z-index:2;font:600 .9rem/1.2 var(--f-body);color:#04111a;background:var(--gas);border-radius:var(--radius-sm);padding:.15em .55em;white-space:nowrap}
+.field.editing:after{content:"\2039  \203A  to choose, then OK"}
+.field.editing select{border-color:var(--gas);box-shadow:0 0 0 .2rem rgba(79,214,255,.35)}
 .help{font-size:.9rem;color:var(--muted);margin:.3rem 0;max-width:62ch}
 .pair{font-size:1.1rem}
 .pair .code{font:700 1.8rem/1 var(--f-mono);letter-spacing:.18em;color:var(--gas);margin-left:.6rem}

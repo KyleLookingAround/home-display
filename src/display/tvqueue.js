@@ -59,7 +59,7 @@ function hqStart(){
   hqSet(queueFed(HQ.q, top.id, Date.now()));
   tmAct(sp => sp.play({ device: tmDevice(), uris: [top.uri] }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
-    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
+    return sp.devices().then(ds => { const d = bestDevice(playOn(ds, null)); if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
   }).catch(e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; }), 900);
 }
 /** Skipping with songs waiting in the house queue plays the next of them, not what Spotify would have played. */

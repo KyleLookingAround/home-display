@@ -181,6 +181,34 @@ function render(){
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
   else if (m === 'music') renderMusic();
+  fitScreen();
+}
+/*
+ * Fitting the screen. On a big screen everything is sized from one root size (about 27px at 1080p), but a TV's
+ * browser may zoom its text, keep a bar on screen, or not understand min(): then a view runs off the bottom and the
+ * toolbar wraps. After each render, the root size shrinks until the view (and the toolbar, on one row) fits the
+ * screen, and grows back when there's room. Phones scroll, as phones do.
+ */
+D.fit = 1;
+function toolbarWraps(){
+  const items = $$('#bar .btn, #picker [role="tab"]');
+  return items.length > 1 && items[items.length - 1].offsetTop > items[0].offsetTop + 4;
+}
+function fitScreen(){
+  const html = document.documentElement;
+  if (innerWidth < 1144){ if (html.style.fontSize){ html.style.fontSize = ''; D.fit = 1; } return; }
+  const base = Math.min(innerWidth * 0.014, innerHeight * 0.025);
+  const over = () => Math.max(html.scrollHeight / innerHeight, html.scrollWidth / innerWidth, toolbarWraps() ? 1.06 : 0);
+  let f = D.fit;
+  html.style.fontSize = (base * f).toFixed(2) + 'px';
+  for (let i = 0; i < 8; i++){
+    const o = over();
+    if (o > 1.0005 && f > 0.55) f = Math.max(0.55, f / o * 0.985);
+    else if (f < 1 && o < 0.94){ f = Math.min(1, f * 1.03); html.style.fontSize = (base * f).toFixed(2) + 'px'; if (over() > 1.0005){ f = f / 1.03; } html.style.fontSize = (base * f).toFixed(2) + 'px'; break; }
+    else break;
+    html.style.fontSize = (base * f).toFixed(2) + 'px';
+  }
+  if (f !== D.fit){ D.fit = f; if (shown() === 'screensaver' && typeof Cockpit !== 'undefined') Cockpit.resize(); }
 }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
@@ -501,13 +529,32 @@ function moveFocus(root, key){
 const isBack = e => ['Escape', 'GoBack', 'BrowserBack', 'XF86Back'].indexOf(e.key) >= 0 || e.keyCode === 10009 || e.keyCode === 461 || (e.key === 'Backspace' && !editable(e.target));
 const editable = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['checkbox', 'radio', 'button', 'submit'].indexOf(el.type) < 0));
 const COLOUR_KEYS = { 403: 'energy', 404: 'home', 405: 'travel', 406: 'screensaver', ColorF0Red: 'energy', ColorF1Green: 'home', ColorF2Yellow: 'travel', ColorF3Blue: 'screensaver' };
+/** The next (or previous) choice in a dropdown, as if picked from its list. */
+function stepSelect(sel, dir){
+  const n = sel.options.length; if (!n) return;
+  const i = Math.max(0, Math.min(n - 1, sel.selectedIndex + dir));
+  if (i === sel.selectedIndex) return;
+  sel.selectedIndex = i;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
 function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
+  tmWebWake();
   if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
   if (!open() && tmMediaKey(e)){ e.preventDefault(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
+    // a dropdown changes in place, since TV browsers often can't open its list: OK starts changing it, the arrows
+    // step through its choices, and OK or Back is done
+    const sel = e.target && e.target.tagName === 'SELECT' ? e.target : null, field = sel ? sel.parentNode : null;
+    if (sel && field.classList.contains('editing')){
+      e.preventDefault();
+      if (e.key === 'Enter' || isBack(e)) field.classList.remove('editing');
+      else if (/^Arrow/.test(e.key)) stepSelect(sel, e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+    if (sel && e.key === 'Enter'){ e.preventDefault(); field.classList.add('editing'); return; }
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
     if (/^Arrow/.test(e.key)){
       const t = e.target, txt = editable(t) && t.type !== 'date';
@@ -638,6 +685,8 @@ function wire(){
     try { navigator.clipboard.writeText(link).then(() => done(true), () => done(false)); } catch(e){ done(false); }
   });
   document.addEventListener('keydown', onKey);
+  // a dropdown in focus says that left and right change it
+  document.addEventListener('focusin', e => { $$('.field.pick').forEach(f => f.classList.remove('pick', 'editing')); if (e.target && e.target.tagName === 'SELECT' && e.target.parentNode.classList.contains('field')) e.target.parentNode.classList.add('pick'); });
   const wake = () => { D.lastInput = Date.now(); if (D.override && D.override !== D.mode){ D.override = null; applyMode(); return true; } return false; };
   let lastMove = 0;
   document.addEventListener('mousemove', () => { if (D.embed) return; const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });

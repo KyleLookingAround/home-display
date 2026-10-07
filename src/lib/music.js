@@ -57,11 +57,26 @@ export function deviceKind(type){
   if (/computer/.test(t)) return 'computer';
   return 'other';
 }
-/** The devices to offer, the one playing first, those that can't be controlled left out. */
+/** The wall display's own Spotify player (the Web Playback SDK in display.html), first choice to play on. */
+export const SCREEN_PLAYER = 'Harold Street TV';
+/**
+ * Where to play, best first: the wall display's own player, then speakers, computers and phones, and the TV's Spotify
+ * app last, since starting it takes the screen over from the display.
+ */
+const KIND_RANK = { screen: 0, speaker: 1, computer: 2, phone: 3, other: 4, tv: 5 };
+export const deviceRank = d => d.name === SCREEN_PLAYER ? 0 : KIND_RANK[d.kind] != null ? KIND_RANK[d.kind] : 4;
+/** The devices to offer, the one playing first, then best first (deviceRank); those that can't be controlled left out. */
 export function playOn(devices, current){
-  return (devices || []).filter(d => !d.is_restricted).map(d => ({ id: d.id, name: d.name, type: d.type, kind: deviceKind(d.type), active: !!d.is_active || (current && current.id === d.id), volume: d.volume_percent, canVolume: d.supports_volume !== false }))
-    .sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
+  return (devices || []).filter(d => !d.is_restricted).map(d => ({ id: d.id, name: d.name, type: d.type, kind: d.name === SCREEN_PLAYER ? 'screen' : deviceKind(d.type), active: !!d.is_active || (current && current.id === d.id), volume: d.volume_percent, canVolume: d.supports_volume !== false }))
+    .sort((a, b) => ((b.active ? 1 : 0) - (a.active ? 1 : 0)) || (deviceRank(a) - deviceRank(b)));
 }
+/** Where to start music when nothing is playing: the best device that isn't the TV's Spotify app, or null to ask. */
+export function bestDevice(devices){
+  const ok = (devices || []).filter(d => d.kind !== 'tv').sort((a, b) => deviceRank(a) - deviceRank(b));
+  return ok[0] || null;
+}
+/** Play on the device that's on now, unless it's the TV's Spotify app sitting idle: then somewhere better (bestDevice). */
+export const keepDevice = (model) => !!(model && model.device && (model.playing || deviceKind(model.device.type) !== 'tv'));
 /** A list from Spotify's paging object (or a plain list), with its rows' tracks unwrapped: { items, next, total }. */
 export function page(j, key){
   const p = key && j ? j[key] : j;

@@ -11,7 +11,8 @@ import { store } from './browser.js';
 export const SPOTIFY_AUTH = 'https://accounts.spotify.com';
 export const SPOTIFY_API = 'https://api.spotify.com/v1';
 export const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-modify-playback-state', 'user-read-currently-playing', 'user-read-recently-played',
-  'user-top-read', 'user-library-read', 'user-library-modify', 'playlist-read-private', 'playlist-read-collaborative', 'user-follow-read', 'user-read-private'];
+  'user-top-read', 'user-library-read', 'user-library-modify', 'playlist-read-private', 'playlist-read-collaborative', 'user-follow-read', 'user-read-private',
+  'streaming', 'user-read-email'];   // the last two let the wall display play music itself (the Web Playback SDK)
 
 export class SpotifyError extends Error {
   constructor(code, msg, status){ super(msg || code); this.code = code; this.status = status || 0; }

@@ -436,6 +436,12 @@ body.night #stars{opacity:.12}
 .field.wide{flex-basis:30rem}
 .field label{display:block;font-size:.9rem;font-weight:600;color:var(--muted);margin-bottom:.3rem}
 .field input,.field select{font:1rem/1.25 var(--f-body);color:var(--ink);background:var(--card-2);border:2px solid var(--line-hot);border-radius:var(--radius-sm);padding:.5em .6em;width:100%}
+.field select{-webkit-appearance:none;appearance:none;padding-right:2.4em;background-color:var(--card-2);background-image:linear-gradient(45deg,transparent 50%,var(--gas) 50%),linear-gradient(135deg,var(--gas) 50%,transparent 50%);background-position:calc(100% - 1.1em) 50%,calc(100% - .75em) 50%;background-size:.35em .35em,.35em .35em;background-repeat:no-repeat}
+/* on the remote, OK starts changing a choice and the arrows step through it (stepSelect in display.js) */
+.field{position:relative}
+.field.pick:after{content:"OK to change";position:absolute;right:.6rem;top:100%;margin-top:-.25rem;z-index:2;font:600 .9rem/1.2 var(--f-body);color:#04111a;background:var(--gas);border-radius:var(--radius-sm);padding:.15em .55em;white-space:nowrap}
+.field.editing:after{content:"\2039  \203A  to choose, then OK"}
+.field.editing select{border-color:var(--gas);box-shadow:0 0 0 .2rem rgba(79,214,255,.35)}
 .help{font-size:.9rem;color:var(--muted);margin:.3rem 0;max-width:62ch}
 .pair{font-size:1.1rem}
 .pair .code{font:700 1.8rem/1 var(--f-mono);letter-spacing:.18em;color:var(--gas);margin-left:.6rem}
@@ -2888,7 +2894,8 @@ function wifiCode(w){
 const SPOTIFY_AUTH = 'https://accounts.spotify.com';
 const SPOTIFY_API = 'https://api.spotify.com/v1';
 const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-modify-playback-state', 'user-read-currently-playing', 'user-read-recently-played',
-  'user-top-read', 'user-library-read', 'user-library-modify', 'playlist-read-private', 'playlist-read-collaborative', 'user-follow-read', 'user-read-private'];
+  'user-top-read', 'user-library-read', 'user-library-modify', 'playlist-read-private', 'playlist-read-collaborative', 'user-follow-read', 'user-read-private',
+  'streaming', 'user-read-email'];   // the last two let the wall display play music itself (the Web Playback SDK)
 
 class SpotifyError extends Error {
   constructor(code, msg, status){ super(msg || code); this.code = code; this.status = status || 0; }
@@ -3163,11 +3170,26 @@ function deviceKind(type){
   if (/computer/.test(t)) return 'computer';
   return 'other';
 }
-/** The devices to offer, the one playing first, those that can't be controlled left out. */
+/** The wall display's own Spotify player (the Web Playback SDK in display.html), first choice to play on. */
+const SCREEN_PLAYER = 'Harold Street TV';
+/**
+ * Where to play, best first: the wall display's own player, then speakers, computers and phones, and the TV's Spotify
+ * app last, since starting it takes the screen over from the display.
+ */
+const KIND_RANK = { screen: 0, speaker: 1, computer: 2, phone: 3, other: 4, tv: 5 };
+const deviceRank = d => d.name === SCREEN_PLAYER ? 0 : KIND_RANK[d.kind] != null ? KIND_RANK[d.kind] : 4;
+/** The devices to offer, the one playing first, then best first (deviceRank); those that can't be controlled left out. */
 function playOn(devices, current){
-  return (devices || []).filter(d => !d.is_restricted).map(d => ({ id: d.id, name: d.name, type: d.type, kind: deviceKind(d.type), active: !!d.is_active || (current && current.id === d.id), volume: d.volume_percent, canVolume: d.supports_volume !== false }))
-    .sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0));
+  return (devices || []).filter(d => !d.is_restricted).map(d => ({ id: d.id, name: d.name, type: d.type, kind: d.name === SCREEN_PLAYER ? 'screen' : deviceKind(d.type), active: !!d.is_active || (current && current.id === d.id), volume: d.volume_percent, canVolume: d.supports_volume !== false }))
+    .sort((a, b) => ((b.active ? 1 : 0) - (a.active ? 1 : 0)) || (deviceRank(a) - deviceRank(b)));
 }
+/** Where to start music when nothing is playing: the best device that isn't the TV's Spotify app, or null to ask. */
+function bestDevice(devices){
+  const ok = (devices || []).filter(d => d.kind !== 'tv').sort((a, b) => deviceRank(a) - deviceRank(b));
+  return ok[0] || null;
+}
+/** Play on the device that's on now, unless it's the TV's Spotify app sitting idle: then somewhere better (bestDevice). */
+const keepDevice = (model) => !!(model && model.device && (model.playing || deviceKind(model.device.type) !== 'tv'));
 /** A list from Spotify's paging object (or a plain list), with its rows' tracks unwrapped: { items, next, total }. */
 function page(j, key){
   const p = key && j ? j[key] : j;
@@ -5545,6 +5567,7 @@ const tmTrack = () => tmModel() ? tmModel().track : null;
 async function pollSpotify(){
   const sp = tmSp();
   if (!sp) return null;
+  tmWebStart();                             // this screen as a player of its own, once
   const m = playerModel(await sp.player(), Date.now());
   const id = m && m.track ? m.track.id : '';
   if (id !== TM.lastTrack){
@@ -5565,7 +5588,41 @@ async function tmAct(fn, after){
   catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
   tmSoon(after);
 }
-const tmDevice = () => tmModel() && tmModel().device ? tmModel().device.id : null;
+/** Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own player. */
+const tmDevice = () => { const m = tmModel(); return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null); };
+
+/* ---------- this screen as a Spotify player of its own (Spotify's Web Playback SDK) ---------- */
+// So music plays here, through the TV's speakers, and Spotify's own app never takes the screen over. It needs
+// Premium, a sign-in with the "streaming" permission (TV sign-ins from October 2026 have it) and a browser that can
+// play protected audio; without them the screen says why, and music plays on the best other device (bestDevice).
+const WEB = { player: null, id: '', err: '', loading: false, woke: false };
+function tmWebStart(){
+  if (WEB.loading || D.embed || !TM.acc || !/^https:$/.test(location.protocol)) return;
+  if (!navigator.requestMediaKeySystemAccess || typeof Promise === 'undefined'){ WEB.err = 'This TV\'s browser can\'t play Spotify itself'; return; }
+  WEB.loading = true;
+  const cant = msg => { WEB.err = msg; WEB.id = ''; render(); };
+  window.onSpotifyWebPlaybackSDKReady = function(){
+    try {
+      const p = new window.Spotify.Player({ name: SCREEN_PLAYER, volume: 0.7,
+        getOAuthToken: function(cb){ const a = TM.acc; if (!a) return cb(''); accessToken(a, a.client).then(cb, function(){ cb(''); }); } });
+      p.addListener('ready', function(e){ WEB.id = e.device_id; WEB.err = ''; render(); });
+      p.addListener('not_ready', function(){ WEB.id = ''; });
+      p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
+      p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
+      p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      p.connect();
+      WEB.player = p;
+    } catch(e){ cant('This TV\'s browser can\'t play Spotify itself'); }
+  };
+  const s = document.createElement('script');
+  s.src = 'https://sdk.scdn.co/spotify-player.js'; s.async = true;
+  s.onerror = function(){ WEB.loading = false; cant('Spotify\'s player didn\'t load'); };
+  document.head.appendChild(s);
+}
+/** Browsers only let a page make sound after someone presses something: the first key on the remote does it. */
+function tmWebWake(){ if (WEB.player && !WEB.woke && WEB.player.activateElement){ WEB.woke = true; try { WEB.player.activateElement(); } catch(e){} } }
+/** Where music plays, for the foot of the Music view. */
+const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
   const m = tmModel();
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
@@ -5584,7 +5641,7 @@ function tmFavourite(i){
 function tmPlayContext(uri){
   tmAct(sp => sp.play({ device: tmDevice(), context: uri }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
-    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: uri }); });
+    return sp.devices().then(ds => { const d = bestDevice(playOn(ds, null)); if (!d) throw e; return sp.play({ device: d.id, context: uri }); });
   }), 900);
 }
 /** Weather radio (0 on the remote): a playlist for the weather and the time of the week (src/lib/discover.js). */
@@ -5700,7 +5757,7 @@ function renderMusic(){
       : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, ' : 'Play on any Spotify device, or press ') + '0 for weather radio: ' + esc(weatherMood(SRC.weather.data && SRC.weather.data.now, Date.now()).title.toLowerCase()) + '.') + '</p>'
       + (waiting ? '<div class="m-next">' + hqNextHtml() + '</div>' : tmFavsHtml() + tmWallHtml()) + '</div>' + (HQ.party ? '<aside class="m-party">' + hqPartyHtml() + '</aside>' : ''));
     $('#mEmpty').className = 'm-empty' + (HQ.party ? ' with-party' : '');
-    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
+    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + (tmWhere() ? ' · ' + esc(tmWhere()) : '') + '</span>'; return;
   }
   const art = artUrl(t.images, 640);
   if ($('#mCover').getAttribute('src') !== art){ $('#mCover').setAttribute('src', art); $('#mNeb').setAttribute('src', artUrl(t.images, 300)); }
@@ -5776,6 +5833,8 @@ function tmTodayHtml(){
 function tmTake(acc){
   rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
+  // a new sign-in may bring the permission to play here: start this screen's player again with it
+  if (WEB.player){ try { WEB.player.disconnect(); } catch(e){} WEB.player = null; WEB.id = ''; WEB.err = ''; if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady(); }
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
 }
 /* ===================== display: the house queue, parties and who's listening (src/lib/queue.js) ===================== */
@@ -5839,7 +5898,7 @@ function hqStart(){
   hqSet(queueFed(HQ.q, top.id, Date.now()));
   tmAct(sp => sp.play({ device: tmDevice(), uris: [top.uri] }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
-    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
+    return sp.devices().then(ds => { const d = bestDevice(playOn(ds, null)); if (!d) throw e; return sp.play({ device: d.id, uris: [top.uri] }); });
   }).catch(e => { hqSet(queueFed(HQ.q, top.id, 0)); throw e; }), 900);
 }
 /** Skipping with songs waiting in the house queue plays the next of them, not what Spotify would have played. */
@@ -6114,6 +6173,34 @@ function render(){
   else if (m === 'screensaver') renderSaver();
   else if (m === 'night') renderNight();
   else if (m === 'music') renderMusic();
+  fitScreen();
+}
+/*
+ * Fitting the screen. On a big screen everything is sized from one root size (about 27px at 1080p), but a TV's
+ * browser may zoom its text, keep a bar on screen, or not understand min(): then a view runs off the bottom and the
+ * toolbar wraps. After each render, the root size shrinks until the view (and the toolbar, on one row) fits the
+ * screen, and grows back when there's room. Phones scroll, as phones do.
+ */
+D.fit = 1;
+function toolbarWraps(){
+  const items = $$('#bar .btn, #picker [role="tab"]');
+  return items.length > 1 && items[items.length - 1].offsetTop > items[0].offsetTop + 4;
+}
+function fitScreen(){
+  const html = document.documentElement;
+  if (innerWidth < 1144){ if (html.style.fontSize){ html.style.fontSize = ''; D.fit = 1; } return; }
+  const base = Math.min(innerWidth * 0.014, innerHeight * 0.025);
+  const over = () => Math.max(html.scrollHeight / innerHeight, html.scrollWidth / innerWidth, toolbarWraps() ? 1.06 : 0);
+  let f = D.fit;
+  html.style.fontSize = (base * f).toFixed(2) + 'px';
+  for (let i = 0; i < 8; i++){
+    const o = over();
+    if (o > 1.0005 && f > 0.55) f = Math.max(0.55, f / o * 0.985);
+    else if (f < 1 && o < 0.94){ f = Math.min(1, f * 1.03); html.style.fontSize = (base * f).toFixed(2) + 'px'; if (over() > 1.0005){ f = f / 1.03; } html.style.fontSize = (base * f).toFixed(2) + 'px'; break; }
+    else break;
+    html.style.fontSize = (base * f).toFixed(2) + 'px';
+  }
+  if (f !== D.fit){ D.fit = f; if (shown() === 'screensaver' && typeof Cockpit !== 'undefined') Cockpit.resize(); }
 }
 function agileNow(now){ const a = SRC.agile.data; return a ? a.filter(r => r.from <= now && now < r.to)[0] || null : null; }
 function foot(keys){
@@ -6434,13 +6521,32 @@ function moveFocus(root, key){
 const isBack = e => ['Escape', 'GoBack', 'BrowserBack', 'XF86Back'].indexOf(e.key) >= 0 || e.keyCode === 10009 || e.keyCode === 461 || (e.key === 'Backspace' && !editable(e.target));
 const editable = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['checkbox', 'radio', 'button', 'submit'].indexOf(el.type) < 0));
 const COLOUR_KEYS = { 403: 'energy', 404: 'home', 405: 'travel', 406: 'screensaver', ColorF0Red: 'energy', ColorF1Green: 'home', ColorF2Yellow: 'travel', ColorF3Blue: 'screensaver' };
+/** The next (or previous) choice in a dropdown, as if picked from its list. */
+function stepSelect(sel, dir){
+  const n = sel.options.length; if (!n) return;
+  const i = Math.max(0, Math.min(n - 1, sel.selectedIndex + dir));
+  if (i === sel.selectedIndex) return;
+  sel.selectedIndex = i;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
 function onKey(e){
   const woke = !!D.override && D.override !== D.mode;
   D.lastInput = Date.now();
+  tmWebWake();
   if (wifiOpen()){ e.preventDefault(); hideWifi(); return; }
   if (!open() && tmMediaKey(e)){ e.preventDefault(); return; }
   if (woke){ D.override = null; applyMode(); e.preventDefault(); return; }
   if (open()){
+    // a dropdown changes in place, since TV browsers often can't open its list: OK starts changing it, the arrows
+    // step through its choices, and OK or Back is done
+    const sel = e.target && e.target.tagName === 'SELECT' ? e.target : null, field = sel ? sel.parentNode : null;
+    if (sel && field.classList.contains('editing')){
+      e.preventDefault();
+      if (e.key === 'Enter' || isBack(e)) field.classList.remove('editing');
+      else if (/^Arrow/.test(e.key)) stepSelect(sel, e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1);
+      return;
+    }
+    if (sel && e.key === 'Enter'){ e.preventDefault(); field.classList.add('editing'); return; }
     if (isBack(e)){ e.preventDefault(); closeSheet(); return; }
     if (/^Arrow/.test(e.key)){
       const t = e.target, txt = editable(t) && t.type !== 'date';
@@ -6571,6 +6677,8 @@ function wire(){
     try { navigator.clipboard.writeText(link).then(() => done(true), () => done(false)); } catch(e){ done(false); }
   });
   document.addEventListener('keydown', onKey);
+  // a dropdown in focus says that left and right change it
+  document.addEventListener('focusin', e => { $$('.field.pick').forEach(f => f.classList.remove('pick', 'editing')); if (e.target && e.target.tagName === 'SELECT' && e.target.parentNode.classList.contains('field')) e.target.parentNode.classList.add('pick'); });
   const wake = () => { D.lastInput = Date.now(); if (D.override && D.override !== D.mode){ D.override = null; applyMode(); return true; } return false; };
   let lastMove = 0;
   document.addEventListener('mousemove', () => { if (D.embed) return; const n = Date.now(); if (n - lastMove < 300) return; lastMove = n; if (!wake() && !open()) showChrome(); });

@@ -4,6 +4,10 @@ Newest first. **Creation**, **Update**, **Finding** or **Deprecation**.
 
 ## 2026-10-07
 
+- **Finding**: from photos of the TV, three things.
+  - Every view ran off the bottom of the TV and the toolbar wrapped onto two rows: the TV's browser gives the page less room than a true 1920 by 1080 (or zooms its text, or doesn't know `min()`). After each render the display now shrinks its root size until the view, and the toolbar on one row, fit the screen, and grows back when there's room (`fitScreen` in display.js). A test checks a TV with a browser bar, 720p and 16:10.
+  - The dropdowns in the TV's settings couldn't be changed with the remote: left and right only moved on, and OK tried to open a list the TV can't show. Now OK starts changing a dropdown, the arrows step through its choices in place, and OK or Back is done; a tag under it says which (`stepSelect`).
+  - Playing anything from the phone's Music tab started it on the TV's own Spotify app, which takes the screen over. The display now plays music itself as "Harold Street TV" where the TV's browser can, and music is never started on the TV's app by itself ([decision 0016](decisions/0016-playing-on-the-wall-display.md)). Sign the TV in to Spotify again from the phone once (Screen, Spotify on the TV) for the new permission.
 - **Update**: a design pass over the commute and the maps, phone, laptop and TV.
   - The commute's answer comes first, above the station sign: "Leave by 07:38" (or "Leave in 4 min", "Run for it", in red when you'd be late), why ("In for 08:30"), and the train, where you get off and when you're at work or home (`commuteAnswer`). The same block sits under the sign on the TV's Travel.
   - The journey card opens with where the train is, with its time, platform and lateness in a pill, then the map, then a line of stops with their times and a marker for where you are now (`journeySteps`; `JourneySteps.svelte`, `stepsHtml` on the TV).

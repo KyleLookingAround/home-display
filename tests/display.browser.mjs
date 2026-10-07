@@ -252,6 +252,52 @@ test('display: every mode fits a 1080p TV, with 24px text and no sideways scroll
   }
 });
 
+test('display: every view fits a TV whatever its browser leaves of the screen, with the toolbar on one row', async () => {
+  // a TV browser with a bar at the top, a 720p screen, a 16:10 one, and a TV whose text comes out larger than asked
+  for (const [width, height, zoom] of [[1920, 940, 1], [1280, 720, 1], [1680, 1050, 1], [1920, 1080, 1.2]]) {
+    const { page, ctx, errors } = await open('/display.html#today', { width, height, settings: { ...COMMUTE, tramStop: '' }, at: TUESDAY_EARLY });
+    if (zoom !== 1) await page.addStyleTag({ content: `body *{font-size-adjust:none} .mode{font-size:${zoom}em}` });
+    for (const m of ['today', 'energy', 'travel', 'music', 'night']) {
+      await page.evaluate(id => { location.hash = id; }, m);
+      await page.waitForTimeout(700);
+      await page.evaluate(() => { document.body.classList.add('chrome-on'); window.dispatchEvent(new Event('resize')); });
+      await page.waitForTimeout(500);
+      if (zoom === 1) await shot(page, `tv-fit-${width}x${height}-${m}`);
+      const r = await page.evaluate(() => ({ sh: document.documentElement.scrollHeight, ih: innerHeight, sw: document.documentElement.scrollWidth, iw: innerWidth,
+        wraps: (() => { const b = [...document.querySelectorAll('#bar .btn, #picker [role="tab"]')]; return b[b.length - 1].offsetTop > b[0].offsetTop + 4; })() }));
+      assert.ok(r.sh <= r.ih + 1, `${m} at ${width}x${height}${zoom !== 1 ? ' zoomed' : ''}: taller than the screen (${r.sh} > ${r.ih})`);
+      assert.ok(r.sw <= r.iw + 1, `${m} at ${width}x${height}: wider than the screen`);
+      assert.equal(r.wraps, false, `${m} at ${width}x${height}: the toolbar wraps`);
+    }
+    assert.deepEqual(errors, []);
+    await ctx.close();
+  }
+});
+
+test('display: the choices in the settings sheet change with the remote', async () => {
+  const { page, ctx, errors } = await open('/display.html#today');
+  await page.keyboard.press('Enter'); await page.click('#setBtn'); await page.waitForSelector('#sheet:not([hidden])');
+  await page.focus('#fRotate');
+  assert.equal(await page.inputValue('#fRotate'), '0');
+  const cls = () => page.evaluate(() => document.getElementById('fRotate').parentNode.className);
+  assert.match(await cls(), /\bpick\b/, 'it says OK changes it');
+  await page.keyboard.press('Enter');
+  assert.match(await cls(), /\bediting\b/);
+  await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowDown');
+  assert.equal(await page.inputValue('#fRotate'), '2', 'right and down: the next choices');
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.inputValue('#fRotate'), '1', 'left: back one');
+  await shot(page, 'tv-settings-choosing');
+  await page.keyboard.press('Backspace');
+  assert.equal(await page.isVisible('#sheet'), true, 'Back is done changing, not closing the settings');
+  assert.doesNotMatch(await cls(), /\bediting\b/);
+  assert.equal(await page.inputValue('#fRotate'), '1', 'kept');
+  await page.keyboard.press('ArrowDown');
+  assert.notEqual(await page.evaluate(() => document.activeElement.id), 'fRotate', 'the arrows move on again');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
 test('display: content on the TV is real data, labelled examples only where nothing is set up', async () => {
   const { page, ctx } = await open('/display.html#today');
   await page.waitForTimeout(800);

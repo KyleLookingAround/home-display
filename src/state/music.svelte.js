@@ -6,7 +6,7 @@
  */
 import { store } from '../lib/browser.js';
 import { spotify, spotifyStore, saveSpotifyStore, activeAccount, forgetAccount, spotifyErrorText } from '../lib/spotify.js';
-import { playerModel, progressAt, playOn, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
+import { playerModel, progressAt, playOn, bestDevice, keepDevice, loadLyrics, coverColours, artUrl, trackOf, contextLabel } from '../lib/music.js';
 import { songStory, linerNotes } from '../lib/musicdata.js';
 import { cacheGet, cacheSet } from './cache.js';
 import { tv, tvQueue, tvSend } from './tv.svelte.js';
@@ -241,17 +241,20 @@ export function transfer(d){
   say('Playing on ' + d.name);
   return act(() => sp().transfer(d.id, true), 1200);
 }
-/** Plays a list of songs (uris), from one of them; or an album or playlist (context), from a song in it. */
+/**
+ * Plays a list of songs (uris), from one of them; or an album or playlist (context), from a song in it. On the
+ * device that's on now; but never the TV's own Spotify app unless it's already playing, since starting it takes the
+ * screen over from the wall display: then the display's own player, a speaker or this phone (bestDevice), or ask.
+ */
 export function play(o){
   return act(async () => {
-    try { await sp().play(Object.assign({ device: device() }, o)); }
-    catch (e){
-      // Nothing is active: start on the last device Spotify knows, if there is one.
-      if (e.code !== 'NO_DEVICE') throw e;
-      const ds = playOn(await sp().devices(), null);
-      if (!ds.length) throw e;
-      await sp().play(Object.assign({}, o, { device: ds[0].id }));
+    let id = keepDevice(music.player) ? device() : null;
+    if (!id){
+      const ds = playOn(await sp().devices(), music.player && music.player.device), best = bestDevice(ds);
+      if (!best){ music.devices = ds; music.picker = true; say(ds.length ? 'Choose where to play.' : 'Open Spotify on a speaker or this phone, then try again.'); return; }
+      id = best.id;
     }
+    await sp().play(Object.assign({}, o, { device: id }));
   }, 700);
 }
 export async function addToQueue(t){

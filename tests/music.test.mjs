@@ -132,3 +132,21 @@ test('the screensaver shows the song playing, or the album wall when nothing is'
   assert.deepEqual(M.musicCards(paused, albums.slice(0, 3), 0).map(x => x.id), ['album-a1'], 'no wall with fewer than six');
   assert.deepEqual(M.musicCards(null, null, 0), []);
 });
+
+test('where to play: never the TV\'s own Spotify app by itself, the wall display\'s player first', () => {
+  const raw = [{ id: 'tv', name: 'Living room TV', type: 'TV' }, { id: 'ph', name: 'Kyle\'s phone', type: 'Smartphone' }, { id: 'g', name: 'Kitchen speaker', type: 'Speaker' },
+    { id: 'hs', name: M.SCREEN_PLAYER, type: 'Computer' }];
+  const ds = M.playOn(raw);
+  assert.deepEqual(ds.map(d => d.id), ['hs', 'g', 'ph', 'tv'], 'the screen\'s player, a speaker, the phone, the TV app last');
+  assert.equal(ds[0].kind, 'screen');
+  assert.equal(M.bestDevice(ds).id, 'hs');
+  assert.equal(M.bestDevice(M.playOn(raw.slice(0, 2))).id, 'ph', 'without the screen or a speaker, the phone');
+  assert.equal(M.bestDevice(M.playOn([raw[0]])), null, 'only the TV app: ask rather than start it');
+  assert.equal(M.playOn([raw[1], Object.assign({}, raw[0], { is_active: true })])[0].id, 'tv', 'the one playing stays first');
+  const model = (type, playing) => ({ playing, device: { id: 'x', type } });
+  assert.equal(M.keepDevice(model('TV', true)), true, 'already playing on the TV app: carry on there');
+  assert.equal(M.keepDevice(model('TV', false)), false, 'idle on the TV app: play somewhere else');
+  assert.equal(M.keepDevice(model('Speaker', false)), true);
+  assert.equal(M.keepDevice(null), false);
+  assert.ok(S.SPOTIFY_SCOPES.includes('streaming'), 'sign-ins can play on the wall display');
+});

@@ -17,3 +17,4 @@
 | [0013](0013-house-queue.md) | A house queue the TV keeps and feeds to Spotify a song ahead; parties guests join with a code on a page outside the lock; each person's own Spotify |
 | [0014](0014-finding-music.md) | Finding music without Spotify's recommendations: ListenBrainz (and Last.fm), new releases, Ticketmaster gigs with the key on the phone, a weather radio, and a listening log kept on the phone |
 | [0015](0015-maps-and-location.md) | Maps, location and distance: a train placed between stations from its live times, an open station list, our own map on CARTO's tiles, and location kept on the phone (sealed to the TV) |
+| [0016](0016-playing-on-the-wall-display.md) | Playing music on the wall display itself (Spotify's Web Playback SDK, "Harold Street TV"), and never starting the TV's Spotify app by itself |

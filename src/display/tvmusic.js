@@ -21,6 +21,7 @@ const tmTrack = () => tmModel() ? tmModel().track : null;
 async function pollSpotify(){
   const sp = tmSp();
   if (!sp) return null;
+  tmWebStart();                             // this screen as a player of its own, once
   const m = playerModel(await sp.player(), Date.now());
   const id = m && m.track ? m.track.id : '';
   if (id !== TM.lastTrack){
@@ -41,7 +42,41 @@ async function tmAct(fn, after){
   catch(e){ const t = spotifyErrorText(e); toast(t[0] + ' ' + t[1], 6000); }
   tmSoon(after);
 }
-const tmDevice = () => tmModel() && tmModel().device ? tmModel().device.id : null;
+/** Where commands go: the device that's on now, unless it's the TV's Spotify app sitting idle; then this screen's own player. */
+const tmDevice = () => { const m = tmModel(); return keepDevice(m) ? m.device.id : WEB.id || (m && m.device ? m.device.id : null); };
+
+/* ---------- this screen as a Spotify player of its own (Spotify's Web Playback SDK) ---------- */
+// So music plays here, through the TV's speakers, and Spotify's own app never takes the screen over. It needs
+// Premium, a sign-in with the "streaming" permission (TV sign-ins from October 2026 have it) and a browser that can
+// play protected audio; without them the screen says why, and music plays on the best other device (bestDevice).
+const WEB = { player: null, id: '', err: '', loading: false, woke: false };
+function tmWebStart(){
+  if (WEB.loading || D.embed || !TM.acc || !/^https:$/.test(location.protocol)) return;
+  if (!navigator.requestMediaKeySystemAccess || typeof Promise === 'undefined'){ WEB.err = 'This TV\'s browser can\'t play Spotify itself'; return; }
+  WEB.loading = true;
+  const cant = msg => { WEB.err = msg; WEB.id = ''; render(); };
+  window.onSpotifyWebPlaybackSDKReady = function(){
+    try {
+      const p = new window.Spotify.Player({ name: SCREEN_PLAYER, volume: 0.7,
+        getOAuthToken: function(cb){ const a = TM.acc; if (!a) return cb(''); accessToken(a, a.client).then(cb, function(){ cb(''); }); } });
+      p.addListener('ready', function(e){ WEB.id = e.device_id; WEB.err = ''; render(); });
+      p.addListener('not_ready', function(){ WEB.id = ''; });
+      p.addListener('initialization_error', function(){ cant('This TV\'s browser can\'t play Spotify itself'); });
+      p.addListener('authentication_error', function(){ cant('Sign the TV in to Spotify again on your phone to play on this screen'); });
+      p.addListener('account_error', function(){ cant('Playing on this screen needs Spotify Premium'); });
+      p.connect();
+      WEB.player = p;
+    } catch(e){ cant('This TV\'s browser can\'t play Spotify itself'); }
+  };
+  const s = document.createElement('script');
+  s.src = 'https://sdk.scdn.co/spotify-player.js'; s.async = true;
+  s.onerror = function(){ WEB.loading = false; cant('Spotify\'s player didn\'t load'); };
+  document.head.appendChild(s);
+}
+/** Browsers only let a page make sound after someone presses something: the first key on the remote does it. */
+function tmWebWake(){ if (WEB.player && !WEB.woke && WEB.player.activateElement){ WEB.woke = true; try { WEB.player.activateElement(); } catch(e){} } }
+/** Where music plays, for the foot of the Music view. */
+const tmWhere = () => WEB.id ? 'plays on this screen' : WEB.err ? WEB.err.charAt(0).toLowerCase() + WEB.err.slice(1) : '';
 function tmToggle(){
   const m = tmModel();
   if (m){ SRC.music.data = Object.assign({}, m, { playing: !m.playing, progress: progressAt(m, Date.now()), at: Date.now() }); render(); }
@@ -60,7 +95,7 @@ function tmFavourite(i){
 function tmPlayContext(uri){
   tmAct(sp => sp.play({ device: tmDevice(), context: uri }).catch(e => {
     if (e.code !== 'NO_DEVICE') throw e;
-    return sp.devices().then(ds => { const d = playOn(ds, null)[0]; if (!d) throw e; return sp.play({ device: d.id, context: uri }); });
+    return sp.devices().then(ds => { const d = bestDevice(playOn(ds, null)); if (!d) throw e; return sp.play({ device: d.id, context: uri }); });
   }), 900);
 }
 /** Weather radio (0 on the remote): a playlist for the weather and the time of the week (src/lib/discover.js). */
@@ -176,7 +211,7 @@ function renderMusic(){
       : (tmFavs().length ? 'Press ' + (tmFavs().length > 1 ? '1 to ' + tmFavs().length : '1') + ' for a favourite, ' : 'Play on any Spotify device, or press ') + '0 for weather radio: ' + esc(weatherMood(SRC.weather.data && SRC.weather.data.now, Date.now()).title.toLowerCase()) + '.') + '</p>'
       + (waiting ? '<div class="m-next">' + hqNextHtml() + '</div>' : tmFavsHtml() + tmWallHtml()) + '</div>' + (HQ.party ? '<aside class="m-party">' + hqPartyHtml() + '</aside>' : ''));
     $('#mEmpty').className = 'm-empty' + (HQ.party ? ' with-party' : '');
-    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + '</span>'; return;
+    $('#mFoot').innerHTML = '<span>' + (TM.acc.name ? 'Spotify · ' + esc(TM.acc.name) : 'Spotify') + (tmWhere() ? ' · ' + esc(tmWhere()) : '') + '</span>'; return;
   }
   const art = artUrl(t.images, 640);
   if ($('#mCover').getAttribute('src') !== art){ $('#mCover').setAttribute('src', art); $('#mNeb').setAttribute('src', artUrl(t.images, 300)); }
@@ -252,5 +287,7 @@ function tmTodayHtml(){
 function tmTake(acc){
   rememberAccount(acc);                     // alongside anyone already here, and listening as them
   TM.acc = acc; TM.lastTrack = '';
+  // a new sign-in may bring the permission to play here: start this screen's player again with it
+  if (WEB.player){ try { WEB.player.disconnect(); } catch(e){} WEB.player = null; WEB.id = ''; WEB.err = ''; if (window.Spotify && window.onSpotifyWebPlaybackSDKReady) window.onSpotifyWebPlaybackSDKReady(); }
   ['music', 'shelf'].forEach(k => { SRC[k].data = null; SRC[k].err = null; SRC[k].last = 0; SRC[k].fails = 0; });
 }
